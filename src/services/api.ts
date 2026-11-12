@@ -436,10 +436,22 @@ export const api = {
 
     const sanitized = sanitizeForFirestore(preparedData);
 
+    // Client must not overwrite server-owned terminal statuses (paid/rejected)
+    const terminalStatus =
+      sanitized.status === 'paid' || sanitized.status === 'rejected';
+    const remotePayload = { ...sanitized };
+    if (terminalStatus) {
+      delete remotePayload.status;
+    }
+
     // Sync to Firebase Realtime Database
     if (isFirebaseConfigured() && rtdb) {
       try {
-        await rtdbSet(rtdbRef(rtdb, `invitations/${preparedData.id}`), sanitized);
+        if (terminalStatus) {
+          await rtdbUpdate(rtdbRef(rtdb, `invitations/${preparedData.id}`), remotePayload);
+        } else {
+          await rtdbSet(rtdbRef(rtdb, `invitations/${preparedData.id}`), sanitized);
+        }
       } catch (err) {
         console.warn('RTDB saveInvitation error:', err);
       }
@@ -448,7 +460,14 @@ export const api = {
     // Sync to Firestore
     if (isFirebaseConfigured() && db) {
       try {
-        await safeFirestore(setDoc(doc(db, 'invitations', preparedData.id), sanitized), 8000);
+        if (terminalStatus) {
+          await safeFirestore(
+            updateDoc(doc(db, 'invitations', preparedData.id), remotePayload),
+            8000
+          );
+        } else {
+          await safeFirestore(setDoc(doc(db, 'invitations', preparedData.id), sanitized), 8000);
+        }
       } catch (err) {
         console.warn('Firestore saveInvitation error:', err);
       }
@@ -650,7 +669,8 @@ export const api = {
     price: number;
     fileName: string;
     fileType: string;
-    fileBase64: string;
+    fileBase64?: string;
+    fileUrl?: string;
   }): Promise<{ success: boolean; orderId: string; status: OrderItem['status']; message?: string; error?: string }> {
     try {
       const res = await fetch('/api/payment/upload-receipt', {
@@ -660,8 +680,8 @@ export const api = {
       });
       const data = await res.json();
       if (data.success && data.status) {
-        // Update local state
-        await this.updateOrderStatus(payload.orderId, data.status);
+        // Local mirror only — server already wrote pending_review to Firebase
+        await this.updateOrderStatus(payload.orderId, data.status, { syncRemote: false });
       }
       return data;
     } catch (err: any) {
@@ -703,16 +723,24 @@ export const api = {
     }
   },
 
-  async updateOrderStatus(orderId: string, status: OrderItem['status']): Promise<boolean> {
+  async updateOrderStatus(
+    orderId: string,
+    status: OrderItem['status'],
+    options?: { syncRemote?: boolean }
+  ): Promise<boolean> {
     const all = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, mockOrders);
     const updated = all.map((o) => (o.id === orderId ? { ...o, status } : o));
     setStored(STORAGE_KEY_ORDERS, updated);
     realtimeHub.emit('orders', updated);
 
-    if (isFirebaseConfigured() && rtdb) {
+    // paid/rejected may only be written by the server (firebase-admin). Client must not set them.
+    const isTerminal = status === 'paid' || status === 'rejected';
+    const syncRemote = options?.syncRemote !== false && !isTerminal;
+
+    if (syncRemote && isFirebaseConfigured() && rtdb) {
       rtdbUpdate(rtdbRef(rtdb, `orders/${orderId}`), { status }).catch(() => {});
     }
-    if (isFirebaseConfigured() && db) {
+    if (syncRemote && isFirebaseConfigured() && db) {
       safeFirestore(updateDoc(doc(db, 'orders', orderId), { status }), 2000);
     }
     return true;

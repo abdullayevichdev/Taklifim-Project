@@ -1,11 +1,25 @@
 {
-  "version": 2,
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/payment/upload-receipt.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/telegram/webhook.ts": {
+      "maxDuration": 20
+    },
+    "api/payment/status/[orderId].ts": {
+      "maxDuration": 10
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

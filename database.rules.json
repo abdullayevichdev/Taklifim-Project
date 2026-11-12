@@ -1,0 +1,47 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "templates": {
+      ".read": true,
+      "$id": {
+        ".write": true
+      }
+    },
+
+    "invitations": {
+      ".read": true,
+      "$id": {
+        ".write": true,
+        "status": {
+          ".validate": "!data.exists() || newData.val() === data.val() || (newData.val() !== 'paid' && newData.val() !== 'rejected')"
+        }
+      }
+    },
+
+    "orders": {
+      ".read": true,
+      "$id": {
+        ".write": true,
+        "status": {
+          ".validate": "!data.exists() || newData.val() === data.val() || (newData.val() !== 'paid' && newData.val() !== 'rejected')"
+        }
+      }
+    },
+
+    "guests": {
+      ".read": true,
+      "$id": {
+        ".write": true
+      }
+    },
+
+    "messages": {
+      ".read": true,
+      "$id": {
+        ".write": true
+      }
+    }
+  }
+}
