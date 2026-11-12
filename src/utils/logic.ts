@@ -89,7 +89,7 @@ export function validateRSVPForm(data: {
  * Formats monetary amounts in Uzbek So'm
  */
 export function formatPriceUZS(amount: number): string {
-  if (amount === 0) return 'Bepul';
+  if (amount === 0) return '0 so‘m';
   const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${formatted} so‘m`;
 }
@@ -124,11 +124,6 @@ export function filterTemplates(
         t.category.toLowerCase().includes(q) ||
         (t.description?.uz && t.description.uz.toLowerCase().includes(q))
     );
-  }
-
-  // Free filter
-  if (options.freeOnly) {
-    result = result.filter((t) => t.isFree || t.price === 0);
   }
 
   // Max price filter

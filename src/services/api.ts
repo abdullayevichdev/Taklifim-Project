@@ -5,6 +5,7 @@ import {
   OrderItem,
   ContactMessage,
 } from '../types';
+import { generateInvitationSlug, parseHostNames } from '../utils/slug';
 import { mockTemplates } from '../data/mockTemplates';
 import { mockGuests } from '../data/mockGuests';
 import { mockOrders } from '../data/mockOrders';
@@ -359,10 +360,48 @@ export const api = {
     return list;
   },
 
+  async isSlugAvailable(slug: string, ignoreInvitationId?: string): Promise<boolean> {
+    const clean = slug.toLowerCase().trim();
+    if (!clean) return false;
+
+    // 1. Local check
+    const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
+    const localConflict = list.find((i) => i.slug === clean && i.id !== ignoreInvitationId);
+    if (localConflict) return false;
+
+    // 2. RTDB index check
+    if (isFirebaseConfigured() && rtdb) {
+      try {
+        const snap = await rtdbGet(rtdbRef(rtdb, `slugs/${clean}`));
+        if (snap.exists()) {
+          const boundId = snap.val();
+          if (boundId && boundId !== ignoreInvitationId) {
+            return false;
+          }
+        }
+      } catch {}
+    }
+    return true;
+  },
+
+  async generateUniqueSlug(groomName?: string, brideName?: string, currentInvitationId?: string): Promise<string> {
+    const { groom, bride } = parseHostNames('', groomName, brideName);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = generateInvitationSlug(groom, bride);
+      const available = await this.isSlugAvailable(candidate, currentInvitationId);
+      if (available) {
+        return candidate;
+      }
+    }
+    return generateInvitationSlug(groom, bride);
+  },
+
   async getInvitationBySlug(slug: string): Promise<InvitationData | null> {
+    const cleanSlug = slug.toLowerCase().trim();
+
     // 1. First check local storage for instantaneous load
     const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
-    const localMatch = list.find((inv) => inv.slug === slug || inv.id === slug);
+    const localMatch = list.find((inv) => inv.slug === cleanSlug || inv.id === cleanSlug);
     if (localMatch) {
       return localMatch;
     }
@@ -370,11 +409,26 @@ export const api = {
     // 2. Public lookup from Firebase Realtime Database
     if (isFirebaseConfigured() && rtdb) {
       try {
+        // Check if slugs index maps cleanSlug -> invitationId
+        const slugSnap = await rtdbGet(rtdbRef(rtdb, `slugs/${cleanSlug}`));
+        if (slugSnap.exists()) {
+          const invId = slugSnap.val();
+          if (invId) {
+            const invSnap = await rtdbGet(rtdbRef(rtdb, `invitations/${invId}`));
+            if (invSnap.exists()) {
+              const found = invSnap.val() as InvitationData;
+              const updated = [found, ...list.filter((i) => i.id !== found.id)];
+              setStored(STORAGE_KEY_INVITATIONS, updated);
+              return found;
+            }
+          }
+        }
+
         const snap = await rtdbGet(rtdbRef(rtdb, 'invitations'));
         if (snap.exists()) {
           const val = snap.val();
           const all: InvitationData[] = Array.isArray(val) ? val.filter(Boolean) : Object.values(val || {});
-          const found = all.find((inv) => inv.slug === slug || inv.id === slug);
+          const found = all.find((inv) => inv.slug === cleanSlug || inv.id === cleanSlug);
           if (found) {
             const updated = [found, ...list.filter((i) => i.id !== found.id)];
             setStored(STORAGE_KEY_INVITATIONS, updated);
@@ -390,7 +444,7 @@ export const api = {
     if (isFirebaseConfigured() && db) {
       try {
         const col = collection(db, 'invitations');
-        const q = query(col, where('slug', '==', slug));
+        const q = query(col, where('slug', '==', cleanSlug));
         const snap = await safeFirestore(getDocs(q as any), 8000);
         if (snap && !snap.empty) {
           const d = snap.docs[0];
@@ -400,7 +454,7 @@ export const api = {
           return found;
         }
 
-        const docSnap = await safeFirestore(getDocs(query(col, where('id', '==', slug))), 4000);
+        const docSnap = await safeFirestore(getDocs(query(col, where('id', '==', cleanSlug))), 4000);
         if (docSnap && !docSnap.empty) {
           const d = docSnap.docs[0];
           const found = { id: d.id, ...(d.data() as Record<string, any>) } as InvitationData;
@@ -415,8 +469,17 @@ export const api = {
 
   async saveInvitation(data: InvitationData): Promise<InvitationData> {
     const now = new Date().toISOString();
+
+    // Auto-generate name-based slug if missing or default "toylarimiz-XXXX"
+    let finalSlug = data.slug ? data.slug.toLowerCase().trim() : '';
+    if (!finalSlug || finalSlug.startsWith('toylarimiz-')) {
+      const { groom, bride } = parseHostNames(data.hostNames, data.partner1Name, data.partner2Name);
+      finalSlug = await this.generateUniqueSlug(groom, bride, data.id);
+    }
+
     const preparedData: InvitationData = {
       ...data,
+      slug: finalSlug,
       updatedAt: now,
       createdAt: data.createdAt || now,
     };
@@ -452,6 +515,8 @@ export const api = {
         } else {
           await rtdbSet(rtdbRef(rtdb, `invitations/${preparedData.id}`), sanitized);
         }
+        // Save slug index mapping
+        await rtdbSet(rtdbRef(rtdb, `slugs/${preparedData.slug}`), preparedData.id);
       } catch (err) {
         console.warn('RTDB saveInvitation error:', err);
       }

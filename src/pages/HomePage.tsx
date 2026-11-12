@@ -620,7 +620,7 @@ export const HomePage: React.FC = () => {
               <p className="text-xs text-[#7A6A63] mt-1">Tezkor va qulay taklifnoma</p>
               <div className="my-5">
                 <span className="font-playfair text-3xl font-extrabold text-[#1E1418]">
-                  150 000
+                  50 000
                 </span>
                 <span className="text-xs text-[#7A6A63] ml-1">so‘m</span>
               </div>
@@ -657,7 +657,7 @@ export const HomePage: React.FC = () => {
               <p className="text-xs text-[#6B5A62] mt-1">Fotoalbom va RSVP boshqaruvi</p>
               <div className="my-5">
                 <span className="font-playfair text-4xl font-extrabold text-[#1E1418]">
-                  240 000
+                  60 000
                 </span>
                 <span className="text-xs text-[#6B5A62] ml-1">so‘m</span>
               </div>
@@ -697,7 +697,7 @@ export const HomePage: React.FC = () => {
               <p className="text-xs text-[#7A6A63] mt-1">Eksklyuziv VIP Xizmat</p>
               <div className="my-5">
                 <span className="font-playfair text-3xl font-extrabold text-[#1E1418]">
-                  450 000
+                  70 000
                 </span>
                 <span className="text-xs text-[#7A6A63] ml-1">so‘m</span>
               </div>

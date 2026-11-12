@@ -5,6 +5,7 @@ import { useLanguage } from '../locales';
 import { api } from '../services/api';
 import { InvitationData, GuestRSVP, OrderItem, Language } from '../types';
 import { calculateRSVPStats, formatPriceUZS } from '../utils/logic';
+import { generateInvitationSlug } from '../utils/slug';
 import { ShareModal } from '../components/ShareModal';
 import { PhoneInput } from '../components/PhoneInput';
 import {
@@ -154,7 +155,7 @@ export const CustomerDashboard: React.FC = () => {
     const duplicated: InvitationData = {
       ...inv,
       id: `inv-${Date.now()}`,
-      slug: `${inv.slug}-nusxa-${Math.floor(100 + Math.random() * 900)}`,
+      slug: generateInvitationSlug(inv.partner1Name || inv.hostNames, inv.partner2Name),
       eventTitle: `${inv.eventTitle} (Nusxa)`,
       status: 'draft',
       createdAt: new Date().toISOString(),

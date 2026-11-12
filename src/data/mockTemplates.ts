@@ -6,7 +6,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-1',
     name: 'Aurelia Royal',
     category: 'weddings',
-    price: 180000,
+    price: 60000,
     isPopular: true,
     previewImage: '/templates/template-1.jpg',
     description: {
@@ -41,7 +41,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-2',
     name: 'White Serenade',
     category: 'weddings',
-    price: 190000,
+    price: 65000,
     isPopular: true,
     isNew: true,
     previewImage: '/templates/template-2.jpg',
@@ -77,7 +77,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-3',
     name: 'Velvet Sharqona',
     category: 'traditional',
-    price: 200000,
+    price: 70000,
     isPopular: true,
     previewImage: '/templates/template-3.jpg',
     description: {
@@ -112,7 +112,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-4',
     name: 'Golden Symphony',
     category: 'weddings',
-    price: 175000,
+    price: 55000,
     isNew: true,
     previewImage: '/templates/template-4.jpg',
     description: {
@@ -147,7 +147,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-5',
     name: 'Emerald Grace',
     category: 'traditional',
-    price: 185000,
+    price: 60000,
     previewImage: '/templates/template-5.jpg',
     description: {
       uz: 'Zumrad yashil va nafis tilla ranglarning olijanob uyg‘unligi.',
@@ -181,7 +181,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-6',
     name: 'Pastel Romance',
     category: 'engagements',
-    price: 160000,
+    price: 50000,
     isPopular: true,
     previewImage: '/templates/template-6.avif',
     description: {
@@ -216,7 +216,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-7',
     name: 'Blush Elegance',
     category: 'weddings',
-    price: 170000,
+    price: 55000,
     previewImage: '/templates/template-7.avif',
     description: {
       uz: 'Nafis pushti va mayin sut ranglaridagi zamonaviy to‘y estetikasi.',
@@ -250,7 +250,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-8',
     name: 'Floral Harmony',
     category: 'engagements',
-    price: 165000,
+    price: 55000,
     previewImage: '/templates/template-8.avif',
     description: {
       uz: 'Tabiat nafasi, zaytun barglari va och yashil gullar uyg‘unligi.',
@@ -284,7 +284,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-9',
     name: 'Crystal Pure',
     category: 'weddings',
-    price: 155000,
+    price: 50000,
     previewImage: '/templates/template-9.avif',
     description: {
       uz: 'Moviy osmon va billur tiniqlikdagi minimalist to‘y uslubi.',
@@ -318,7 +318,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-10',
     name: 'Midnight Sapphire',
     category: 'anniversaries',
-    price: 195000,
+    price: 70000,
     isPopular: true,
     previewImage: '/templates/template-10.jpg',
     description: {
@@ -353,7 +353,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-11',
     name: 'Pearl Minimal',
     category: 'weddings',
-    price: 150000,
+    price: 50000,
     previewImage: '/templates/template-11.jpg',
     description: {
       uz: 'Marvarid jilosi, toza chiziqlar va zamonaviy minimalizm ruhiyati.',
@@ -387,7 +387,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-12',
     name: 'Vintage Charm',
     category: 'anniversaries',
-    price: 170000,
+    price: 55000,
     previewImage: '/templates/template-12.jpg',
     description: {
       uz: 'Vintaj uslubidagi iliq qahva ranglari va qadimiy aristokratik nafislik.',
@@ -421,7 +421,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-13',
     name: 'Rose Gold Luxe',
     category: 'weddings',
-    price: 190000,
+    price: 65000,
     isPopular: true,
     previewImage: '/templates/template-13.jpg',
     description: {
@@ -456,7 +456,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-14',
     name: 'Botanical Garden',
     category: 'traditional',
-    price: 165000,
+    price: 55000,
     previewImage: '/templates/template-14.jpg',
     description: {
       uz: 'Bahoriy yangilanish, zumrad barglar va toza tabiat nafisligi.',
@@ -490,7 +490,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-15',
     name: 'Celestial Dream',
     category: 'birthdays',
-    price: 140000,
+    price: 50000,
     isNew: true,
     previewImage: '/templates/template-15.jpg',
     description: {
@@ -525,7 +525,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-16',
     name: 'Sunlit Terracotta',
     category: 'engagements',
-    price: 160000,
+    price: 55000,
     previewImage: '/templates/template-16.jpg',
     description: {
       uz: 'Iliq terrakota va quyosh nurlari jilosidagi samimiy unashuv taklifnomasi.',
@@ -559,7 +559,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-17',
     name: 'Ivory Blossom',
     category: 'baby_showers',
-    price: 130000,
+    price: 50000,
     previewImage: '/templates/template-17.avif',
     description: {
       uz: 'Fil suyagi va nozik gullar jilosidagi yoqimli beshik to‘y taklifnomasi.',
@@ -593,7 +593,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-18',
     name: 'Royal Ruby',
     category: 'weddings',
-    price: 185000,
+    price: 65000,
     previewImage: '/templates/template-18.jpg',
     description: {
       uz: 'Yoqut qizil va oltin ranglarning shohona tantanalarga xos oliy jilosi.',
@@ -627,7 +627,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-19',
     name: 'Modern Noir',
     category: 'anniversaries',
-    price: 175000,
+    price: 60000,
     previewImage: '/templates/template-19.jpg',
     description: {
       uz: 'Zamonaviy qora va oq kontrastdagi yuqori darajadagi shahar modasi dizayni.',
@@ -661,7 +661,7 @@ export const mockTemplates: Template[] = [
     slug: 'template-20',
     name: 'Sweet Butterfly',
     category: 'baby_showers',
-    price: 135000,
+    price: 50000,
     isNew: true,
     previewImage: '/templates/template-20.jpg',
     description: {

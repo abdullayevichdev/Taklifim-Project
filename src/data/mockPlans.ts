@@ -2,53 +2,6 @@ import { PricingPlan } from '../types';
 
 export const mockPlans: PricingPlan[] = [
   {
-    id: 'plan-free',
-    slug: 'free',
-    name: {
-      uz: '1 Martalik Tekin',
-      ru: '1 Раз Бесплатно',
-      en: '1-Time Free',
-    },
-    price: 0,
-    isPopular: false,
-    description: {
-      uz: 'Birinchi taklifnomangizni mutlaqo bepul yarating — 1 marta imkoniyat.',
-      ru: 'Создайте своё первое приглашение совершенно бесплатно — только 1 раз.',
-      en: 'Create your very first invitation absolutely free — one-time only.',
-    },
-    features: {
-      uz: [
-        '1 ta tekin taklifnoma (bir martalik)',
-        'Asosiy shablon va ma\'lumotlar',
-        'Manzil va xarita havolasi',
-        'RSVP forma (25 mehmonlimit)',
-        '30 kunlik faol sahifa',
-        'Taklifim watermark belgisi',
-      ],
-      ru: [
-        '1 бесплатное приглашение (единовременно)',
-        'Базовый шаблон и информация',
-        'Адрес и ссылка на карту',
-        'RSVP форма (лимит 25 гостей)',
-        'Страница активна 30 дней',
-        'Водяной знак Taklifim',
-      ],
-      en: [
-        '1 free invitation (one-time only)',
-        'Basic template & event info',
-        'Venue address & map link',
-        'RSVP form (25 guest limit)',
-        'Page active for 30 days',
-        'Taklifim watermark included',
-      ],
-    },
-    buttonText: {
-      uz: 'Tekin boshlash',
-      ru: 'Начать бесплатно',
-      en: 'Start for Free',
-    },
-  },
-  {
     id: 'plan-standard',
     slug: 'standard',
     name: {
@@ -56,7 +9,7 @@ export const mockPlans: PricingPlan[] = [
       ru: 'Стандарт',
       en: 'Standard',
     },
-    price: 150000,
+    price: 50000,
     isPopular: false,
     description: {
       uz: 'Katalogdagi tayyor shablonlar asosida qulay va tezkor taklifnoma yaratish.',
@@ -103,7 +56,7 @@ export const mockPlans: PricingPlan[] = [
       ru: 'Персональный',
       en: 'Personalized',
     },
-    price: 240000,
+    price: 60000,
     isPopular: true,
     description: {
       uz: 'Kengaytirilgan dizayn sozlamalari, fotoalbom va mehmonlar RSVP boshqaruvi.',
@@ -153,7 +106,7 @@ export const mockPlans: PricingPlan[] = [
       ru: 'Премиум Индивидуальный',
       en: 'Individual Premium',
     },
-    price: 450000,
+    price: 70000,
     isPopular: false,
     description: {
       uz: 'Maxsus individual dizayn, shaxsiy domen va individual monogramma.',

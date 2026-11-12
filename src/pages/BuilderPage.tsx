@@ -13,6 +13,7 @@ import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
 import { formatPriceUZS } from '../utils/logic';
+import { generateInvitationSlug, cleanNameForSlug } from '../utils/slug';
 import {
   compressImageForUpload,
   validatePdfFile,
@@ -124,7 +125,7 @@ export const BuilderPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [activeTabMobile, setActiveTabMobile] = useState<'settings' | 'preview'>('settings');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('plan-free');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('plan-standard');
   const [isDemoSubmitting, setIsDemoSubmitting] = useState<boolean>(false);
   const [isOrderComplete, setIsOrderComplete] = useState<boolean>(false);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
@@ -171,7 +172,7 @@ export const BuilderPage: React.FC = () => {
 
     return {
       id: `inv-${Date.now()}`,
-      slug: `toylarimiz-${Math.floor(1000 + Math.random() * 9000)}`,
+      slug: generateInvitationSlug('Asrorbek', 'Madina'),
       templateId: initialTemplate.id,
       templateSlug: initialTemplate.slug,
       language: 'uz',
@@ -403,7 +404,7 @@ export const BuilderPage: React.FC = () => {
 
     try {
       const currentTemplate = availableTemplates.find((t) => t.slug === invitationState.templateSlug) || initialTemplate;
-      const finalPrice = canUseFreePlan() ? 0 : (currentTemplate?.price || 180000);
+      const finalPrice = currentTemplate?.price || 60000;
 
       let orderId = activeOrderId;
       if (!orderId) {
@@ -1014,9 +1015,31 @@ export const BuilderPage: React.FC = () => {
                       onChange={(e) =>
                         setInvitationState((p) => ({ ...p, hostNames: e.target.value }))
                       }
-                      placeholder="Masalan: Nodir & Malika"
+                      placeholder="Masalan: Asrorbek & Madina"
                       className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
                     />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-[#3A2D28] block mb-1">
+                      Taklifnoma havolasi (Slug)
+                    </label>
+                    <div className="flex items-center gap-1 bg-white p-2.5 rounded-xl border border-black/10 text-xs">
+                      <span className="text-[#8A7C74] shrink-0 font-mono text-[11px]">{typeof window !== 'undefined' ? window.location.origin : ''}/i/</span>
+                      <input
+                        type="text"
+                        value={invitationState.slug}
+                        onChange={(e) => {
+                          const cleaned = cleanNameForSlug(e.target.value);
+                          setInvitationState((p) => ({ ...p, slug: cleaned }));
+                        }}
+                        placeholder="asrorbek-madina-4135"
+                        className="w-full bg-transparent font-mono text-[#231E1B] font-bold outline-none"
+                      />
+                    </div>
+                    <span className="text-[10px] text-[#7A6A63] block mt-1">
+                      Havola kuyov va kelin ismlaridan shakllanadi.
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -2141,8 +2164,7 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 11: Plan & Manual Card Payment */}
             {currentStep === 11 && (() => {
               const currentTemplate = availableTemplates.find((t) => t.slug === invitationState.templateSlug) || initialTemplate;
-              const isFreeAvailable = canUseFreePlan();
-              const templatePrice = currentTemplate?.price || 180000;
+              const templatePrice = currentTemplate?.price || 60000;
 
               return (
                 <div className="space-y-6">
@@ -2151,52 +2173,14 @@ export const BuilderPage: React.FC = () => {
                       11. To'lov va Faollashtirish
                     </h3>
                     <p className="text-xs text-[#7A6A63]">
-                      {isFreeAvailable
-                        ? 'Siz uchun 1 martalik bepul faollashtirish imkoniyati faol!'
-                        : `Tanlangan «${currentTemplate.name}» shabloni uchun to‘lov miqdori:`}
+                      Tanlangan «{currentTemplate.name}» shabloni uchun to‘lov miqdori:
                     </p>
                   </div>
 
-                  {/* 1-MARTALIK BEPUL TARIF */}
-                  {isFreeAvailable ? (
-                    <div className="p-5 rounded-3xl border-2 border-emerald-500 bg-gradient-to-br from-emerald-50/80 to-teal-50/50 shadow-md space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                          🎁 1 MARTALIK BEPUL SOVG‘A
-                        </span>
-                        <span className="text-xl font-extrabold text-emerald-700">0 so‘m</span>
-                      </div>
-                      <h4 className="font-playfair text-lg font-bold text-[#231E1B]">
-                        Birinchi taklifnomangiz mutlaqo bepul!
-                      </h4>
-                      <p className="text-xs text-[#5C4F48] leading-relaxed">
-                        Siz ushbu hisobingizdan ilk taklifnomangizni hech qanday to‘lovsiz, to‘liq barcha imkoniyatlari bilan faollashtirishingiz mumkin.
-                      </p>
-
-                      <button
-                        type="button"
-                        disabled={isDemoSubmitting}
-                        onClick={handleFinalCheckout}
-                        className="w-full mt-2 py-4 rounded-2xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-md bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-emerald-200 hover:shadow-lg hover:scale-[1.01]"
-                      >
-                        {isDemoSubmitting ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Faollashtirilmoqda...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>🎁 Bepul Faollashtirish (0 so‘m)</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    /* PULLIK SHABLON UCHUN KARTA ORQALI TO'LOV VA CHEK YUKLASH */
-                    <div className="space-y-5">
-                      {/* Karta Ma'lumotlari Box */}
-                      <div className="p-5 rounded-3xl border-2 border-[#D9658B]/40 bg-gradient-to-br from-white via-[#FFF8FA] to-[#FAF6F0] shadow-md space-y-4 relative overflow-hidden">
+                  {/* KARTA ORQALI TO'LOV VA CHEK YUKLASH */}
+                  <div className="space-y-5">
+                    {/* Karta Ma'lumotlari Box */}
+                    <div className="p-5 rounded-3xl border-2 border-[#D9658B]/40 bg-gradient-to-br from-white via-[#FFF8FA] to-[#FAF6F0] shadow-md space-y-4 relative overflow-hidden">
                         <div className="flex items-center justify-between border-b border-black/5 pb-3">
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FFF5F8] text-[#D9658B] border border-[#D9658B]/30">
                             «{currentTemplate.name}» Shablon
@@ -2383,7 +2367,6 @@ export const BuilderPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  )}
                 </div>
               );
             })()}

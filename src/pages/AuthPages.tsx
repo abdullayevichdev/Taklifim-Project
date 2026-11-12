@@ -15,6 +15,7 @@ import {
   Smartphone,
   KeyRound,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { PhoneInput } from '../components/PhoneInput';
 
@@ -299,20 +300,18 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
           </p>
         </div>
 
-        {/* 1 Martalik Tekin Sovg'a Bannersi */}
+        {/* Welcome Banner */}
         {mode === 'register' && (
           <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFF5F8] to-[#F0F8FF] border border-[#E27B9B]/30 flex items-center gap-3 animate-fadeIn">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#F5C9D8] to-[#E27B9B] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Gift className="w-5 h-5" />
+              <Sparkles className="w-5 h-5" />
             </div>
             <div className="text-xs">
               <span className="font-extrabold text-[#1E1418] block">
-                {isEligibleForFree ? '🎁 1 martalik Bepul Taklifnoma Sovg‘a!' : 'Xush kelibsiz!'}
+                Xush kelibsiz!
               </span>
               <span className="text-[11px] text-[#5C4F48]">
-                {isEligibleForFree
-                  ? 'Ro‘yxatdan o‘ting va 1 ta to‘liq taklifnomani 0 so‘mga yarating.'
-                  : 'Zamonaviy interaktiv taklifnomalar xizmatiga ulaning.'}
+                Zamonaviy va nafis interaktiv taklifnomalar xizmatiga ulaning.
               </span>
             </div>
           </div>

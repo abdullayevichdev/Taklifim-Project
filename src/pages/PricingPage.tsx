@@ -9,27 +9,26 @@ import {
   X,
   Sparkles,
   ChevronDown,
-  Gift,
 } from 'lucide-react';
 
 export const PricingPage: React.FC = () => {
   const { language } = useLanguage();
   const [openFaqId, setOpenFaqId] = useState<string>('faq-1');
 
-  // Detailed comparison matrix features including Free plan
+  // Detailed comparison matrix features
   const comparisonFeatures = [
-    { name: 'Katalogdagi shablonlar', free: 'Tanlangan shablon', std: 'Barchasi', per: 'Barchasi', prm: 'Barchasi + Maxsus dizayn' },
-    { name: 'Shaxsiy havola va QR-kod', free: true, std: true, per: true, prm: true },
-    { name: 'Musiqa va ovozli ijro', free: false, std: true, per: true, prm: true },
-    { name: 'Interaktiv xarita va navigatsiya', free: true, std: true, per: true, prm: true },
-    { name: 'Fotosuratlar soni', free: '1 ta', std: '2 ta', per: '10 tagacha', prm: 'Cheksiz' },
-    { name: 'Dastur (Schedule) jadvali', free: false, std: false, per: true, prm: true },
-    { name: 'Dres-kod palitrasi', free: false, std: false, per: true, prm: true },
-    { name: 'Mehmonlar RSVP tizimi', free: '25 mehmongacha', std: false, per: true, prm: true },
-    { name: 'Mijoz kabineti (Dashboard)', free: true, std: false, per: true, prm: true },
-    { name: 'Shaxsiy domen & maxsus havola', free: false, std: false, per: false, prm: true },
-    { name: 'Shaxsiy monogramma yaratish', free: false, std: false, per: false, prm: true },
-    { name: 'Havola faollik muddati', free: '30 kun', std: '6 oy', per: '12 oy', prm: 'Muddatsiz arxiv' },
+    { name: 'Katalogdagi shablonlar', std: 'Barchasi', per: 'Barchasi', prm: 'Barchasi + Maxsus' },
+    { name: 'Shaxsiy havola va QR-kod', std: true, per: true, prm: true },
+    { name: 'Musiqa va ovozli ijro', std: true, per: true, prm: true },
+    { name: 'Interaktiv xarita va navigatsiya', std: true, per: true, prm: true },
+    { name: 'Fotosuratlar soni', std: '2 ta', per: '10 tagacha', prm: 'Cheksiz' },
+    { name: 'Dastur (Schedule) jadvali', std: false, per: true, prm: true },
+    { name: 'Dres-kod palitrasi', std: false, per: true, prm: true },
+    { name: 'Mehmonlar RSVP tizimi', std: false, per: true, prm: true },
+    { name: 'Mijoz kabineti (Dashboard)', std: false, per: true, prm: true },
+    { name: 'Shaxsiy domen & maxsus havola', std: false, per: false, prm: true },
+    { name: 'Shaxsiy monogramma yaratish', std: false, per: false, prm: true },
+    { name: 'Havola faollik muddati', std: '6 oy', per: '12 oy', prm: 'Muddatsiz arxiv' },
   ];
 
   return (
@@ -39,7 +38,7 @@ export const PricingPage: React.FC = () => {
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-panel text-xs font-bold text-[#B48B47]">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Shaffof, Qulay va Tekin Imkoniyat</span>
+            <span>Shaffof, Qulay va Hamyonbop Imkoniyat</span>
           </div>
           <h1 className="font-playfair text-4xl sm:text-5xl font-extrabold text-[#231E1B] tracking-tight">
             Tariflar va Narxlar
@@ -49,32 +48,21 @@ export const PricingPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 4 Pricing Cards: Free, Standard, Personalized, Premium */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+        {/* 3 Pricing Cards: Standard (50k), Personalized (60k), Premium (70k) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
           {mockPlans.map((plan) => {
-            const isFree = plan.price === 0;
-
             return (
               <div
                 key={plan.id}
-                className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 relative ${
+                className={`rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 relative ${
                   plan.isPopular
                     ? 'glass-panel-elevated border-2 border-[#D9658B]/70 shadow-xl bg-gradient-to-b from-white/95 to-[#FBF8F5]/90 -translate-y-2 ring-2 ring-[#D9658B]/20'
-                    : isFree
-                    ? 'glass-panel-elevated border-2 border-emerald-400/80 shadow-md bg-gradient-to-b from-white/95 to-emerald-50/40 hover:border-emerald-500'
                     : 'glass-panel border border-white/80 shadow-xs hover:border-black/10 hover:shadow-md'
                 }`}
               >
                 {plan.isPopular && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full bg-[#D9658B] text-white text-[10px] font-bold uppercase tracking-wider shadow-xs whitespace-nowrap">
                     ⭐ Eng Ommabop
-                  </div>
-                )}
-
-                {isFree && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-xs whitespace-nowrap flex items-center gap-1">
-                    <Gift className="w-3 h-3" />
-                    <span>1 Marta Tekin</span>
                   </div>
                 )}
 
@@ -90,25 +78,14 @@ export const PricingPage: React.FC = () => {
                   </p>
 
                   <div className="my-5 pb-5 border-b border-black/5">
-                    {isFree ? (
-                      <div>
-                        <span className="font-playfair text-3xl font-extrabold text-emerald-700">
-                          0 so‘m
-                        </span>
-                        <span className="text-xs text-emerald-600 font-semibold block mt-1">
-                          1 marta bepul sinab ko‘ring
-                        </span>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="font-playfair text-3xl font-extrabold text-[#231E1B]">
-                          {formatPriceUZS(plan.price)}
-                        </span>
-                        <span className="text-xs text-[#8A7C74] block mt-1">
-                          bir marotaba to‘lanadi
-                        </span>
-                      </div>
-                    )}
+                    <div>
+                      <span className="font-playfair text-3xl font-extrabold text-[#231E1B]">
+                        {formatPriceUZS(plan.price)}
+                      </span>
+                      <span className="text-xs text-[#8A7C74] block mt-1">
+                        bir marotaba to‘lanadi
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-2.5 mb-6">
@@ -124,17 +101,13 @@ export const PricingPage: React.FC = () => {
                 <div className="pt-2">
                   <Link
                     to={plan.slug === 'premium' ? '/contact' : '/templates'}
-                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold text-center block transition-all shadow-xs ${
-                      isFree
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 hover:shadow-md'
-                        : plan.isPopular
+                    className={`w-full py-3.5 px-4 rounded-2xl text-xs font-bold text-center block transition-all shadow-xs ${
+                      plan.isPopular
                         ? 'bg-gradient-to-r from-[#F5C9D8] to-[#F5EBDD] text-[#231E1B] hover:shadow-md'
                         : 'bg-white text-[#231E1B] border border-black/10 hover:bg-black/5'
                     }`}
                   >
-                    {isFree
-                      ? 'Bepul Boshlash'
-                      : plan.slug === 'premium'
+                    {plan.slug === 'premium'
                       ? 'Individual Buyurtma'
                       : 'Shablonni Tanlash'}
                   </Link>
@@ -145,7 +118,7 @@ export const PricingPage: React.FC = () => {
         </div>
 
         {/* Plan Comparison Table */}
-        <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-white/95 shadow-md space-y-6">
+        <div className="glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-white/95 shadow-md space-y-6 max-w-5xl mx-auto">
           <div className="text-center max-w-lg mx-auto">
             <h3 className="font-playfair text-2xl font-bold text-[#231E1B]">
               Tariflar o‘rtasidagi farq
@@ -160,27 +133,15 @@ export const PricingPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-black/10 text-[#7A6A63]">
                   <th className="py-3 px-4 font-bold text-[#231E1B]">Xususiyatlar</th>
-                  <th className="py-3 px-4 text-center font-bold text-emerald-700 bg-emerald-50/40 rounded-t-xl">1 Marta Tekin</th>
-                  <th className="py-3 px-4 text-center font-bold">Standard</th>
-                  <th className="py-3 px-4 text-center font-bold text-[#D9658B]">Personalized</th>
-                  <th className="py-3 px-4 text-center font-bold">Individual Premium</th>
+                  <th className="py-3 px-4 text-center font-bold">Standard (50 000)</th>
+                  <th className="py-3 px-4 text-center font-bold text-[#D9658B]">Personalized (60 000)</th>
+                  <th className="py-3 px-4 text-center font-bold">Individual Premium (70 000)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
                 {comparisonFeatures.map((row, idx) => (
                   <tr key={idx} className="hover:bg-white/40 transition-colors">
                     <td className="py-3 px-4 font-medium text-[#231E1B]">{row.name}</td>
-                    <td className="py-3 px-4 text-center text-emerald-800 bg-emerald-50/20 font-medium">
-                      {typeof row.free === 'boolean' ? (
-                        row.free ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto" />
-                        ) : (
-                          <X className="w-4 h-4 text-rose-300 mx-auto" />
-                        )
-                      ) : (
-                        row.free
-                      )}
-                    </td>
                     <td className="py-3 px-4 text-center text-[#5C4F48]">
                       {typeof row.std === 'boolean' ? (
                         row.std ? (

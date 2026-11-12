@@ -207,22 +207,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // 1-martalik tekin tarif tekshiruvi (Hisob va qurilma bo'yicha)
+  // Free plan has been disabled — always return false
   const canUseFreePlan = (): boolean => {
-    if (user?.freePlanUsed) {
-      return false;
-    }
-    try {
-      const fp = getDeviceFingerprint();
-      const usedFp = localStorage.getItem(`taklifim_free_used_${fp}`);
-      const globalUsed = localStorage.getItem('taklifim_free_plan_used');
-      if (usedFp === 'true' || globalUsed === 'true') {
-        return false;
-      }
-    } catch {
-      // ignore
-    }
-    return true;
+    return false;
   };
 
   const markFreePlanUsed = () => {

@@ -26,8 +26,7 @@ export const TemplatesPage: React.FC = () => {
   const [category, setCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'price_asc' | 'price_desc'>('popular');
-  const [maxPrice, setMaxPrice] = useState<number>(300000);
-  const [freeOnly, setFreeOnly] = useState<boolean>(false);
+  const [maxPrice, setMaxPrice] = useState<number>(70000);
   const [showFiltersMobile, setShowFiltersMobile] = useState<boolean>(false);
 
   useEffect(() => {
@@ -59,9 +58,8 @@ export const TemplatesPage: React.FC = () => {
       query: searchQuery,
       sortBy,
       maxPrice,
-      freeOnly,
     });
-  }, [templates, category, searchQuery, sortBy, maxPrice, freeOnly]);
+  }, [templates, category, searchQuery, sortBy, maxPrice]);
 
   return (
     <div className="pt-28 pb-20 min-h-screen">
@@ -166,9 +164,9 @@ export const TemplatesPage: React.FC = () => {
                 </label>
                 <input
                   type="range"
-                  min="100000"
-                  max="300000"
-                  step="10000"
+                  min="50000"
+                  max="70000"
+                  step="5000"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   className="w-full accent-[#D9658B] cursor-pointer"
@@ -176,23 +174,12 @@ export const TemplatesPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer font-medium">
-                  <input
-                    type="checkbox"
-                    checked={freeOnly}
-                    onChange={(e) => setFreeOnly(e.target.checked)}
-                    className="rounded text-[#D9658B] focus:ring-0 w-4 h-4"
-                  />
-                  <span>Faqat bepul namunalar</span>
-                </label>
-
-                {(category !== 'all' || searchQuery || maxPrice < 300000 || freeOnly) && (
+                {(category !== 'all' || searchQuery || maxPrice < 70000) && (
                   <button
                     onClick={() => {
                       setCategory('all');
                       setSearchQuery('');
-                      setMaxPrice(300000);
-                      setFreeOnly(false);
+                      setMaxPrice(70000);
                     }}
                     className="text-rose-600 hover:underline text-xs ml-auto"
                   >
@@ -231,8 +218,7 @@ export const TemplatesPage: React.FC = () => {
               onClick={() => {
                 setCategory('all');
                 setSearchQuery('');
-                setMaxPrice(300000);
-                setFreeOnly(false);
+                setMaxPrice(70000);
               }}
               className="px-5 py-2.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold hover:bg-black transition-colors"
             >
