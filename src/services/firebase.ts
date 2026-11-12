@@ -3,6 +3,7 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 import { getDatabase, Database } from 'firebase/database';
 import { getAuth, Auth } from 'firebase/auth';
 import { getAnalytics, Analytics } from 'firebase/analytics';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 /**
  * FIREBASE KONFIGURATSIYASI — TAKLIFIM.UZ (teklifim-9dae7)
@@ -37,6 +38,7 @@ let db: Firestore | null = null;
 let rtdb: Database | null = null;
 let auth: Auth | null = null;
 let analytics: Analytics | null = null;
+let storage: FirebaseStorage | null = null;
 
 // Teklifim loyihasida Firebase Realtime Database (RTDB) asosiy real-time bulutli baza hisoblanadi.
 // Cloud Firestore esa projectda (teklifim-9dae7) yoqilmaganligi sababli 10 soniyalik backend timeout xatosini keltirib chiqarmasligi uchun nofaol qilingan.
@@ -47,6 +49,7 @@ if (isFirebaseConfigured()) {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     rtdb = getDatabase(app);
     auth = getAuth(app);
+    storage = getStorage(app);
 
     if (ENABLE_FIRESTORE) {
       try {
@@ -72,4 +75,4 @@ if (isFirebaseConfigured()) {
   );
 }
 
-export { app, db, rtdb, auth, analytics };
+export { app, db, rtdb, auth, analytics, storage };

@@ -13,6 +13,13 @@ import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
 import { formatPriceUZS } from '../utils/logic';
+import {
+  compressImageForUpload,
+  validatePdfFile,
+  MAX_PDF_BYTES,
+} from '../utils/receiptCompress';
+import { isFirebaseConfigured, storage } from '../services/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
 import {
   ArrowLeft,
@@ -129,6 +136,9 @@ export const BuilderPage: React.FC = () => {
   const [copiedCard, setCopiedCard] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
+  const [preparedFileType, setPreparedFileType] = useState<string>('');
+  const [preparedFileName, setPreparedFileName] = useState<string>('');
+  const [isPreparingFile, setIsPreparingFile] = useState<boolean>(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
 
@@ -326,38 +336,65 @@ export const BuilderPage: React.FC = () => {
     }
   };
 
-  // Handle receipt file change
-  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle receipt file change (images compressed to ≤1.5MB; PDF ≤4MB)
+  const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError('');
+    setFileBase64('');
+    setPreparedFileType('');
+    setPreparedFileName('');
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError("Fayl hajmi 10 MB dan oshmasligi kerak!");
-      return;
-    }
 
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
     if (!isImage && !isPdf) {
-      setUploadError("Faqat rasm (JPG, PNG) yoki PDF fayl yuklash mumkin.");
+      setUploadError('Faqat rasm (JPG, PNG) yoki PDF fayl yuklash mumkin.');
       return;
     }
 
-    setSelectedFile(file);
+    if (isPdf) {
+      const pdfError = validatePdfFile(file);
+      if (pdfError) {
+        setUploadError(pdfError);
+        return;
+      }
+      setSelectedFile(file);
+      setPreparedFileType('application/pdf');
+      setPreparedFileName(file.name);
+      setFileBase64(''); // PDF goes via Firebase Storage on submit
+      return;
+    }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFileBase64(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsPreparingFile(true);
+    try {
+      const compressed = await compressImageForUpload(file);
+      setSelectedFile(file);
+      setFileBase64(compressed.base64);
+      setPreparedFileType(compressed.fileType);
+      setPreparedFileName(compressed.fileName);
+    } catch (err: any) {
+      setSelectedFile(null);
+      setUploadError(err.message || 'Rasmni siqib bo‘lmadi. Boshqa fayl tanlang.');
+    } finally {
+      setIsPreparingFile(false);
+    }
   };
 
   // Upload receipt and send to Telegram admin
   const handleSubmitReceiptUpload = async () => {
-    if (!selectedFile || !fileBase64) {
+    const isPdf =
+      preparedFileType === 'application/pdf' ||
+      selectedFile?.type === 'application/pdf' ||
+      (selectedFile?.name || '').toLowerCase().endsWith('.pdf');
+
+    if (!selectedFile || (!fileBase64 && !isPdf)) {
       setUploadError("Iltimos, avval to'lov cheki faylini tanlang.");
+      return;
+    }
+
+    if (isPdf && selectedFile.size > MAX_PDF_BYTES) {
+      setUploadError('PDF fayl hajmi 4 MB dan oshmasligi kerak.');
       return;
     }
 
@@ -397,6 +434,21 @@ export const BuilderPage: React.FC = () => {
         updatedAt: new Date().toISOString(),
       });
 
+      let fileUrl: string | undefined;
+      let fileBase64Payload: string | undefined = fileBase64 || undefined;
+
+      // PDFs: upload to Firebase Storage to stay under Vercel ~4.5MB body limit
+      if (isPdf) {
+        if (!isFirebaseConfigured() || !storage) {
+          throw new Error('PDF yuklash uchun Firebase Storage sozlanmagan.');
+        }
+        const path = `receipts/${orderId}/${Date.now()}_${selectedFile.name}`;
+        const ref = storageRef(storage, path);
+        await uploadBytes(ref, selectedFile, { contentType: 'application/pdf' });
+        fileUrl = await getDownloadURL(ref);
+        fileBase64Payload = undefined;
+      }
+
       const res = await api.uploadReceipt({
         orderId,
         invitationId: invitationState.id,
@@ -407,9 +459,10 @@ export const BuilderPage: React.FC = () => {
         weddingDate: invitationState.eventDate,
         venueName: invitationState.venueName,
         price: finalPrice,
-        fileName: selectedFile.name,
-        fileType: selectedFile.type,
-        fileBase64,
+        fileName: preparedFileName || selectedFile.name,
+        fileType: preparedFileType || selectedFile.type,
+        fileBase64: fileBase64Payload,
+        fileUrl,
       });
 
       if (res.success) {
@@ -2243,7 +2296,7 @@ export const BuilderPage: React.FC = () => {
 
                           <div className="space-y-2">
                             <label className="text-xs font-bold text-[#231E1B] block">
-                              To'lov Chekini Yuklash (Rasm yoki PDF, max 10 MB) *
+                              To'lov Chekini Yuklash (Rasm ≤1.5 MB, PDF ≤4 MB) *
                             </label>
 
                             <div className="relative border-2 border-dashed border-[#D9658B]/40 hover:border-[#D9658B] rounded-2xl p-4 text-center bg-[#FFF8FA] transition-colors cursor-pointer group">
@@ -2251,19 +2304,29 @@ export const BuilderPage: React.FC = () => {
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp,application/pdf"
                                 onChange={handleReceiptFileChange}
+                                disabled={isPreparingFile || isUploadingReceipt}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                               />
                               <div className="space-y-2 flex flex-col items-center justify-center">
                                 <div className="w-10 h-10 rounded-full bg-[#FFF5F8] text-[#D9658B] flex items-center justify-center group-hover:scale-110 transition-transform">
                                   <Upload className="w-5 h-5" />
                                 </div>
-                                {selectedFile ? (
+                                {isPreparingFile ? (
+                                  <div>
+                                    <span className="text-xs font-bold text-[#231E1B] block">
+                                      Rasm siqilmoqda...
+                                    </span>
+                                    <span className="text-[10px] text-[#7A6A63]">
+                                      1.5 MB gacha optimallashtiriladi
+                                    </span>
+                                  </div>
+                                ) : selectedFile ? (
                                   <div>
                                     <span className="text-xs font-bold text-[#231E1B] block truncate max-w-xs">
-                                      📄 {selectedFile.name}
+                                      📄 {preparedFileName || selectedFile.name}
                                     </span>
                                     <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
-                                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB — Fayl tanlandi
+                                      Fayl tayyor — yuborish mumkin
                                     </span>
                                   </div>
                                 ) : (
@@ -2272,7 +2335,7 @@ export const BuilderPage: React.FC = () => {
                                       Faylni tanlash uchun shu yerga bosing
                                     </span>
                                     <span className="text-[10px] text-[#7A6A63]">
-                                      JPG, PNG yoki PDF formatida
+                                      JPG/PNG avtomatik siqiladi; PDF max 4 MB
                                     </span>
                                   </div>
                                 )}
@@ -2289,10 +2352,18 @@ export const BuilderPage: React.FC = () => {
 
                           <button
                             type="button"
-                            disabled={isUploadingReceipt || !selectedFile}
+                            disabled={
+                              isUploadingReceipt ||
+                              isPreparingFile ||
+                              !selectedFile ||
+                              (preparedFileType !== 'application/pdf' && !fileBase64)
+                            }
                             onClick={handleSubmitReceiptUpload}
                             className={`w-full py-4 rounded-2xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-md ${
-                              isUploadingReceipt || !selectedFile
+                              isUploadingReceipt ||
+                              isPreparingFile ||
+                              !selectedFile ||
+                              (preparedFileType !== 'application/pdf' && !fileBase64)
                                 ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                                 : 'bg-gradient-to-r from-[#E27B9B] via-[#D9658B] to-[#B9DFFA] text-white hover:shadow-lg hover:scale-[1.01] active:scale-95'
                             }`}
