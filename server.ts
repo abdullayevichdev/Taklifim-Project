@@ -12,10 +12,10 @@ import {
   getOrder,
   updateInvitationStatus,
   upsertOrder,
-} from './api/_lib/firebaseAdmin';
-import { checkRateLimit } from './api/_lib/rateLimit';
-import { handleTelegramUpdate, sendReceiptToTelegram } from './api/_lib/telegram';
-import { getTelegramConfig } from './api/_lib/env';
+} from './api/_lib/firebaseAdmin.js';
+import { checkRateLimit } from './api/_lib/rateLimit.js';
+import { handleTelegramUpdate, sendReceiptToTelegram } from './api/_lib/telegram.js';
+import { getTelegramConfig } from './api/_lib/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

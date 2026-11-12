@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getTelegramConfig } from '../_lib/env';
-import { handleTelegramUpdate } from '../_lib/telegram';
+import { getTelegramConfig } from '../_lib/env.js';
+import { handleTelegramUpdate } from '../_lib/telegram.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

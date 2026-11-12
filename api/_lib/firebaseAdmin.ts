@@ -1,6 +1,6 @@
 import { cert, getApps, getApp, initializeApp, type App } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
-import { getFirebaseDatabaseUrl } from './env';
+import { cleanEnvString, cleanPrivateKey, getFirebaseDatabaseUrl } from './env.js';
 
 export type OrderStatus =
   | 'draft'
@@ -35,27 +35,31 @@ function parseServiceAccount(): {
   clientEmail: string;
   privateKey: string;
 } | null {
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (json) {
-    const parsed = JSON.parse(json) as {
-      project_id?: string;
-      client_email?: string;
-      private_key?: string;
-      projectId?: string;
-      clientEmail?: string;
-      privateKey?: string;
-    };
-    const projectId = parsed.project_id || parsed.projectId;
-    const clientEmail = parsed.client_email || parsed.clientEmail;
-    const privateKey = (parsed.private_key || parsed.privateKey || '').replace(/\\n/g, '\n');
-    if (projectId && clientEmail && privateKey) {
-      return { projectId, clientEmail, privateKey };
+  const jsonRaw = cleanEnvString(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (jsonRaw) {
+    try {
+      const parsed = JSON.parse(jsonRaw) as {
+        project_id?: string;
+        client_email?: string;
+        private_key?: string;
+        projectId?: string;
+        clientEmail?: string;
+        privateKey?: string;
+      };
+      const projectId = cleanEnvString(parsed.project_id || parsed.projectId);
+      const clientEmail = cleanEnvString(parsed.client_email || parsed.clientEmail);
+      const privateKey = cleanPrivateKey(parsed.private_key || parsed.privateKey);
+      if (projectId && clientEmail && privateKey) {
+        return { projectId, clientEmail, privateKey };
+      }
+    } catch (e) {
+      console.error('FIREBASE_SERVICE_ACCOUNT_JSON parse error:', e);
     }
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const projectId = cleanEnvString(process.env.FIREBASE_PROJECT_ID);
+  const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
+  const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
   if (projectId && clientEmail && privateKey) {
     return { projectId, clientEmail, privateKey };

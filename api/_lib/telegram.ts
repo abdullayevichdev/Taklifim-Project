@@ -1,10 +1,10 @@
-import { getTelegramConfig } from './env';
+import { getTelegramConfig } from './env.js';
 import {
   getOrder,
   updateInvitationStatus,
   upsertOrder,
   type OrderStatus,
-} from './firebaseAdmin';
+} from './firebaseAdmin.js';
 
 async function tgApi(method: string, body: Record<string, unknown> | FormData) {
   const { botToken } = getTelegramConfig();

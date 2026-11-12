@@ -3,9 +3,9 @@ import {
   getOrder,
   updateInvitationStatus,
   upsertOrder,
-} from '../_lib/firebaseAdmin';
-import { checkRateLimit } from '../_lib/rateLimit';
-import { sendReceiptToTelegram } from '../_lib/telegram';
+} from '../_lib/firebaseAdmin.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
+import { sendReceiptToTelegram } from '../_lib/telegram.js';
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
