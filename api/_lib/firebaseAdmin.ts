@@ -95,6 +95,20 @@ export function getRtdb() {
   return getDatabase(getAdminApp());
 }
 
+export function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      result[key] = stripUndefined(value as Record<string, unknown>);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export async function getOrder(orderId: string): Promise<ServerOrder | null> {
   const snap = await getRtdb().ref(`orders/${orderId}`).get();
   if (!snap.exists()) return null;
@@ -110,7 +124,10 @@ export async function upsertOrder(
   orderId: string,
   patch: Partial<ServerOrder> & Record<string, unknown>
 ): Promise<void> {
-  await getRtdb().ref(`orders/${orderId}`).update(patch);
+  const cleanPatch = stripUndefined(patch);
+  if (Object.keys(cleanPatch).length > 0) {
+    await getRtdb().ref(`orders/${orderId}`).update(cleanPatch);
+  }
 }
 
 export async function updateInvitationStatus(
@@ -118,5 +135,6 @@ export async function updateInvitationStatus(
   status: OrderStatus,
   updatedAt: string
 ): Promise<void> {
-  await getRtdb().ref(`invitations/${invitationId}`).update({ status, updatedAt });
+  const cleanPatch = stripUndefined({ status, updatedAt });
+  await getRtdb().ref(`invitations/${invitationId}`).update(cleanPatch);
 }

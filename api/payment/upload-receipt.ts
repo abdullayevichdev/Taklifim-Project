@@ -83,22 +83,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const nowIso = new Date().toISOString();
     const existing = await getOrder(orderId);
 
-    const orderData = {
+    const orderData: Record<string, any> = {
       id: orderId,
       orderId,
-      invitationId: invitationId || existing?.invitationId,
-      invitationSlug: invitationSlug || existing?.invitationSlug,
       customerName: customerName || existing?.customerName || 'Mijoz',
       customerPhone: customerPhone || existing?.customerPhone || '+998',
       templateName: templateName || existing?.templateName || 'Standart Shablon',
       weddingDate: weddingDate || existing?.weddingDate || '-',
       venueName: venueName || existing?.venueName || '-',
       price: Number(price) || existing?.price || 180000,
-      status: 'pending_review' as const,
-      receiptUrl: fileUrl || existing?.receiptUrl || undefined,
+      status: 'pending_review',
       createdAt: existing?.createdAt || nowIso,
       updatedAt: nowIso,
     };
+
+    const finalInvId = invitationId || existing?.invitationId;
+    if (finalInvId) orderData.invitationId = finalInvId;
+
+    const finalInvSlug = invitationSlug || existing?.invitationSlug;
+    if (finalInvSlug) orderData.invitationSlug = finalInvSlug;
+
+    const finalReceiptUrl = fileUrl || existing?.receiptUrl;
+    if (finalReceiptUrl) orderData.receiptUrl = finalReceiptUrl;
 
     await upsertOrder(orderId, orderData);
 
@@ -118,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileName,
       fileType,
       fileBuffer,
-      fileUrl: fileUrl || undefined,
+      fileUrl: finalReceiptUrl,
     });
 
     if (!tgResult.ok) {
@@ -128,10 +134,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    await upsertOrder(orderId, {
-      telegramMessageId: tgResult.messageId,
-      updatedAt: new Date().toISOString(),
-    });
+    const patch: Record<string, any> = { updatedAt: new Date().toISOString() };
+    if (tgResult.messageId) {
+      patch.telegramMessageId = tgResult.messageId;
+    }
+    await upsertOrder(orderId, patch);
 
     return res.json({
       success: true,
