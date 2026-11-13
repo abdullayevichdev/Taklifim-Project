@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Search, Check } from 'lucide-react';
+import { ChevronDown, Search, Check, AlertCircle } from 'lucide-react';
 import { useLanguage, translations } from '../locales';
 import { Language } from '../types';
 
@@ -100,14 +100,21 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         setIsDropdownOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
     if (isDropdownOpen) {
       document.addEventListener('mousedown', handleOutsideClick);
       document.addEventListener('touchstart', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
       setTimeout(() => searchInputRef.current?.focus(), 50);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isDropdownOpen]);
 
@@ -158,42 +165,47 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   const remainingDigits = selectedCountry.digitCount - digits.length;
 
   return (
-    <div className={`space-y-1 ${className}`}>
-      <div className="relative flex items-center rounded-xl bg-white border border-black/10 focus-within:border-[#D9658B] focus-within:ring-2 focus-within:ring-[#D9658B]/20 transition-all shadow-xs">
+    <div className={`space-y-1.5 ${className}`}>
+      <div
+        className={`relative flex items-center rounded-[var(--lg-radius)] glass-surface-subtle bg-white/80 min-h-[44px] focus-within:bg-white/95 focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60 transition-all ${
+          error ? 'ring-2 ring-rose-500/40 border-rose-400' : ''
+        }`}
+      >
         <div ref={dropdownRef} className="relative">
           <button
             type="button"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="h-11 px-3 flex items-center gap-1.5 bg-black/5 hover:bg-black/10 rounded-l-xl border-r border-black/10 text-xs font-bold text-[#1E1418] transition-colors select-none shrink-0"
+            className="min-h-[44px] px-3 flex items-center gap-1.5 bg-white/55 hover:bg-white/90 rounded-l-[var(--lg-radius)] border-r border-black/10 text-xs font-bold text-[#1E1418] transition-colors select-none shrink-0 cursor-pointer"
             title={`${selectedCountry.names[activeLang]} (${selectedCountry.dialCode})`}
             aria-label={t.shared.phoneCountryAria}
+            aria-expanded={isDropdownOpen}
           >
-            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#231E1B]/10 text-[9px] font-extrabold tracking-tight text-[#231E1B]">
+            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#1E1418]/10 text-[9px] font-extrabold tracking-tight text-[#1E1418]">
               {selectedCountry.code}
             </span>
-            <span className="font-mono text-xs font-bold text-[#231E1B]">{selectedCountry.dialCode}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-[#7A6A63] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            <span className="font-mono tabular-nums text-xs font-bold text-[#1E1418]">{selectedCountry.dialCode}</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-[#4A383F] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#9E3E60]' : ''}`} aria-hidden="true" />
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute top-12 left-0 w-72 max-h-72 bg-white rounded-2xl shadow-2xl border border-black/10 z-[9999] overflow-hidden flex flex-col animate-fadeIn">
-              <div className="p-2.5 border-b border-black/5 bg-gray-50/80 sticky top-0">
+            <div className="absolute top-12 left-0 w-72 max-h-72 glass-surface-elevated rounded-[var(--lg-radius-lg)] shadow-2xl border border-white/95 z-[9999] overflow-hidden flex flex-col animate-fadeIn">
+              <div className="p-2.5 border-b border-black/5 bg-white/60 sticky top-0">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-[#4A383F] absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t.shared.phoneSearchPlaceholder}
-                    className="w-full pl-8 pr-3 py-1.5 bg-white rounded-lg border border-black/10 text-xs outline-none focus:border-[#D9658B]"
+                    className="w-full pl-8 pr-3 py-1.5 bg-white/90 rounded-xl border border-black/10 text-xs text-[#1E1418] placeholder-[#7A6A63] outline-none focus:ring-2 focus:ring-[#D66389]/35 focus:border-[#D66389]/60"
                   />
                 </div>
               </div>
 
               <div className="overflow-y-auto flex-1 divide-y divide-black/5">
                 {filteredCountries.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-gray-400">
+                  <div className="p-4 text-center text-xs text-[#4A383F]">
                     {t.shared.phoneNotFound}
                   </div>
                 ) : (
@@ -204,19 +216,19 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
                         key={`${c.code}-${c.dialCode}`}
                         type="button"
                         onClick={() => handleCountrySelect(c)}
-                        className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between hover:bg-black/5 transition-colors ${
-                          isSelected ? 'bg-pink-50 text-[#D9658B] font-bold' : 'text-[#231E1B]'
+                        className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between hover:bg-white/80 transition-colors cursor-pointer ${
+                          isSelected ? 'bg-rose-50/90 text-[#9E3E60] font-bold' : 'text-[#1E1418]'
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="inline-flex items-center justify-center w-6 py-0.5 rounded bg-black/5 text-[9px] font-extrabold text-[#231E1B] shrink-0">
+                          <span className="inline-flex items-center justify-center w-6 py-0.5 rounded bg-black/5 text-[9px] font-extrabold text-[#1E1418] shrink-0">
                             {c.code}
                           </span>
                           <span className="truncate">{c.names[activeLang]}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                          <span className="font-mono text-xs text-gray-500 font-semibold">{c.dialCode}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#D9658B]" />}
+                          <span className="font-mono tabular-nums text-xs text-[#4A383F] font-semibold">{c.dialCode}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#9E3E60]" aria-hidden="true" />}
                         </div>
                       </button>
                     );
@@ -238,7 +250,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
           onChange={(e) => handleDigitsChange(e.target.value)}
           placeholder={selectedCountry.example}
           required={required}
-          className="flex-1 h-11 px-3.5 bg-transparent text-xs font-mono font-bold text-[#1E1418] placeholder:text-gray-400 placeholder:font-normal outline-none"
+          className="flex-1 min-h-[44px] px-3.5 bg-transparent text-xs sm:text-[13px] font-mono tabular-nums font-bold text-[#1E1418] placeholder:text-[#7A6A63] placeholder:font-normal outline-none"
         />
 
         {digits.length > 0 && (
@@ -249,7 +261,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
               </span>
             ) : (
               <span
-                className="text-[10px] font-mono text-gray-400"
+                className="text-[10px] font-mono tabular-nums text-[#4A383F]"
                 title={`${t.shared.phoneRemainingPrefix} ${remainingDigits} ${t.shared.phoneRemainingSuffix}`}
               >
                 {digits.length}/{selectedCountry.digitCount}
@@ -260,9 +272,13 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       </div>
 
       {error && (
-        <span className="text-rose-600 text-[11px] font-medium block animate-fadeIn">
-          {error}
-        </span>
+        <div
+          role="alert"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50/90 border border-rose-200/80 text-[11px] font-semibold text-rose-700 animate-fadeIn"
+        >
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );

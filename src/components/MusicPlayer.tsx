@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Volume2, VolumeX, Volume1, Play, Pause, X, Disc } from 'lucide-react';
+import { Volume2, VolumeX, Volume1, Play, Pause, X, Disc, Music } from 'lucide-react';
 import { audioStorage } from '../utils/audioStorage';
 import { useLanguage, translations } from '../locales';
 import { Language } from '../types';
+import { GlassSurface, GlassButton, GlassSlider } from './glass';
 
 interface MusicPlayerProps {
   url?: string;
@@ -42,10 +43,15 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Ekranning boshqa ixtiyoriy joyiga bosilganda menyuni avtomatik yopish
+  // Close player popover on outside click or Escape key
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
         setIsOpen(false);
       }
     };
@@ -53,10 +59,12 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     if (isOpen) {
       document.addEventListener('mousedown', handleOutsideClick);
       document.addEventListener('touchstart', handleOutsideClick);
+      document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -143,7 +151,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const handleVolumeChange = (newVol: number) => {
     setVolume(newVol);
     if (newVol === 0) setIsMuted(true);
-    else if (isMuted) setIsMuted(false);
+    else if (isMuted) {
+      setIsMuted(false);
+      if (audioRef.current) audioRef.current.muted = false;
+    }
     if (audioRef.current) audioRef.current.volume = newVol;
   };
 
@@ -160,45 +171,62 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    setCurrentTime(time);
-    if (audioRef.current) audioRef.current.currentTime = time;
+  const handleSeek = (nextTime: number) => {
+    setCurrentTime(nextTime);
+    if (audioRef.current) audioRef.current.currentTime = nextTime;
   };
 
   if (!url) return null;
 
   return (
-    <div ref={panelRef} className="fixed bottom-6 left-4 z-[9999] select-none">
-      {/* 
-        1. EKRANNING CHETIDA QALQIB TURUVCHI IXCHAM TUGMA (3-rasmdagi qora video play iconkasi)
-        Doimiy ravishda video qo'yish (Play) iconkasi ko'rinishida turadi.
-      */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative w-12 h-12 rounded-2xl bg-[#1A1417] text-white flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.4)] border border-white/20 hover:scale-105 active:scale-95 transition-all duration-300"
+    <div
+      ref={panelRef}
+      className="fixed left-4 z-[9999] select-none"
+      style={{ bottom: 'max(18px, calc(env(safe-area-inset-bottom) + 12px))' }}
+    >
+      {/* Floating Liquid Glass Music Pill Trigger */}
+      <GlassButton
+        tone={isPlaying ? 'tinted' : 'light'}
+        size="md"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="!min-w-[48px] !min-h-[48px] !px-3.5 shadow-[0_14px_34px_-8px_rgba(30,20,24,0.28)]"
         title={t.shared.musicControlTitle}
         aria-label={t.shared.musicAria}
+        aria-expanded={isOpen}
       >
-        <Play className="w-5 h-5 text-white ml-0.5 fill-transparent stroke-[2.5]" />
-
-        {isPlaying && (
-          <span className="absolute -inset-1 rounded-2xl border border-[#D9658B]/60 pointer-events-none opacity-70" />
-        )}
-      </button>
+        <span className="inline-flex items-center gap-2">
+          {isPlaying ? (
+            <Disc className="w-5 h-5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : (
+            <Music className="w-5 h-5 shrink-0" aria-hidden="true" />
+          )}
+          <span className="hidden sm:inline text-xs font-bold tracking-tight max-w-[140px] truncate">
+            {isPlaying ? resolvedTitle : t.shared.musicLabel}
+          </span>
+        </span>
+      </GlassButton>
 
       {isOpen && (
-        <div className="absolute bottom-16 left-0 w-[320px] sm:w-[350px] rounded-3xl p-4 bg-white/95 backdrop-blur-2xl border border-white/95 shadow-[0_25px_60px_rgba(0,0,0,0.25)] animate-fadeIn space-y-3.5">
-          {/* Top bar: Title & Close */}
-          <div className="flex items-center justify-between pb-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-[#D9658B]">
-              <Disc className="w-3.5 h-3.5" />
+        <GlassSurface
+          variant="elevated"
+          rounded="3xl"
+          role="dialog"
+          aria-label={t.shared.musicLabel}
+          className="absolute bottom-16 left-0 w-[calc(100vw-2rem)] max-w-[356px] p-4 sm:p-5 space-y-4 shadow-[0_24px_60px_-12px_rgba(30,20,24,0.26)] animate-fadeIn motion-reduce:animate-none"
+        >
+          {/* Top bar: Label & Close */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-[#9E3E60]">
+              <Disc
+                className={`w-3.5 h-3.5 ${isPlaying ? 'animate-spin motion-reduce:animate-none' : ''}`}
+                aria-hidden="true"
+              />
               <span>{t.shared.musicLabel}</span>
             </div>
             <button
+              type="button"
               onClick={() => setIsOpen(false)}
-              className="p-1 rounded-lg text-[#7A6A63] hover:bg-black/5 hover:text-black transition-colors"
+              className="w-8 h-8 rounded-xl glass-surface-subtle text-[#4A383F] hover:text-[#1E1418] hover:bg-white flex items-center justify-center transition-colors cursor-pointer"
               title={t.shared.musicCloseAria}
               aria-label={t.shared.musicCloseAria}
             >
@@ -206,88 +234,82 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             </button>
           </div>
 
-          {/* Middle: Play/Pause + Track Name + Duration + Volume */}
+          {/* Middle: Play/Pause + Track Name + Elapsed Time */}
           <div className="flex items-center gap-3">
-            <button
+            <GlassButton
+              tone="tinted"
+              size="md"
               onClick={togglePlay}
-              className="w-12 h-12 rounded-2xl bg-[#1A1417] text-white flex items-center justify-center shadow-md active:scale-95 transition-all shrink-0 hover:bg-black"
+              className="!min-w-[48px] !w-12 !h-12 !px-0 shrink-0"
               title={isPlaying ? t.shared.musicPauseAria : t.shared.musicPlayAria}
               aria-label={isPlaying ? t.shared.musicPauseAria : t.shared.musicPlayAria}
             >
               {isPlaying ? (
-                <Pause className="w-5 h-5" />
+                <Pause className="w-5 h-5" aria-hidden="true" />
               ) : (
-                <Play className="w-5 h-5 ml-0.5 fill-transparent stroke-[2.5]" />
+                <Play className="w-5 h-5 ml-0.5" aria-hidden="true" />
               )}
-            </button>
+            </GlassButton>
 
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-bold text-[#1E1418] truncate leading-tight" title={resolvedTitle}>
+              <div className="text-sm font-bold text-[#1E1418] truncate leading-tight" title={resolvedTitle}>
                 {resolvedTitle}
               </div>
-              <div className="flex items-center gap-3 text-[10px] text-[#7A6A63] font-mono mt-1">
+              <div className="flex items-center gap-1.5 text-xs text-[#4A383F] tabular-nums mt-1 font-medium">
                 <span>{formatTime(currentTime)}</span>
                 <span className="opacity-40">/</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
-
-            <div className="flex items-center gap-1.5 pl-2 border-l border-black/5 shrink-0">
-              <button
-                onClick={toggleMute}
-                className="w-9 h-9 rounded-xl bg-[#FBF0F4] text-[#D9658B] flex items-center justify-center hover:bg-[#F5E1E9] transition-colors"
-                title={isMuted ? t.shared.musicUnmuteAria : t.shared.musicMuteAria}
-                aria-label={isMuted ? t.shared.musicUnmuteAria : t.shared.musicMuteAria}
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-4 h-4 text-rose-500" />
-                ) : volume < 0.5 ? (
-                  <Volume1 className="w-4 h-4" />
-                ) : (
-                  <Volume2 className="w-4 h-4" />
-                )}
-              </button>
-              <span className="text-[11px] font-mono font-bold text-[#5C4F48] w-7 text-right">
-                {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
-              </span>
-            </div>
           </div>
 
-          {/* Bottom: Seek & Volume sliders */}
-          <div className="pt-1 border-t border-black/5 flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-1">
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                value={currentTime}
-                onChange={handleSeek}
-                className="w-full h-1.5 bg-black/10 rounded-lg appearance-none cursor-pointer accent-[#D9658B]"
-                title={t.shared.musicSeekAria}
-                aria-label={t.shared.musicSeekAria}
-              />
-            </div>
+          {/* Seek Slider */}
+          <div className="pt-2 border-t border-black/5">
+            <GlassSlider
+              key={`seek-${Math.round(duration || 100)}`}
+              min={0}
+              max={duration > 0 ? duration : 100}
+              step={0.5}
+              value={Math.min(currentTime, duration > 0 ? duration : 100)}
+              onChange={handleSeek}
+              label={t.shared.musicSeekAria}
+              valueDisplay={`${formatTime(currentTime)} / ${formatTime(duration)}`}
+            />
+          </div>
 
-            <div className="w-px h-4 bg-black/10 shrink-0" />
+          {/* Volume Control Row */}
+          <div className="pt-2 border-t border-black/5 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="w-10 h-10 rounded-xl glass-surface-subtle text-[#9E3E60] flex items-center justify-center hover:bg-white transition-colors shrink-0 cursor-pointer"
+              title={isMuted ? t.shared.musicUnmuteAria : t.shared.musicMuteAria}
+              aria-label={isMuted ? t.shared.musicUnmuteAria : t.shared.musicMuteAria}
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-rose-600" aria-hidden="true" />
+              ) : volume < 0.5 ? (
+                <Volume1 className="w-4 h-4" aria-hidden="true" />
+              ) : (
+                <Volume2 className="w-4 h-4" aria-hidden="true" />
+              )}
+            </button>
 
-            <div className="w-24 sm:w-28 flex items-center gap-1">
-              <Volume1 className="w-3 h-3 text-[#7A6A63] shrink-0" />
-              <input
-                type="range"
+            <div className="flex-1 min-w-0">
+              <GlassSlider
                 min={0}
                 max={1}
-                step="0.02"
+                step={0.02}
                 value={isMuted ? 0 : volume}
-                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-black/10 rounded-lg appearance-none cursor-pointer accent-[#D9658B]"
-                title={t.shared.musicVolumeAria}
-                aria-label={t.shared.musicVolumeAria}
+                onChange={handleVolumeChange}
+                label={t.shared.musicVolumeAria}
+                valueDisplay={`${isMuted ? 0 : Math.round(volume * 100)}%`}
               />
-              <Volume2 className="w-3 h-3 text-[#D9658B] shrink-0" />
             </div>
           </div>
-        </div>
+        </GlassSurface>
       )}
     </div>
   );
 };
+

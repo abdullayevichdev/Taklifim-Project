@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { GlassSurface } from './glass';
 
 export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useAuth();
@@ -8,33 +9,41 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-24 lg:bottom-6 right-4 sm:right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+    >
       {toasts.map((toast) => (
-        <div
+        <GlassSurface
           key={toast.id}
-          className="pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl glass-panel-elevated shadow-xl border border-white/95 animate-fadeIn"
+          variant="elevated"
+          rounded="2xl"
+          className="pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 animate-fadeIn"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             {toast.type === 'success' && (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
             )}
             {toast.type === 'error' && (
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" aria-hidden="true" />
             )}
             {toast.type === 'info' && (
-              <Info className="w-5 h-5 text-sky-600 shrink-0" />
+              <Info className="w-5 h-5 text-[#4A9BD4] shrink-0" aria-hidden="true" />
             )}
-            <p className="text-xs font-medium text-[#231E1B] leading-tight">
+            <p className="text-xs font-semibold text-[#1E1418] leading-snug">
               {toast.message}
             </p>
           </div>
           <button
+            type="button"
             onClick={() => removeToast(toast.id)}
-            className="p-1 rounded-lg hover:bg-black/5 text-[#7A6A63] transition-colors"
+            aria-label="Close notification"
+            className="min-w-[32px] min-h-[32px] rounded-full hover:bg-black/5 text-[#4A383F] hover:text-[#1E1418] flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
-        </div>
+        </GlassSurface>
       ))}
     </div>
   );

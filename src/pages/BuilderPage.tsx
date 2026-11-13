@@ -63,6 +63,18 @@ import {
   Phone,
 } from 'lucide-react';
 import { TaklifimLogo } from '../components/TaklifimLogo';
+import {
+  GlassSurface,
+  GlassButton,
+  GlassSwitch,
+  GlassSegmented,
+  GlassInput,
+  GlassTextarea,
+  GlassModal,
+} from '../components/glass';
+
+const GLASS_FIELD_CLS =
+  'w-full min-h-[42px] px-3.5 py-2 rounded-[var(--lg-radius)] glass-surface-subtle bg-white/80 text-xs sm:text-[13px] text-[#1E1418] placeholder-[#7A6A63] outline-none transition-all focus:bg-white/95 focus:ring-2 focus:ring-[#D66389]/35 focus:border-[#D66389]/60';
 
 // Mashhur tantanalar zallari va ularning aniq koordinatalari
 const POPULAR_VENUES = [
@@ -752,78 +764,86 @@ export const BuilderPage: React.FC = () => {
 
     return (
       <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4">
-        <div className="w-full max-w-lg glass-panel-elevated rounded-3xl p-8 sm:p-10 border border-white/95 shadow-2xl text-center space-y-6 animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-100 to-teal-100 mx-auto flex items-center justify-center text-emerald-600 shadow-sm">
-            <CheckCircle2 className="w-9 h-9" />
+        <GlassSurface variant="elevated" rounded="3xl" className="w-full max-w-lg p-8 sm:p-10 text-center space-y-6 animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 mx-auto flex items-center justify-center text-emerald-700 shadow-xs">
+            <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            <span className="inline-block text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
               {t.builder.orderCompleteBadge}
             </span>
-            <h1 className="font-playfair text-3xl font-bold text-[#231E1B]">
+            <h1 className="font-playfair text-3xl font-bold text-[#1E1418]">
               {t.builder.orderCompleteHeading}
             </h1>
-            <p className="text-xs sm:text-sm text-[#5C4F48] leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#4A383F] leading-relaxed">
               {t.builder.orderCompleteDesc}
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/80 border border-black/5 text-xs text-left space-y-2.5">
-            <div className="flex justify-between border-b pb-1.5">
-              <span className="text-[#8A7C74]">{t.guestGate.eventLabel}:</span>
-              <strong className="text-[#231E1B]">{invitationState.eventTitle}</strong>
+          <GlassSurface variant="subtle" rounded="2xl" className="p-4 text-xs text-left space-y-2.5">
+            <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+              <span className="text-[#4A383F]">{t.guestGate.eventLabel}:</span>
+              <strong className="text-[#1E1418] text-right">{invitationState.eventTitle}</strong>
             </div>
-            <div className="flex justify-between border-b pb-1.5">
-              <span className="text-[#8A7C74]">{t.builder.reviewCouple}</span>
-              <strong className="text-[#231E1B]">{invitationState.hostNames}</strong>
+            <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+              <span className="text-[#4A383F]">{t.builder.reviewCouple}</span>
+              <strong className="text-[#1E1418] text-right">{invitationState.hostNames}</strong>
             </div>
-            <div className="flex justify-between border-b pb-1.5">
-              <span className="text-[#8A7C74]">{t.guestGate.dateLabel}:</span>
-              <strong className="text-[#231E1B]">{invitationState.eventDate} ({invitationState.startTime})</strong>
+            <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+              <span className="text-[#4A383F]">{t.guestGate.dateLabel}:</span>
+              <strong className="text-[#1E1418] tabular-nums text-right">{invitationState.eventDate} ({invitationState.startTime})</strong>
             </div>
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-[#8A7C74]">{t.builder.linkLabel}</span>
-              <span className="font-mono text-[#D9658B] font-bold truncate max-w-[200px]">
+            <div className="flex justify-between items-center gap-3 pt-0.5">
+              <span className="text-[#4A383F]">{t.builder.linkLabel}</span>
+              <span className="font-mono text-[#9E3E60] font-bold truncate max-w-[200px]">
                 {liveUrl}
               </span>
             </div>
-          </div>
+          </GlassSurface>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <Link
-              to={liveUrl}
-              className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold text-white bg-[#231E1B] hover:bg-black transition-all shadow-sm flex items-center justify-center gap-2 hover:scale-[1.02]"
+            <GlassButton
+              tone="tinted"
+              size="md"
+              href={liveUrl}
+              onAnchorClick={(e) => {
+                e.preventDefault();
+                navigate(liveUrl);
+              }}
+              leftIcon={<Eye className="w-4 h-4" aria-hidden="true" />}
+              className="w-full"
             >
-              <Eye className="w-4 h-4" />
-              <span>{t.builder.viewInvitationBtn}</span>
-            </Link>
+              {t.builder.viewInvitationBtn}
+            </GlassButton>
 
-            <button
+            <GlassButton
               type="button"
+              tone="light"
+              size="md"
               onClick={() => {
                 if (navigator.clipboard) {
                   navigator.clipboard.writeText(fullLiveUrl);
                   showToast(t.common.linkCopied, 'success');
                 }
               }}
-              className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold text-[#231E1B] glass-panel hover:bg-white transition-all shadow-sm flex items-center justify-center gap-2"
+              leftIcon={<Share2 className="w-4 h-4 text-[#9E3E60]" aria-hidden="true" />}
+              className="w-full"
             >
-              <Share2 className="w-4 h-4" />
-              <span>{t.common.copyLink}</span>
-            </button>
+              {t.common.copyLink}
+            </GlassButton>
           </div>
 
           <div className="pt-2 border-t border-black/5">
             <Link
               to="/dashboard"
-              className="text-xs font-semibold text-[#8A7C74] hover:text-[#231E1B] flex items-center justify-center gap-1.5"
+              className="text-xs font-semibold text-[#4A383F] hover:text-[#1E1418] inline-flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{t.builder.goDashboardCta}</span>
             </Link>
           </div>
-        </div>
+        </GlassSurface>
       </div>
     );
   }
@@ -832,77 +852,77 @@ export const BuilderPage: React.FC = () => {
     <div className="pt-24 pb-16 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Top Builder Bar */}
-        <div className="glass-panel-elevated rounded-3xl p-4 sm:p-5 border border-white/95 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <GlassSurface variant="elevated" rounded="3xl" className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               to="/templates"
-              className="p-2 rounded-xl hover:bg-black/5 text-[#5C4F48] transition-colors"
+              className="min-h-[40px] min-w-[40px] rounded-full glass-surface-subtle hover:bg-white text-[#4A383F] hover:text-[#1E1418] flex items-center justify-center transition-colors"
               title={t.common.back}
+              aria-label={t.common.back}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
             </Link>
             <div>
-              <h1 className="font-playfair text-xl font-bold text-[#231E1B]">
+              <h1 className="font-playfair text-xl font-bold text-[#1E1418]">
                 {t.builder.title}
               </h1>
-              <p className="text-[11px] text-[#7A6A63]">
+              <p className="text-[11px] text-[#4A383F] tabular-nums">
                 {stepsList[currentStep - 1]?.title} {t.builder.stepProgressSuffix} ({currentStep}/11)
               </p>
             </div>
           </div>
 
           {/* Quick Draft Actions */}
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex flex-wrap items-center gap-2">
+            <GlassButton
+              type="button"
+              tone="light"
+              size="sm"
               onClick={handleSaveDraft}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#4A3E39] glass-panel hover:bg-white border border-black/5"
+              leftIcon={<Save className="w-3.5 h-3.5 text-[#9E3E60]" aria-hidden="true" />}
               title={t.builder.saveDraft}
             >
-              <Save className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{t.builder.saveDraft}</span>
-            </button>
+            </GlassButton>
             <button
+              type="button"
               onClick={() => setShowResetModal(true)}
-              className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors"
+              className="min-h-[40px] min-w-[40px] rounded-full glass-surface-subtle hover:bg-rose-50 text-rose-600 flex items-center justify-center transition-colors cursor-pointer"
               title={t.builder.startOver}
+              aria-label={t.builder.startOver}
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-4 h-4" aria-hidden="true" />
             </button>
 
             {/* Mobile View Toggle */}
-            <div className="flex lg:hidden items-center p-1 rounded-xl bg-black/5">
-              <button
-                onClick={() => setActiveTabMobile('settings')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold ${
-                  activeTabMobile === 'settings' ? 'bg-white shadow-xs text-[#231E1B]' : 'text-[#7A6A63]'
-                }`}
-              >
-                {t.builder.settingsTab}
-              </button>
-              <button
-                onClick={() => setActiveTabMobile('preview')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold ${
-                  activeTabMobile === 'preview' ? 'bg-white shadow-xs text-[#231E1B]' : 'text-[#7A6A63]'
-                }`}
-              >
-                {t.builder.previewShortTab}
-              </button>
+            <div className="lg:hidden">
+              <GlassSegmented
+                ariaLabel={t.builder.title}
+                value={activeTabMobile}
+                onChange={(val) => setActiveTabMobile(val)}
+                options={[
+                  { value: 'settings', label: t.builder.settingsTab },
+                  { value: 'preview', label: t.builder.previewShortTab },
+                ]}
+              />
             </div>
           </div>
-        </div>
+        </GlassSurface>
 
         {/* Steps Progress Pills (Horizontal Scrollable) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
           {stepsList.map((st) => (
             <button
               key={st.num}
+              type="button"
               onClick={() => setCurrentStep(st.num)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              aria-current={currentStep === st.num ? 'step' : undefined}
+              className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer tabular-nums ${
                 currentStep === st.num
-                  ? 'bg-[#231E1B] text-white shadow-xs'
+                  ? 'bg-[#1E1418] text-white shadow-sm'
                   : currentStep > st.num
-                  ? 'bg-[#E8F3FA] text-[#1E3A5F]'
-                  : 'glass-panel text-[#8A7C74] hover:bg-white'
+                  ? 'glass-surface-tinted-sky text-[#1E3A5F] hover:bg-white/90'
+                  : 'glass-surface-subtle text-[#4A383F] hover:text-[#1E1418] hover:bg-white/90'
               }`}
             >
               <span>{st.num}. {st.title}</span>
@@ -913,8 +933,10 @@ export const BuilderPage: React.FC = () => {
         {/* SPLIT LAYOUT: Settings Panel on Left, Reactive Live Preview on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT: STEP SETTINGS PANEL */}
-          <div
-            className={`lg:col-span-6 glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-white/95 shadow-lg space-y-6 ${
+          <GlassSurface
+            variant="elevated"
+            rounded="3xl"
+            className={`lg:col-span-6 p-6 sm:p-8 space-y-6 ${
               activeTabMobile === 'preview' ? 'hidden lg:block' : 'block'
             }`}
           >
@@ -968,43 +990,35 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 2: Event Details */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step2Heading}
                 </h3>
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.eventTypeLabel}</label>
-                    <input
-                      type="text"
-                      value={invitationState.eventType}
-                      onChange={(e) =>
-                        setInvitationState((p) => ({ ...p, eventType: e.target.value }))
-                      }
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                    />
-                  </div>
+                <div className="space-y-3.5 text-xs">
+                  <GlassInput
+                    type="text"
+                    label={t.builder.eventTypeLabel}
+                    value={invitationState.eventType}
+                    onChange={(e) =>
+                      setInvitationState((p) => ({ ...p, eventType: e.target.value }))
+                    }
+                  />
+
+                  <GlassInput
+                    type="text"
+                    label={t.builder.hostNamesLabel}
+                    value={invitationState.hostNames}
+                    onChange={(e) =>
+                      setInvitationState((p) => ({ ...p, hostNames: e.target.value }))
+                    }
+                    placeholder={t.builder.hostNamesPlaceholder}
+                  />
 
                   <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
-                      {t.builder.hostNamesLabel}
-                    </label>
-                    <input
-                      type="text"
-                      value={invitationState.hostNames}
-                      onChange={(e) =>
-                        setInvitationState((p) => ({ ...p, hostNames: e.target.value }))
-                      }
-                      placeholder={t.builder.hostNamesPlaceholder}
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
+                    <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">
                       {t.builder.slugLabel}
                     </label>
-                    <div className="flex items-center gap-1 bg-white p-2.5 rounded-xl border border-black/10 text-xs">
-                      <span className="text-[#8A7C74] shrink-0 font-mono text-[11px]">{typeof window !== 'undefined' ? window.location.origin : ''}/i/</span>
+                    <div className="flex items-center gap-1 glass-surface-subtle bg-white/80 min-h-[44px] px-3.5 py-2 rounded-[var(--lg-radius)] text-xs focus-within:bg-white/95 focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
+                      <span className="text-[#4A383F] shrink-0 font-mono text-[11px]">{typeof window !== 'undefined' ? window.location.origin : ''}/i/</span>
                       <input
                         type="text"
                         value={invitationState.slug}
@@ -1013,45 +1027,45 @@ export const BuilderPage: React.FC = () => {
                           setInvitationState((p) => ({ ...p, slug: cleaned }));
                         }}
                         placeholder="asrorbek-madina-4135"
-                        className="w-full bg-transparent font-mono text-[#231E1B] font-bold outline-none"
+                        className="w-full bg-transparent font-mono text-[#1E1418] font-bold outline-none"
                       />
                     </div>
-                    <span className="text-[10px] text-[#7A6A63] block mt-1">
+                    <span className="text-[10px] text-[#4A383F] block mt-1">
                       {t.builder.slugHint}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.weddingDateLabel}</label>
+                      <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">{t.builder.weddingDateLabel}</label>
                       <input
                         type="date"
                         value={invitationState.eventDate}
                         onChange={(e) =>
                           setInvitationState((p) => ({ ...p, eventDate: e.target.value }))
                         }
-                        className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
+                        className={GLASS_FIELD_CLS}
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.startTimeLabel}</label>
+                      <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">{t.builder.startTimeLabel}</label>
                       <input
                         type="time"
                         value={invitationState.startTime}
                         onChange={(e) =>
                           setInvitationState((p) => ({ ...p, startTime: e.target.value }))
                         }
-                        className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
+                        className={GLASS_FIELD_CLS}
                       />
                     </div>
                   </div>
 
                   {/* Venue location type */}
                   <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1.5">
+                    <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">
                       {t.builder.venueWhereLabel}
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2.5">
                       <button
                         type="button"
                         onClick={() =>
@@ -1061,10 +1075,10 @@ export const BuilderPage: React.FC = () => {
                             venueName: p.venueName === 'Xonadonda' || p.venueName === 'Uyda' ? '' : p.venueName,
                           }))
                         }
-                        className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all border ${
+                        className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all border cursor-pointer ${
                           (invitationState.venueLocationType || 'restaurant') === 'restaurant'
-                            ? 'bg-white border-[#D9658B] text-[#D9658B] shadow-xs font-bold ring-2 ring-[#D9658B]/20'
-                            : 'bg-white/60 border-black/10 text-[#5C4F48] hover:bg-white'
+                            ? 'glass-surface-tinted-pink border-[#C64873] text-[#9E3E60] shadow-xs font-bold'
+                            : 'glass-surface-subtle text-[#4A383F] hover:bg-white/90'
                         }`}
                       >
                         <span className="text-xl">🏛️</span>
@@ -1080,10 +1094,10 @@ export const BuilderPage: React.FC = () => {
                             venueName: 'Xonadonda',
                           }))
                         }
-                        className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all border ${
+                        className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all border cursor-pointer ${
                           invitationState.venueLocationType === 'home'
-                            ? 'bg-white border-[#D9658B] text-[#D9658B] shadow-xs font-bold ring-2 ring-[#D9658B]/20'
-                            : 'bg-white/60 border-black/10 text-[#5C4F48] hover:bg-white'
+                            ? 'glass-surface-tinted-pink border-[#C64873] text-[#9E3E60] shadow-xs font-bold'
+                            : 'glass-surface-subtle text-[#4A383F] hover:bg-white/90'
                         }`}
                       >
                         <span className="text-xl">🏡</span>
@@ -1095,7 +1109,7 @@ export const BuilderPage: React.FC = () => {
                   {(invitationState.venueLocationType || 'restaurant') === 'restaurant' && (
                     <div className="space-y-3 pt-1 animate-fadeIn">
                       <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1.5">
+                        <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">
                           {t.builder.audienceLabel}
                         </label>
                         <div className="grid grid-cols-3 gap-2">
@@ -1113,10 +1127,10 @@ export const BuilderPage: React.FC = () => {
                                   celebrationAudience: item.id as 'all' | 'men' | 'women',
                                 }))
                               }
-                              className={`py-2 px-1.5 rounded-xl text-center transition-all border flex flex-col items-center gap-1 ${
+                              className={`py-2.5 px-2 rounded-xl text-center transition-all border flex flex-col items-center gap-1 cursor-pointer ${
                                 (invitationState.celebrationAudience || 'all') === item.id
-                                  ? 'bg-white border-[#D9658B] text-[#D9658B] shadow-xs font-bold ring-2 ring-[#D9658B]/15'
-                                  : 'bg-white/60 border-black/10 text-[#5C4F48] hover:bg-white'
+                                  ? 'glass-surface-tinted-pink border-[#C64873] text-[#9E3E60] shadow-xs font-bold'
+                                  : 'glass-surface-subtle text-[#4A383F] hover:bg-white/90'
                               }`}
                             >
                               <span className="text-base">{item.icon}</span>
@@ -1126,35 +1140,27 @@ export const BuilderPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.venueHallLabel}</label>
-                        <input
-                          type="text"
-                          value={invitationState.venueName === 'Xonadonda' ? '' : invitationState.venueName}
-                          onChange={(e) =>
-                            setInvitationState((p) => ({ ...p, venueName: e.target.value }))
-                          }
-                          placeholder={t.builder.venueHallPlaceholder}
-                          className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                        />
-                      </div>
+                      <GlassInput
+                        type="text"
+                        label={t.builder.venueHallLabel}
+                        value={invitationState.venueName === 'Xonadonda' ? '' : invitationState.venueName}
+                        onChange={(e) =>
+                          setInvitationState((p) => ({ ...p, venueName: e.target.value }))
+                        }
+                        placeholder={t.builder.venueHallPlaceholder}
+                      />
                     </div>
                   )}
 
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
-                      {invitationState.venueLocationType === 'home' ? t.builder.homeAddressLabel : t.builder.exactAddressLabel}
-                    </label>
-                    <input
-                      type="text"
-                      value={invitationState.venueAddress}
-                      onChange={(e) =>
-                        setInvitationState((p) => ({ ...p, venueAddress: e.target.value }))
-                      }
-                      placeholder={invitationState.venueLocationType === 'home' ? t.builder.homeAddressPlaceholder : t.builder.venueAddressPlaceholder}
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                    />
-                  </div>
+                  <GlassInput
+                    type="text"
+                    label={invitationState.venueLocationType === 'home' ? t.builder.homeAddressLabel : t.builder.exactAddressLabel}
+                    value={invitationState.venueAddress}
+                    onChange={(e) =>
+                      setInvitationState((p) => ({ ...p, venueAddress: e.target.value }))
+                    }
+                    placeholder={invitationState.venueLocationType === 'home' ? t.builder.homeAddressPlaceholder : t.builder.venueAddressPlaceholder}
+                  />
                 </div>
               </div>
             )}
@@ -1162,37 +1168,28 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 3: Invitation Text */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step3Heading}
                 </h3>
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
-                      {t.builder.sincereMessageLabel}
-                    </label>
-                    <textarea
-                      rows={5}
-                      value={invitationState.invitationMessage}
-                      onChange={(e) =>
-                        setInvitationState((p) => ({ ...p, invitationMessage: e.target.value }))
-                      }
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B] leading-relaxed"
-                    />
-                  </div>
+                <div className="space-y-3.5 text-xs">
+                  <GlassTextarea
+                    rows={5}
+                    label={t.builder.sincereMessageLabel}
+                    value={invitationState.invitationMessage}
+                    onChange={(e) =>
+                      setInvitationState((p) => ({ ...p, invitationMessage: e.target.value }))
+                    }
+                    className="leading-relaxed"
+                  />
 
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
-                      {t.builder.quoteLabel}
-                    </label>
-                    <input
-                      type="text"
-                      value={invitationState.invitationQuote || ''}
-                      onChange={(e) =>
-                        setInvitationState((p) => ({ ...p, invitationQuote: e.target.value }))
-                      }
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                    />
-                  </div>
+                  <GlassInput
+                    type="text"
+                    label={t.builder.quoteLabel}
+                    value={invitationState.invitationQuote || ''}
+                    onChange={(e) =>
+                      setInvitationState((p) => ({ ...p, invitationQuote: e.target.value }))
+                    }
+                  />
                 </div>
               </div>
             )}
@@ -1376,7 +1373,7 @@ export const BuilderPage: React.FC = () => {
                 </div>
 
                 {/* Gallery section title */}
-                <div className="p-3.5 rounded-2xl bg-white/70 border border-black/5 space-y-2.5">
+                <GlassSurface variant="subtle" rounded="2xl" className="p-3.5 space-y-2.5">
                   <label className="font-bold text-xs text-[#3A2D28] block">
                     {t.builder.galleryTitleTypeLabel}
                   </label>
@@ -1398,29 +1395,26 @@ export const BuilderPage: React.FC = () => {
                       { value: 'Boshqa', label: `✏️ ${t.builder.galleryTitleOptionCustom}` },
                     ]}
                     className="w-full"
-                    buttonClassName="w-full justify-between text-xs"
+                    buttonClassName="w-full justify-between text-xs min-h-[42px] rounded-[var(--lg-radius)]"
                     dropdownClassName="w-full left-0 right-0"
                   />
 
                   {/* Custom title input */}
                   {(!matchedPreset || invitationState.galleryTitle === '') && (
                     <div className="pt-1.5 animate-fadeIn">
-                      <label className="text-[11px] font-semibold text-[#7A6A63] block mb-1">
-                        {t.builder.galleryCustomTitleLabel}
-                      </label>
-                      <input
+                      <GlassInput
                         type="text"
+                        label={t.builder.galleryCustomTitleLabel}
                         value={invitationState.galleryTitle || ''}
                         onChange={(e) => setInvitationState((p) => ({ ...p, galleryTitle: e.target.value }))}
                         placeholder={t.builder.galleryCustomTitlePlaceholder}
-                        className="w-full p-2.5 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#D9658B] transition-all"
                       />
                     </div>
                   )}
-                </div>
+                </GlassSurface>
 
                 {/* Gallery position */}
-                <div className="p-3.5 rounded-2xl bg-white/70 border border-black/5 space-y-2">
+                <GlassSurface variant="subtle" rounded="2xl" className="p-3.5 space-y-2">
                   <label className="font-bold text-xs text-[#3A2D28] block">
                     {t.builder.galleryPositionLabel}
                   </label>
@@ -1436,26 +1430,26 @@ export const BuilderPage: React.FC = () => {
                           key={pos.id}
                           type="button"
                           onClick={() => setInvitationState((p) => ({ ...p, galleryPosition: pos.id as any }))}
-                          className={`p-2.5 rounded-xl text-left border transition-all text-xs flex flex-col justify-between gap-1.5 ${
+                          className={`p-2.5 rounded-xl text-left border transition-all text-xs flex flex-col justify-between gap-1.5 cursor-pointer ${
                             isSel
-                              ? 'bg-gradient-to-tr from-[#FFF5F8] to-[#F0F8FF] border-[#D9658B] shadow-xs ring-1 ring-[#D9658B]/30'
-                              : 'bg-white/80 border-black/10 hover:border-black/20'
+                              ? 'glass-surface-tinted-pink border-[#C64873] shadow-xs'
+                              : 'bg-white/75 border-black/10 hover:bg-white'
                           }`}
                         >
-                          <span className={`font-bold ${isSel ? 'text-[#D9658B]' : 'text-[#3A2D28]'}`}>
+                          <span className={`font-bold ${isSel ? 'text-[#9E3E60]' : 'text-[#3A2D28]'}`}>
                             {pos.label}
                           </span>
-                          <span className="text-[10px] text-[#7A6A63] font-medium bg-black/5 px-2 py-0.5 rounded-full w-max">
+                          <span className="text-[10px] text-[#4A383F] font-medium bg-black/5 px-2 py-0.5 rounded-full w-max">
                             {pos.badge}
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                </div>
+                </GlassSurface>
 
                 {/* Photo upload */}
-                <div className="border-2 border-dashed border-[#B48B47]/40 rounded-2xl p-6 text-center hover:bg-white/40 transition-colors bg-white/20">
+                <div className="glass-surface-subtle border-2 border-dashed border-[#C64873]/40 hover:border-[#C64873] rounded-2xl p-6 text-center hover:bg-white/80 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
@@ -1465,13 +1459,13 @@ export const BuilderPage: React.FC = () => {
                     id="photo-upload-input"
                   />
                   <label htmlFor="photo-upload-input" className="cursor-pointer space-y-2 block">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center mx-auto text-[#231E1B] shadow-xs">
-                      <ImageIcon className="w-6 h-6" />
+                    <div className="w-12 h-12 rounded-2xl glass-surface-tinted-pink flex items-center justify-center mx-auto text-[#9E3E60] shadow-xs">
+                      <ImageIcon className="w-6 h-6" aria-hidden="true" />
                     </div>
-                    <div className="text-xs font-bold text-[#231E1B]">
+                    <div className="text-xs font-bold text-[#1E1418]">
                       {t.builder.selectNewPhotosLabel}
                     </div>
-                    <div className="text-[11px] text-[#7A6A63]">
+                    <div className="text-[11px] text-[#4A383F]">
                       {t.builder.selectNewPhotosHint}
                     </div>
                   </label>
@@ -1564,22 +1558,24 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 6: Schedule */}
             {currentStep === 6 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                     {t.builder.step6Heading}
                   </h3>
-                  <button
+                  <GlassButton
+                    type="button"
+                    tone="tinted"
+                    size="sm"
                     onClick={handleAddScheduleItem}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold hover:bg-black"
+                    leftIcon={<Plus className="w-3.5 h-3.5" aria-hidden="true" />}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>{t.builder.addScheduleItem}</span>
-                  </button>
+                    {t.builder.addScheduleItem}
+                  </GlassButton>
                 </div>
 
                 <div className="space-y-3">
                   {invitationState.schedule.map((item) => (
-                    <div key={item.id} className="p-3 rounded-2xl glass-panel border border-black/10 flex items-center gap-2">
+                    <GlassSurface key={item.id} variant="subtle" rounded="2xl" className="p-3 flex items-center gap-2">
                       <input
                         type="time"
                         value={item.time}
@@ -1590,7 +1586,7 @@ export const BuilderPage: React.FC = () => {
                             schedule: p.schedule.map((s) => (s.id === item.id ? { ...s, time: val } : s)),
                           }));
                         }}
-                        className="w-24 p-1.5 rounded-lg text-xs font-bold border border-black/10 bg-white"
+                        className="w-24 min-h-[38px] px-2 py-1.5 rounded-xl text-xs font-bold border border-black/10 bg-white/90 text-[#1E1418] tabular-nums outline-none focus:ring-2 focus:ring-[#D66389]/35"
                       />
                       <input
                         type="text"
@@ -1603,15 +1599,17 @@ export const BuilderPage: React.FC = () => {
                           }));
                         }}
                         placeholder={t.builder.stepNamePlaceholder}
-                        className="flex-1 p-1.5 rounded-lg text-xs border border-black/10 bg-white"
+                        className="flex-1 min-h-[38px] px-3 py-1.5 rounded-xl text-xs border border-black/10 bg-white/90 text-[#1E1418] outline-none focus:ring-2 focus:ring-[#D66389]/35"
                       />
                       <button
+                        type="button"
                         onClick={() => handleRemoveScheduleItem(item.id)}
-                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                        aria-label={t.dashboard.deleteActionTitle}
+                        className="min-h-[38px] min-w-[38px] rounded-xl text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
-                    </div>
+                    </GlassSurface>
                   ))}
                 </div>
               </div>
@@ -1621,10 +1619,10 @@ export const BuilderPage: React.FC = () => {
             {currentStep === 7 && (
               <div className="space-y-5">
                 <div>
-                  <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                     {t.builder.step7Heading}
                   </h3>
-                  <p className="text-xs text-[#7A6A63] mt-0.5">
+                  <p className="text-xs text-[#4A383F] mt-0.5">
                     {t.builder.step7Desc}
                   </p>
                 </div>
@@ -1632,31 +1630,23 @@ export const BuilderPage: React.FC = () => {
                 <div className="space-y-4 text-xs">
                   {/* Venue name (if restaurant) */}
                   {(invitationState.venueLocationType || 'restaurant') === 'restaurant' && (
-                    <div>
-                      <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.venueHallLabel}</label>
-                      <input
-                        type="text"
-                        value={invitationState.venueName === 'Xonadonda' ? '' : invitationState.venueName}
-                        onChange={(e) => setInvitationState((p) => ({ ...p, venueName: e.target.value }))}
-                        placeholder={t.builder.venueHallPlaceholder}
-                        className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                      />
-                    </div>
+                    <GlassInput
+                      type="text"
+                      label={t.builder.venueHallLabel}
+                      value={invitationState.venueName === 'Xonadonda' ? '' : invitationState.venueName}
+                      onChange={(e) => setInvitationState((p) => ({ ...p, venueName: e.target.value }))}
+                      placeholder={t.builder.venueHallPlaceholder}
+                    />
                   )}
 
                   {/* Exact address */}
-                  <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
-                      {invitationState.venueLocationType === 'home' ? t.builder.homeAddressLabel : t.builder.exactAddressLabel}
-                    </label>
-                    <input
-                      type="text"
-                      value={invitationState.venueAddress}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, venueAddress: e.target.value }))}
-                      placeholder={invitationState.venueLocationType === 'home' ? t.builder.homeAddressPlaceholder : t.builder.venueAddressPlaceholder}
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10 outline-none text-[#231E1B]"
-                    />
-                  </div>
+                  <GlassInput
+                    type="text"
+                    label={invitationState.venueLocationType === 'home' ? t.builder.homeAddressLabel : t.builder.exactAddressLabel}
+                    value={invitationState.venueAddress}
+                    onChange={(e) => setInvitationState((p) => ({ ...p, venueAddress: e.target.value }))}
+                    placeholder={invitationState.venueLocationType === 'home' ? t.builder.homeAddressPlaceholder : t.builder.venueAddressPlaceholder}
+                  />
 
                   {/* Interactive Map */}
                   <div className="space-y-2">
@@ -1693,83 +1683,79 @@ export const BuilderPage: React.FC = () => {
             {currentStep === 8 && (
               <div className="space-y-5">
                 <div>
-                  <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                     {t.builder.step8Heading}
                   </h3>
-                  <p className="text-xs text-[#7A6A63] mt-1">
+                  <p className="text-xs text-[#4A383F] mt-1">
                     {t.builder.step8Desc}
                   </p>
                 </div>
 
                 <div className="space-y-4 text-xs">
                   {/* Music toggle */}
-                  <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-2xl bg-white/70 border border-black/5 hover:bg-white transition-all shadow-xs">
-                    <input
-                      type="checkbox"
+                  <GlassSurface variant="subtle" rounded="2xl" className="p-3.5">
+                    <GlassSwitch
                       checked={invitationState.musicEnabled}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, musicEnabled: e.target.checked }))}
-                      className="w-4 h-4 rounded text-[#D9658B]"
+                      onChange={(checked) => setInvitationState((p) => ({ ...p, musicEnabled: checked }))}
+                      label={t.builder.musicToggleTitle}
+                      description={t.builder.musicToggleDesc}
                     />
-                    <div>
-                      <span className="font-bold text-sm text-[#231E1B] block">{t.builder.musicToggleTitle}</span>
-                      <span className="text-[11px] text-[#7A6A63]">{t.builder.musicToggleDesc}</span>
-                    </div>
-                  </label>
+                  </GlassSurface>
 
                   {invitationState.musicEnabled && (
                     <div className="space-y-5 pt-1 animate-fadeIn">
                       {/* Music placement */}
-                      <div className="p-4 rounded-2xl bg-gradient-to-tr from-[#FFF5F8] via-white to-[#F0F8FF] border border-[#D9658B]/30 space-y-3 shadow-xs">
-                        <label className="font-bold text-xs text-[#231E1B] block">
+                      <GlassSurface variant="tinted-pink" rounded="2xl" className="p-4 space-y-3">
+                        <label className="font-bold text-xs text-[#1E1418] block">
                           🎵 {t.builder.musicPlacementTitle}
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                           <button
                             type="button"
                             onClick={() => setInvitationState((p) => ({ ...p, musicPlacement: 'all' }))}
-                            className={`p-3 rounded-xl border text-left transition-all ${
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                               (!invitationState.musicPlacement || invitationState.musicPlacement === 'all')
-                                ? 'bg-white border-[#D9658B] ring-2 ring-[#D9658B]/20 shadow-xs'
-                                : 'bg-white/60 border-black/5 hover:bg-white'
+                                ? 'bg-white/95 border-[#C64873] shadow-xs'
+                                : 'bg-white/65 border-white/80 hover:bg-white'
                             }`}
                           >
                             <span className="text-base block mb-1">🌟</span>
-                            <span className="font-bold text-[11px] text-[#231E1B] block">{t.builder.musicPlaceAll}</span>
-                            <span className="text-[10px] text-[#7A6A63] block mt-0.5">{t.builder.musicPlaceAllDesc}</span>
+                            <span className="font-bold text-[11px] text-[#1E1418] block">{t.builder.musicPlaceAll}</span>
+                            <span className="text-[10px] text-[#4A383F] block mt-0.5">{t.builder.musicPlaceAllDesc}</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setInvitationState((p) => ({ ...p, musicPlacement: 'cover' }))}
-                            className={`p-3 rounded-xl border text-left transition-all ${
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                               invitationState.musicPlacement === 'cover'
-                                ? 'bg-white border-[#D9658B] ring-2 ring-[#D9658B]/20 shadow-xs'
-                                : 'bg-white/60 border-black/5 hover:bg-white'
+                                ? 'bg-white/95 border-[#C64873] shadow-xs'
+                                : 'bg-white/65 border-white/80 hover:bg-white'
                             }`}
                           >
                             <span className="text-base block mb-1">💌</span>
-                            <span className="font-bold text-[11px] text-[#231E1B] block">{t.builder.musicPlaceCover}</span>
-                            <span className="text-[10px] text-[#7A6A63] block mt-0.5">{t.builder.musicPlaceCoverDesc}</span>
+                            <span className="font-bold text-[11px] text-[#1E1418] block">{t.builder.musicPlaceCover}</span>
+                            <span className="text-[10px] text-[#4A383F] block mt-0.5">{t.builder.musicPlaceCoverDesc}</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setInvitationState((p) => ({ ...p, musicPlacement: 'floating' }))}
-                            className={`p-3 rounded-xl border text-left transition-all ${
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                               invitationState.musicPlacement === 'floating'
-                                ? 'bg-white border-[#D9658B] ring-2 ring-[#D9658B]/20 shadow-xs'
-                                : 'bg-white/60 border-black/5 hover:bg-white'
+                                ? 'bg-white/95 border-[#C64873] shadow-xs'
+                                : 'bg-white/65 border-white/80 hover:bg-white'
                             }`}
                           >
                             <span className="text-base block mb-1">🎧</span>
-                            <span className="font-bold text-[11px] text-[#231E1B] block">{t.builder.musicPlaceFloating}</span>
-                            <span className="text-[10px] text-[#7A6A63] block mt-0.5">{t.builder.musicPlaceFloatingDesc}</span>
+                            <span className="font-bold text-[11px] text-[#1E1418] block">{t.builder.musicPlaceFloating}</span>
+                            <span className="text-[10px] text-[#4A383F] block mt-0.5">{t.builder.musicPlaceFloatingDesc}</span>
                           </button>
                         </div>
-                      </div>
+                      </GlassSurface>
 
                       {/* Multiple Audio Uploads */}
-                      <div className="border-2 border-dashed border-[#B48B47]/40 rounded-2xl p-5 text-center hover:bg-white/60 transition-colors bg-white/30 space-y-2">
+                      <div className="glass-surface-subtle border-2 border-dashed border-[#C64873]/40 hover:border-[#C64873] rounded-2xl p-5 text-center hover:bg-white/80 transition-colors space-y-2">
                         <input
                           type="file"
                           accept="audio/*"
@@ -1779,13 +1765,13 @@ export const BuilderPage: React.FC = () => {
                           id="music-upload-input"
                         />
                         <label htmlFor="music-upload-input" className="cursor-pointer space-y-2 block">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center mx-auto text-[#231E1B] shadow-xs">
-                            <Music className="w-6 h-6 text-[#D9658B]" />
+                          <div className="w-12 h-12 rounded-2xl glass-surface-tinted-pink flex items-center justify-center mx-auto text-[#9E3E60] shadow-xs">
+                            <Music className="w-6 h-6" aria-hidden="true" />
                           </div>
-                          <div className="text-xs font-bold text-[#231E1B]">
+                          <div className="text-xs font-bold text-[#1E1418]">
                             {t.builder.uploadMultipleAudioTitle}
                           </div>
-                          <div className="text-[11px] text-[#7A6A63]">
+                          <div className="text-[11px] text-[#4A383F]">
                             {t.builder.uploadMultipleAudioDesc}
                           </div>
                         </label>
@@ -1962,143 +1948,112 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 9: RSVP Settings */}
             {currentStep === 9 && (
               <div className="space-y-4">
-                <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step9Heading}
                 </h3>
                 <div className="space-y-3 text-xs">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
+                  <GlassSurface variant="subtle" rounded="2xl" className="p-3.5">
+                    <GlassSwitch
                       checked={invitationState.rsvpEnabled}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, rsvpEnabled: e.target.checked }))}
-                      className="w-4 h-4 rounded text-[#D9658B]"
+                      onChange={(checked) => setInvitationState((p) => ({ ...p, rsvpEnabled: checked }))}
+                      label={t.builder.enableRsvpCheckbox}
                     />
-                    <span className="font-bold text-sm text-[#231E1B]">{t.builder.enableRsvpCheckbox}</span>
-                  </label>
+                  </GlassSurface>
 
                   <div>
-                    <label className="font-bold text-[#3A2D28] block mb-1">
+                    <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">
                       {t.builder.rsvpDeadlineLabel}
                     </label>
                     <input
                       type="date"
                       value={invitationState.rsvpDeadline}
                       onChange={(e) => setInvitationState((p) => ({ ...p, rsvpDeadline: e.target.value }))}
-                      className="w-full p-2.5 rounded-xl glass-panel border border-black/10"
+                      className={GLASS_FIELD_CLS}
                     />
                   </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer pt-2">
-                    <input
-                      type="checkbox"
+                  <GlassSurface variant="subtle" rounded="2xl" className="p-3.5 space-y-3">
+                    <GlassSwitch
                       checked={invitationState.allowCompanion}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, allowCompanion: e.target.checked }))}
-                      className="rounded text-[#D9658B]"
+                      onChange={(checked) => setInvitationState((p) => ({ ...p, allowCompanion: checked }))}
+                      label={t.builder.allowCompanionCheckbox}
                     />
-                    <span>{t.builder.allowCompanionCheckbox}</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={invitationState.askMealPreference}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, askMealPreference: e.target.checked }))}
-                      className="rounded text-[#D9658B]"
-                    />
-                    <span>{t.builder.askMealCheckbox}</span>
-                  </label>
+                    <div className="border-t border-black/5 pt-3">
+                      <GlassSwitch
+                        checked={Boolean(invitationState.askMealPreference)}
+                        onChange={(checked) => setInvitationState((p) => ({ ...p, askMealPreference: checked }))}
+                        label={t.builder.askMealCheckbox}
+                      />
+                    </div>
+                  </GlassSurface>
 
                   {/* Host social links & contact */}
-                  <div className="pt-4 border-t border-black/10 space-y-3">
+                  <div className="pt-4 border-t border-black/8 space-y-3">
                     <div>
-                      <h4 className="font-bold text-sm text-[#231E1B] flex items-center gap-2">
+                      <h4 className="font-bold text-sm text-[#1E1418] flex items-center gap-2">
                         <span>📲 {t.builder.socialSectionTitle}</span>
                       </h4>
-                      <p className="text-[11px] text-[#7A6A63] mt-0.5">
+                      <p className="text-[11px] text-[#4A383F] mt-0.5">
                         {t.builder.socialSectionDesc}
                       </p>
                     </div>
 
-                    <div className="space-y-2.5">
-                      <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1 text-[11px] flex items-center gap-1.5">
-                          <span className="text-[#E4405F]">📸</span>
-                          <span>{t.builder.instagramProfileLabel}</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={invitationState.socialLinks?.instagram || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInvitationState((p) => ({
-                              ...p,
-                              socialLinks: { ...p.socialLinks, instagram: val },
-                            }));
-                          }}
-                          placeholder="https://instagram.com/asrorbek_madina"
-                          className="w-full p-2.5 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#D9658B]"
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      <GlassInput
+                        type="text"
+                        label={`📸 ${t.builder.instagramProfileLabel}`}
+                        value={invitationState.socialLinks?.instagram || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInvitationState((p) => ({
+                            ...p,
+                            socialLinks: { ...p.socialLinks, instagram: val },
+                          }));
+                        }}
+                        placeholder="https://instagram.com/asrorbek_madina"
+                      />
 
-                      <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1 text-[11px] flex items-center gap-1.5">
-                          <span className="text-[#229ED9]">✈️</span>
-                          <span>{t.builder.telegramPersonalLabel}</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={invitationState.socialLinks?.telegram || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInvitationState((p) => ({
-                              ...p,
-                              socialLinks: { ...p.socialLinks, telegram: val },
-                            }));
-                          }}
-                          placeholder="https://t.me/asrorbek"
-                          className="w-full p-2.5 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#D9658B]"
-                        />
-                      </div>
+                      <GlassInput
+                        type="text"
+                        label={`✈️ ${t.builder.telegramPersonalLabel}`}
+                        value={invitationState.socialLinks?.telegram || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInvitationState((p) => ({
+                            ...p,
+                            socialLinks: { ...p.socialLinks, telegram: val },
+                          }));
+                        }}
+                        placeholder="https://t.me/asrorbek"
+                      />
 
-                      <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1 text-[11px] flex items-center gap-1.5">
-                          <span className="text-[#0088cc]">📢</span>
-                          <span>{t.builder.telegramChannelLabel}</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={invitationState.socialLinks?.telegramChannel || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInvitationState((p) => ({
-                              ...p,
-                              socialLinks: { ...p.socialLinks, telegramChannel: val },
-                            }));
-                          }}
-                          placeholder="https://t.me/asrorbek_madina_wedding"
-                          className="w-full p-2.5 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#D9658B]"
-                        />
-                      </div>
+                      <GlassInput
+                        type="text"
+                        label={`📢 ${t.builder.telegramChannelLabel}`}
+                        value={invitationState.socialLinks?.telegramChannel || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInvitationState((p) => ({
+                            ...p,
+                            socialLinks: { ...p.socialLinks, telegramChannel: val },
+                          }));
+                        }}
+                        placeholder="https://t.me/asrorbek_madina_wedding"
+                      />
 
-                      <div>
-                        <label className="font-bold text-[#3A2D28] block mb-1 text-[11px] flex items-center gap-1.5">
-                          <span className="text-emerald-600">📞</span>
-                          <span>{t.builder.phoneCallLabel}</span>
-                        </label>
-                        <input
-                          type="tel"
-                          value={invitationState.socialLinks?.phone || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setInvitationState((p) => ({
-                              ...p,
-                              socialLinks: { ...p.socialLinks, phone: val },
-                            }));
-                          }}
-                          placeholder="+998 90 123 45 67"
-                          className="w-full p-2.5 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#D9658B]"
-                        />
-                      </div>
+                      <GlassInput
+                        type="tel"
+                        label={`📞 ${t.builder.phoneCallLabel}`}
+                        value={invitationState.socialLinks?.phone || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setInvitationState((p) => ({
+                            ...p,
+                            socialLinks: { ...p.socialLinks, phone: val },
+                          }));
+                        }}
+                        placeholder="+998 90 123 45 67"
+                      />
                     </div>
                   </div>
                 </div>
@@ -2108,35 +2063,36 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 10: Review */}
             {currentStep === 10 && (
               <div className="space-y-4">
-                <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step10Heading}
                 </h3>
-                <div className="p-4 rounded-2xl bg-white/70 border border-black/5 text-xs space-y-2.5">
-                  <div className="flex justify-between border-b pb-1.5">
-                    <span className="text-[#8A7C74]">{t.guestGate.eventLabel}:</span>
-                    <strong className="text-[#231E1B]">{invitationState.eventTitle}</strong>
+                <GlassSurface variant="subtle" rounded="2xl" className="p-4 text-xs space-y-2.5">
+                  <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+                    <span className="text-[#4A383F]">{t.guestGate.eventLabel}:</span>
+                    <strong className="text-[#1E1418] text-right">{invitationState.eventTitle}</strong>
                   </div>
-                  <div className="flex justify-between border-b pb-1.5">
-                    <span className="text-[#8A7C74]">{t.builder.reviewCouple}</span>
-                    <strong className="text-[#231E1B]">{invitationState.hostNames}</strong>
+                  <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+                    <span className="text-[#4A383F]">{t.builder.reviewCouple}</span>
+                    <strong className="text-[#1E1418] text-right">{invitationState.hostNames}</strong>
                   </div>
-                  <div className="flex justify-between border-b pb-1.5">
-                    <span className="text-[#8A7C74]">{t.builder.reviewDate}</span>
-                    <strong className="text-[#231E1B]">
+                  <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+                    <span className="text-[#4A383F]">{t.builder.reviewDate}</span>
+                    <strong className="text-[#1E1418] tabular-nums text-right">
                       {invitationState.eventDate} ({invitationState.startTime})
                     </strong>
                   </div>
-                  <div className="flex justify-between border-b pb-1.5">
-                    <span className="text-[#8A7C74]">{t.builder.reviewVenue}</span>
-                    <strong className="text-[#231E1B]">{invitationState.venueName}</strong>
+                  <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
+                    <span className="text-[#4A383F]">{t.builder.reviewVenue}</span>
+                    <strong className="text-[#1E1418] text-right">{invitationState.venueName}</strong>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8A7C74]">{t.builder.reviewPhotos}</span>
-                    <strong className="text-[#231E1B]">{formatItemCount(invitationState.galleryImages.length, language)}</strong>
+                  <div className="flex justify-between gap-3 pt-0.5">
+                    <span className="text-[#4A383F]">{t.builder.reviewPhotos}</span>
+                    <strong className="text-[#1E1418] tabular-nums">{formatItemCount(invitationState.galleryImages.length, language)}</strong>
                   </div>
-                </div>
-                <p className="text-xs text-emerald-700 font-medium">
-                  {t.builder.reviewSuccessText}
+                </GlassSurface>
+                <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+                  <span>{t.builder.reviewSuccessText}</span>
                 </p>
               </div>
             )}
@@ -2145,226 +2101,209 @@ export const BuilderPage: React.FC = () => {
             {currentStep === 11 && (() => {
               const currentTemplate = availableTemplates.find((tpl) => tpl.slug === invitationState.templateSlug) || initialTemplate;
               const templatePrice = currentTemplate?.price || 60000;
+              const canSubmitReceipt =
+                !isUploadingReceipt &&
+                !isPreparingFile &&
+                Boolean(selectedFile) &&
+                (preparedFileType === 'application/pdf' || Boolean(fileBase64));
 
               return (
                 <div className="space-y-6">
                   <div className="space-y-1">
-                    <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
+                    <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                       {t.builder.step11Heading}
                     </h3>
-                    <p className="text-xs text-[#7A6A63]">
+                    <p className="text-xs text-[#4A383F]">
                       «{currentTemplate.name}» — {t.builder.step11SelectedTemplateDesc}
                     </p>
                   </div>
 
                   {/* Card payment and receipt upload */}
                   <div className="space-y-5">
-                    <div className="p-5 rounded-3xl border-2 border-[#D9658B]/40 bg-gradient-to-br from-white via-[#FFF8FA] to-[#FAF6F0] shadow-md space-y-4 relative overflow-hidden">
-                        <div className="flex items-center justify-between border-b border-black/5 pb-3">
-                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FFF5F8] text-[#D9658B] border border-[#D9658B]/30">
-                            «{currentTemplate.name}» {t.builder.templateBadgeSuffix}
-                          </span>
-                          <span className="text-2xl font-extrabold text-[#231E1B]">
-                            {formatPriceUZS(templatePrice, language)}
-                          </span>
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-white border border-black/10 shadow-xs space-y-2">
-                          <div className="text-[11px] font-semibold text-[#8A7C74] uppercase tracking-wider flex items-center justify-between">
-                            <span>{t.builder.paymentCardTitle}</span>
-                            <span className="text-emerald-700 font-bold">{PAYMENT_CONFIG.cardBank}</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between gap-2 pt-1">
-                            <span className="font-mono text-lg sm:text-xl font-extrabold text-[#231E1B] tracking-wider">
-                              {PAYMENT_CONFIG.cardNumberFormatted}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleCopyCardNumber}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
-                                copiedCard
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-[#231E1B] text-white hover:bg-black active:scale-95'
-                              }`}
-                            >
-                              {copiedCard ? (
-                                <>
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>{t.builder.copiedCardBtn} ✅</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3.5 h-3.5" />
-                                  <span>{t.builder.copyCardBtn}</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-
-                          <div className="text-xs font-bold text-[#3A2D28] pt-1">
-                            {t.builder.cardHolderLabel}: <span className="text-[#D9658B] uppercase">{PAYMENT_CONFIG.cardHolder}</span>
-                          </div>
-                        </div>
-
-                        <div className="text-xs text-[#5C4F48] space-y-2 leading-relaxed bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200/80">
-                          <p className="font-medium text-[#3A2D28]">
-                            📌 <strong>{t.builder.instructionPrefix}</strong> {paymentCopy.instructionText}
-                          </p>
-                          <p className="text-[11px] text-amber-900/90 font-semibold">
-                            ⚠️ {paymentCopy.warningText}
-                          </p>
-                        </div>
+                    <GlassSurface variant="tinted-pink" rounded="3xl" className="p-5 sm:p-6 space-y-4 relative overflow-hidden">
+                      <div className="flex items-center justify-between gap-2 border-b border-black/8 pb-3">
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/85 text-[#9E3E60] border border-white">
+                          «{currentTemplate.name}» {t.builder.templateBadgeSuffix}
+                        </span>
+                        <span className="text-2xl font-extrabold text-[#1E1418] tabular-nums">
+                          {formatPriceUZS(templatePrice, language)}
+                        </span>
                       </div>
 
-                      {orderStatus === 'pending_review' ? (
-                        /* PENDING REVIEW VIEW */
-                        <div className="p-6 rounded-3xl bg-amber-50/90 border-2 border-amber-300 shadow-md text-center space-y-4 animate-fadeIn">
-                          <div className="w-14 h-14 rounded-full bg-amber-200/80 mx-auto flex items-center justify-center text-amber-800 shadow-xs relative">
-                            <RefreshCw className="w-7 h-7 animate-spin" />
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-800 bg-amber-200/60 px-2.5 py-0.5 rounded-full">
-                              {t.builder.orderNumberLabel}{activeOrderId}
-                            </span>
-                            <h4 className="font-playfair text-lg sm:text-xl font-bold text-[#231E1B]">
-                              {t.builder.receiptSentHeading}
-                            </h4>
-                          </div>
-
-                          <p className="text-xs sm:text-sm font-semibold text-[#5C4F48] leading-relaxed max-w-md mx-auto">
-                            {t.builder.receiptReplyTime}
-                          </p>
-
-                          <div className="inline-flex items-center gap-2 text-[11px] text-amber-800 font-semibold bg-white/80 px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-                            <span>{t.builder.autoCheckStatus}</span>
-                          </div>
+                      <GlassSurface variant="elevated" rounded="2xl" className="p-4 space-y-2.5">
+                        <div className="text-[11px] font-semibold text-[#4A383F] uppercase tracking-wider flex items-center justify-between">
+                          <span>{t.builder.paymentCardTitle}</span>
+                          <span className="text-emerald-700 font-bold">{PAYMENT_CONFIG.cardBank}</span>
                         </div>
-                      ) : (
-                        /* FILE UPLOAD FORM VIEW */
-                        <div className="p-5 rounded-3xl bg-white border border-black/10 shadow-sm space-y-4">
-                          {orderStatus === 'rejected' && (
-                            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                              <div>
-                                <strong>{t.builder.receiptRejectedTitle}</strong> {t.builder.receiptRejectedBody}
-                              </div>
-                            </div>
-                          )}
 
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-[#231E1B] block">
-                              {t.builder.receiptUploadLabel}
-                            </label>
-
-                            <div className="relative border-2 border-dashed border-[#D9658B]/40 hover:border-[#D9658B] rounded-2xl p-4 text-center bg-[#FFF8FA] transition-colors cursor-pointer group">
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp,application/pdf"
-                                onChange={handleReceiptFileChange}
-                                disabled={isPreparingFile || isUploadingReceipt}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              />
-                              <div className="space-y-2 flex flex-col items-center justify-center">
-                                <div className="w-10 h-10 rounded-full bg-[#FFF5F8] text-[#D9658B] flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <Upload className="w-5 h-5" />
-                                </div>
-                                {isPreparingFile ? (
-                                  <div>
-                                    <span className="text-xs font-bold text-[#231E1B] block">
-                                      {t.builder.compressingImage}
-                                    </span>
-                                    <span className="text-[10px] text-[#7A6A63]">
-                                      {t.builder.compressingSub}
-                                    </span>
-                                  </div>
-                                ) : selectedFile ? (
-                                  <div>
-                                    <span className="text-xs font-bold text-[#231E1B] block truncate max-w-xs">
-                                      📄 {preparedFileName || selectedFile.name}
-                                    </span>
-                                    <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
-                                      {t.builder.fileReadyText}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <span className="text-xs font-bold text-[#231E1B] block">
-                                      {t.builder.clickToChooseFile}
-                                    </span>
-                                    <span className="text-[10px] text-[#7A6A63]">
-                                      {t.builder.fileSizeRules}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {uploadError && (
-                            <div className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                              <AlertCircle className="w-4 h-4 shrink-0" />
-                              <span>{uploadError}</span>
-                            </div>
-                          )}
-
-                          <button
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                          <span className="font-mono tabular-nums text-lg sm:text-xl font-extrabold text-[#1E1418] tracking-wider">
+                            {PAYMENT_CONFIG.cardNumberFormatted}
+                          </span>
+                          <GlassButton
                             type="button"
-                            disabled={
-                              isUploadingReceipt ||
-                              isPreparingFile ||
-                              !selectedFile ||
-                              (preparedFileType !== 'application/pdf' && !fileBase64)
-                            }
-                            onClick={handleSubmitReceiptUpload}
-                            className={`w-full py-4 rounded-2xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-md ${
-                              isUploadingReceipt ||
-                              isPreparingFile ||
-                              !selectedFile ||
-                              (preparedFileType !== 'application/pdf' && !fileBase64)
-                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-[#E27B9B] via-[#D9658B] to-[#B9DFFA] text-white hover:shadow-lg hover:scale-[1.01] active:scale-95'
-                            }`}
+                            size="sm"
+                            tone={copiedCard ? 'light' : 'tinted'}
+                            onClick={handleCopyCardNumber}
+                            leftIcon={copiedCard ? <Check className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+                            className="shrink-0"
                           >
-                            {isUploadingReceipt ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                <span>{t.builder.submittingReceiptAdminBtn}</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-4 h-4" />
-                                <span>🚀 {t.builder.submitReceiptAdminBtn}</span>
-                              </>
-                            )}
-                          </button>
+                            {copiedCard ? t.builder.copiedCardBtn : t.builder.copyCardBtn}
+                          </GlassButton>
                         </div>
-                      )}
-                    </div>
+
+                        <div className="text-xs font-bold text-[#3A2D28] pt-0.5">
+                          {t.builder.cardHolderLabel}: <span className="text-[#9E3E60] uppercase">{PAYMENT_CONFIG.cardHolder}</span>
+                        </div>
+                      </GlassSurface>
+
+                      <div className="text-xs text-[#3A2D28] space-y-2 leading-relaxed bg-amber-50/85 backdrop-blur-sm p-3.5 rounded-2xl border border-amber-200/90">
+                        <p className="font-medium text-[#1E1418]">
+                          📌 <strong>{t.builder.instructionPrefix}</strong> {paymentCopy.instructionText}
+                        </p>
+                        <p className="text-[11px] text-amber-900 font-semibold">
+                          ⚠️ {paymentCopy.warningText}
+                        </p>
+                      </div>
+                    </GlassSurface>
+
+                    {orderStatus === 'pending_review' ? (
+                      /* PENDING REVIEW VIEW */
+                      <GlassSurface variant="elevated" rounded="3xl" className="p-6 bg-amber-50/85 border border-amber-200 text-center space-y-4 animate-fadeIn">
+                        <div className="w-14 h-14 rounded-full bg-amber-100 border border-amber-200 mx-auto flex items-center justify-center text-amber-800 shadow-xs">
+                          <RefreshCw className="w-7 h-7 animate-spin" aria-hidden="true" />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <span className="inline-block text-[10px] font-mono tabular-nums font-bold uppercase tracking-widest text-amber-900 bg-amber-200/70 px-3 py-0.5 rounded-full">
+                            {t.builder.orderNumberLabel}{activeOrderId}
+                          </span>
+                          <h4 className="font-playfair text-lg sm:text-xl font-bold text-[#1E1418]">
+                            {t.builder.receiptSentHeading}
+                          </h4>
+                        </div>
+
+                        <p className="text-xs sm:text-sm font-semibold text-[#4A383F] leading-relaxed max-w-md mx-auto">
+                          {t.builder.receiptReplyTime}
+                        </p>
+
+                        <div className="inline-flex items-center gap-2 text-[11px] text-amber-900 font-semibold bg-white/85 px-3.5 py-1.5 rounded-full border border-amber-200">
+                          <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" aria-hidden="true" />
+                          <span>{t.builder.autoCheckStatus}</span>
+                        </div>
+                      </GlassSurface>
+                    ) : (
+                      /* FILE UPLOAD FORM VIEW */
+                      <GlassSurface variant="elevated" rounded="3xl" className="p-5 space-y-4">
+                        {orderStatus === 'rejected' && (
+                          <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
+                            <div>
+                              <strong>{t.builder.receiptRejectedTitle}</strong> {t.builder.receiptRejectedBody}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-[#1E1418] block">
+                            {t.builder.receiptUploadLabel}
+                          </label>
+
+                          <div className="relative glass-surface-subtle border-2 border-dashed border-[#C64873]/40 hover:border-[#C64873] rounded-2xl p-5 text-center hover:bg-white/80 transition-colors cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              onChange={handleReceiptFileChange}
+                              disabled={isPreparingFile || isUploadingReceipt}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            <div className="space-y-2 flex flex-col items-center justify-center">
+                              <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
+                                <Upload className="w-5 h-5" aria-hidden="true" />
+                              </div>
+                              {isPreparingFile ? (
+                                <div>
+                                  <span className="text-xs font-bold text-[#1E1418] block">
+                                    {t.builder.compressingImage}
+                                  </span>
+                                  <span className="text-[10px] text-[#4A383F]">
+                                    {t.builder.compressingSub}
+                                  </span>
+                                </div>
+                              ) : selectedFile ? (
+                                <div>
+                                  <span className="text-xs font-bold text-[#1E1418] block truncate max-w-xs">
+                                    📄 {preparedFileName || selectedFile.name}
+                                  </span>
+                                  <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
+                                    {t.builder.fileReadyText}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="text-xs font-bold text-[#1E1418] block">
+                                    {t.builder.clickToChooseFile}
+                                  </span>
+                                  <span className="text-[10px] text-[#4A383F]">
+                                    {t.builder.fileSizeRules}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {uploadError && (
+                          <div role="alert" className="text-xs text-rose-700 font-semibold flex items-center gap-1.5 bg-rose-50/90 p-3 rounded-xl border border-rose-200">
+                            <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                            <span>{uploadError}</span>
+                          </div>
+                        )}
+
+                        <GlassButton
+                          type="button"
+                          tone="tinted"
+                          size="lg"
+                          loading={isUploadingReceipt}
+                          disabled={!canSubmitReceipt}
+                          onClick={handleSubmitReceiptUpload}
+                          leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
+                          className="w-full"
+                        >
+                          {isUploadingReceipt
+                            ? t.builder.submittingReceiptAdminBtn
+                            : t.builder.submitReceiptAdminBtn}
+                        </GlassButton>
+                      </GlassSurface>
+                    )}
+                  </div>
                 </div>
               );
             })()}
 
             {/* Navigation buttons: Prev / Next */}
-            <div className="pt-6 border-t border-black/5 flex items-center justify-between">
+            <div className="pt-6 border-t border-black/8 flex items-center justify-between gap-3">
               {currentStep > 1 ? (
-                <button
+                <GlassButton
+                  type="button"
+                  tone="light"
+                  size="sm"
                   onClick={() => setCurrentStep((p) => p - 1)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#5C4F48] glass-panel hover:bg-white"
+                  leftIcon={<ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />}
                 >
                   {t.builder.prevStep}
-                </button>
+                </GlassButton>
               ) : (
                 <div />
               )}
 
               {currentStep < 11 && (
-                <button
+                <GlassButton
+                  type="button"
+                  tone="tinted"
+                  size="sm"
                   onClick={() => {
                     setCurrentStep((p) => p + 1);
-                    // Qadam o'zgarganda qoralamani zudlik bilan avto-sinxronizatsiya qilish
                     try {
                       localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
                     } catch {}
@@ -2373,14 +2312,13 @@ export const BuilderPage: React.FC = () => {
                       ownerId: user?.id || 'anonymous',
                     }).catch(() => {});
                   }}
-                  className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#231E1B] hover:bg-black transition-colors"
+                  rightIcon={<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
                 >
-                  <span>{t.builder.nextStep}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                  {t.builder.nextStep}
+                </GlassButton>
               )}
             </div>
-          </div>
+          </GlassSurface>
 
           {/* RIGHT: LIVE REACTIVE PREVIEW ON DESKTOP & MOBILE */}
           {(() => {
@@ -2409,31 +2347,24 @@ export const BuilderPage: React.FC = () => {
                 }`}
               >
                 {/* Device View Toggle */}
-                <div className="mb-4 inline-flex items-center gap-1.5 p-1 rounded-2xl glass-panel-elevated border border-black/5 shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice('mobile')}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      previewDevice === 'mobile'
-                        ? 'bg-[#231E1B] text-white shadow-xs'
-                        : 'text-[#6E5D53] hover:text-[#231E1B]'
-                    }`}
-                  >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span>{t.builder.mobileView}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice('desktop')}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      previewDevice === 'desktop'
-                        ? 'bg-[#231E1B] text-white shadow-xs'
-                        : 'text-[#6E5D53] hover:text-[#231E1B]'
-                    }`}
-                  >
-                    <Monitor className="w-3.5 h-3.5" />
-                    <span>{t.builder.desktopView}</span>
-                  </button>
+                <div className="mb-4">
+                  <GlassSegmented
+                    ariaLabel={t.builder.previewShortTab}
+                    value={previewDevice}
+                    onChange={(val) => setPreviewDevice(val)}
+                    options={[
+                      {
+                        value: 'mobile',
+                        label: t.builder.mobileView,
+                        icon: <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />,
+                      },
+                      {
+                        value: 'desktop',
+                        label: t.builder.desktopView,
+                        icon: <Monitor className="w-3.5 h-3.5" aria-hidden="true" />,
+                      },
+                    ]}
+                  />
                 </div>
 
                 {previewDevice === 'mobile' ? (
@@ -2480,39 +2411,45 @@ export const BuilderPage: React.FC = () => {
       </div>
 
       {/* Reset Confirmation Modal */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-black/10 space-y-5 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-              <RotateCcw className="w-6 h-6" />
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
-                {t.builder.startOver}
-              </h3>
-              <p className="text-xs text-[#6E5D53] leading-relaxed">
-                {t.builder.confirmStartOver}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setShowResetModal(false)}
-                className="py-2.5 px-4 rounded-xl text-xs font-bold text-[#4A3E39] bg-black/5 hover:bg-black/10 transition-colors"
-              >
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                onClick={handleStartOverConfirm}
-                className="py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors"
-              >
-                {t.builder.startOver}
-              </button>
-            </div>
+      <GlassModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        size="sm"
+        ariaLabel={t.builder.startOver}
+        closeLabel={t.common.close}
+      >
+        <div className="space-y-5 text-center pt-1">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 text-rose-600 flex items-center justify-center mx-auto">
+            <RotateCcw className="w-6 h-6" aria-hidden="true" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
+              {t.builder.startOver}
+            </h3>
+            <p className="text-xs text-[#4A383F] leading-relaxed">
+              {t.builder.confirmStartOver}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <GlassButton
+              type="button"
+              tone="clear"
+              size="sm"
+              onClick={() => setShowResetModal(false)}
+              className="w-full"
+            >
+              {t.common.cancel}
+            </GlassButton>
+            <button
+              type="button"
+              onClick={handleStartOverConfirm}
+              className="min-h-[40px] py-2.5 px-4 rounded-full text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer"
+            >
+              {t.builder.startOver}
+            </button>
           </div>
         </div>
-      )}
+      </GlassModal>
     </div>
   );
 };

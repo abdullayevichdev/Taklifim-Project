@@ -39,6 +39,7 @@ import {
   Phone,
 } from 'lucide-react';
 import { TaklifimLogo } from '../components/TaklifimLogo';
+import { GlassSurface, GlassButton, GlassSegmented } from '../components/glass';
 
 // Haqiqiy va to'liq ko'p tilli tarjimalar (UZ / RU / EN)
 const guestTranslations: Record<Language, {
@@ -603,13 +604,13 @@ export const InvitationGuestPage: React.FC = () => {
 
   if (loading || !invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF6F0]">
-        <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 text-[#B48B47] animate-spin mx-auto" />
-          <p className="font-playfair text-sm font-semibold text-[#231E1B]">
+      <div className="min-h-screen flex items-center justify-center p-4 taklifim-glass-backdrop">
+        <GlassSurface variant="elevated" rounded="3xl" className="p-8 text-center space-y-3 max-w-xs w-full">
+          <Loader2 className="w-8 h-8 text-[#C64873] animate-spin motion-reduce:animate-none mx-auto" />
+          <p className="font-playfair text-sm font-semibold text-[#1E1418]">
             {activeLocaleT.guestGate.loading}
           </p>
-        </div>
+        </GlassSurface>
       </div>
     );
   }
@@ -618,33 +619,53 @@ export const InvitationGuestPage: React.FC = () => {
   const isPaidOrPublished = invitation.status === 'paid' || invitation.status === 'published';
   if (!isPaidOrPublished) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#FAF6F0]">
-        <div className="max-w-md w-full glass-panel-elevated rounded-3xl p-8 text-center space-y-4 border border-amber-200 shadow-xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 shadow-sm">
+      <div className="min-h-screen flex items-center justify-center p-4 taklifim-glass-backdrop">
+        <GlassSurface
+          variant="elevated"
+          rounded="3xl"
+          className="max-w-md w-full p-8 text-center space-y-4 animate-fadeIn motion-reduce:animate-none"
+        >
+          <div className="w-16 h-16 rounded-full glass-surface-tinted-pink mx-auto flex items-center justify-center text-[#9E3E60]">
             <Clock className="w-8 h-8" />
           </div>
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-200/60 px-3 py-1 rounded-full">
+          <div className="space-y-1.5">
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100/80 border border-amber-200/80 px-3 py-1 rounded-full">
               {activeLocaleT.guestGate.pendingBadge}
             </span>
-            <h2 className="font-playfair text-xl font-bold text-[#231E1B]">
+            <h2 className="font-playfair text-xl font-bold text-[#1E1418]">
               {activeLocaleT.guestGate.pendingTitle}
             </h2>
           </div>
-          <p className="text-xs text-[#5C4F48] leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#4A383F] leading-relaxed">
             {activeLocaleT.guestGate.pendingDesc}
           </p>
-          <div className="p-3.5 rounded-2xl bg-white/80 border border-black/5 text-[11px] text-[#7A6A63] text-left space-y-1">
-            <div><strong>{activeLocaleT.guestGate.eventLabel}:</strong> {invitation.eventTitle}</div>
-            <div><strong>{activeLocaleT.guestGate.dateLabel}:</strong> {invitation.eventDate}</div>
-          </div>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold hover:bg-black transition-colors"
+          <GlassSurface
+            variant="subtle"
+            rounded="2xl"
+            className="p-3.5 text-xs text-[#4A383F] text-left space-y-1"
+          >
+            <div>
+              <strong className="text-[#1E1418]">{activeLocaleT.guestGate.eventLabel}:</strong>{' '}
+              {invitation.eventTitle}
+            </div>
+            <div>
+              <strong className="text-[#1E1418]">{activeLocaleT.guestGate.dateLabel}:</strong>{' '}
+              <span className="tabular-nums">{invitation.eventDate}</span>
+            </div>
+          </GlassSurface>
+          <GlassButton
+            href="/"
+            tone="tinted"
+            size="md"
+            className="w-full"
+            onAnchorClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
           >
             {activeLocaleT.guestGate.backHomeBtn}
-          </Link>
-        </div>
+          </GlassButton>
+        </GlassSurface>
       </div>
     );
   }
@@ -753,7 +774,7 @@ export const InvitationGuestPage: React.FC = () => {
         {/* Template Visual Theme Backdrop */}
         {templateDef.previewImage && (
           <div
-            className="fixed inset-0 pointer-events-none -z-10 bg-cover bg-center transition-all duration-700"
+            className="fixed inset-0 pointer-events-none -z-10 bg-cover bg-center transition-opacity duration-700"
             style={{
               backgroundImage: `url(${templateDef.previewImage})`,
               opacity: isDarkTheme ? 0.38 : 0.28,
@@ -763,94 +784,64 @@ export const InvitationGuestPage: React.FC = () => {
         )}
 
         {/* Top Floating Language Switcher for Envelope Screen */}
-        <div className="absolute top-1.5 left-2 z-40 flex items-center justify-center">
-          <div
-            className={`rounded-full px-3 py-1.5 flex items-center gap-1.5 border shadow-xs ${
-              isDarkTheme
-                ? 'bg-slate-900/90 border-white/15 text-white'
-                : 'glass-panel border-white/80 bg-white/80'
-            }`}
-          >
-            <Globe className={`w-3.5 h-3.5 ${isDarkTheme ? 'text-amber-300' : 'text-[#5C4F48]'}`} />
-            <button
-              onClick={() => setInvLang('uz')}
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition-all ${
-                invLang === 'uz'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 shadow-xs'
-                    : 'bg-[#231E1B] text-white shadow-xs'
-                  : isDarkTheme
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-[#7A6A63] hover:text-[#231E1B]'
-              }`}
-            >
-              UZ
-            </button>
-            <button
-              onClick={() => setInvLang('ru')}
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition-all ${
-                invLang === 'ru'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 shadow-xs'
-                    : 'bg-[#231E1B] text-white shadow-xs'
-                  : isDarkTheme
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-[#7A6A63] hover:text-[#231E1B]'
-              }`}
-            >
-              RU
-            </button>
-            <button
-              onClick={() => setInvLang('en')}
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition-all ${
-                invLang === 'en'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 shadow-xs'
-                    : 'bg-[#231E1B] text-white shadow-xs'
-                  : isDarkTheme
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-[#7A6A63] hover:text-[#231E1B]'
-              }`}
-            >
-              EN
-            </button>
-          </div>
+        <div className="fixed sm:absolute top-3 left-3 z-40">
+          <GlassSegmented<Language>
+            value={invLang}
+            onChange={setInvLang}
+            ariaLabel="UZ / RU / EN"
+            options={[
+              { value: 'uz', label: 'UZ' },
+              { value: 'ru', label: 'RU' },
+              { value: 'en', label: 'EN' },
+            ]}
+          />
         </div>
 
         {/* Soft floating romance ambient glow */}
-        <div className="absolute top-1/4 -left-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none" style={{ backgroundColor: secondaryColor }} />
-        <div className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none" style={{ backgroundColor: primaryColor }} />
-
-        {/* Realistic Luxury Envelope Card */}
         <div
-          className={`relative max-w-md w-full rounded-[36px] p-8 sm:p-10 text-center space-y-6 backdrop-blur-2xl transition-all duration-700 ${
+          className="absolute top-1/4 -left-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none"
+          style={{ backgroundColor: secondaryColor }}
+        />
+        <div
+          className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none"
+          style={{ backgroundColor: primaryColor }}
+        />
+
+        {/* Liquid Glass Luxury Envelope Card */}
+        <div
+          className={`relative max-w-md w-full rounded-[36px] p-8 sm:p-10 text-center space-y-6 transition-all duration-700 motion-reduce:transition-none ${
             isDarkTheme
-              ? 'bg-[#0E1A2B]/95 text-white border-2 border-amber-400/30 shadow-[0_25px_80px_rgba(0,0,0,0.7)]'
-              : 'bg-white/85 text-[#231E1B] border border-white/95 shadow-[0_25px_70px_rgba(0,0,0,0.12)]'
+              ? 'bg-[#0E1A2B]/88 backdrop-blur-2xl text-white border border-amber-300/35 shadow-[0_25px_80px_rgba(0,0,0,0.65)]'
+              : 'glass-surface-elevated text-[#1E1418]'
           } ${
-            isOpeningAnimation ? 'scale-105 opacity-80 blur-[0.5px] -translate-y-4' : 'animate-fadeIn'
+            isOpeningAnimation ? 'opacity-80 -translate-y-4' : 'animate-fadeIn motion-reduce:animate-none'
           }`}
           style={{
             boxShadow: `0 25px 60px -15px ${primaryColor}35, 0 0 0 1px ${
-              isDarkTheme ? 'rgba(212,175,55,0.25)' : 'rgba(255, 255, 255, 0.9)'
+              isDarkTheme ? 'rgba(212,175,55,0.28)' : 'rgba(255, 255, 255, 0.92)'
             }`,
           }}
         >
-          {/* Decorative Envelope Flap Header with Gold Trim */}
+          {/* Decorative Envelope Flap Header */}
           <div className="relative pt-2">
-            <div className="w-16 h-1 mx-auto rounded-full opacity-40 mb-3" style={{ backgroundColor: primaryColor }} />
+            <div
+              className="w-16 h-1 mx-auto rounded-full opacity-45 mb-3"
+              style={{ backgroundColor: primaryColor }}
+            />
             <span
               className="font-script text-3xl sm:text-4xl tracking-wider block font-bold leading-relaxed mb-1"
               style={{
                 color: isDarkTheme ? '#F5D061' : '#7A4A28',
-                textShadow: isDarkTheme ? '0 2px 10px rgba(0,0,0,0.6)' : '0 1px 2px rgba(255, 255, 255, 0.9)',
+                textShadow: isDarkTheme
+                  ? '0 2px 10px rgba(0,0,0,0.6)'
+                  : '0 1px 2px rgba(255, 255, 255, 0.9)',
               }}
             >
               {gt.envelopeSubtitle}
             </span>
             <div
               className={`text-[10px] uppercase tracking-[0.25em] font-extrabold mt-1 ${
-                isDarkTheme ? 'text-amber-200/80' : 'text-[#7A6A63]'
+                isDarkTheme ? 'text-amber-200/85' : 'text-[#4A383F]'
               }`}
             >
               {loc.weddingCeremony}
@@ -858,15 +849,20 @@ export const InvitationGuestPage: React.FC = () => {
           </div>
 
           {/* Royal Wax Seal Monogram */}
-          <div className="relative py-2">
-            <div
-              className={`w-24 h-24 rounded-full mx-auto p-1.5 shadow-[0_10px_30px_rgba(217,101,139,0.35)] flex items-center justify-center cursor-pointer transition-all duration-700 relative group ${
-                isOpeningAnimation ? 'rotate-180 scale-125' : 'hover:scale-105 active:scale-95'
+          <div className="relative py-2 flex justify-center">
+            <button
+              type="button"
+              disabled={isOpeningAnimation}
+              onClick={handleOpenInvitation}
+              aria-label={gt.openEnvelope}
+              className={`w-24 h-24 rounded-full p-1.5 shadow-[0_12px_32px_rgba(198,72,115,0.34)] flex items-center justify-center cursor-pointer transition-all duration-700 motion-reduce:transition-none relative group ${
+                isOpeningAnimation
+                  ? 'rotate-180 opacity-85'
+                  : 'hover:-translate-y-1'
               }`}
               style={{
                 background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
               }}
-              onClick={handleOpenInvitation}
             >
               <div
                 className={`w-full h-full rounded-full flex flex-col items-center justify-center border-2 border-white shadow-inner ${
@@ -875,17 +871,17 @@ export const InvitationGuestPage: React.FC = () => {
                     : 'bg-gradient-to-tr from-[#FFF5F8] via-white to-[#F0F8FF]'
                 }`}
               >
-                <Gem className="w-4 h-4 mb-0.5" style={{ color: primaryColor }} />
+                <Gem className="w-4 h-4 mb-0.5" style={{ color: primaryColor }} aria-hidden="true" />
                 <span
                   className={`font-playfair text-xs font-black tracking-widest ${
-                    isDarkTheme ? 'text-amber-300' : 'text-[#231E1B]'
+                    isDarkTheme ? 'text-amber-300' : 'text-[#1E1418]'
                   }`}
                 >
                   {getMonogram(invitation)}
                 </span>
               </div>
               <div className="absolute inset-0 rounded-full border border-white/60 opacity-40 pointer-events-none" />
-            </div>
+            </button>
           </div>
 
           {/* Couple Names & Title */}
@@ -900,60 +896,52 @@ export const InvitationGuestPage: React.FC = () => {
             </h1>
             <p
               className={`text-xs sm:text-sm max-w-xs mx-auto leading-relaxed italic ${
-                isDarkTheme ? 'text-slate-300' : 'text-[#5C4F48]'
+                isDarkTheme ? 'text-slate-200' : 'text-[#4A383F]'
               }`}
             >
               {loc.invitationQuote}
             </p>
           </div>
 
-          {/* Grand Opening Button */}
-          <div className="pt-2">
-            <button
-              disabled={isOpeningAnimation}
+          {/* Grand Opening Liquid Glass CTA */}
+          <div className="pt-2 space-y-2.5">
+            <GlassButton
+              tone="tinted"
+              size="lg"
+              loading={isOpeningAnimation}
               onClick={handleOpenInvitation}
-              className="w-full py-4 sm:py-5 px-8 rounded-2xl text-sm font-extrabold text-white shadow-[0_12px_35px_rgba(226,123,155,0.45)] hover:shadow-[0_18px_45px_rgba(226,123,155,0.65)] hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden group"
-              style={{
-                background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-              }}
+              className="w-full"
+              leftIcon={<Heart className="w-4 h-4 fill-white text-white" aria-hidden="true" />}
+              rightIcon={<MailOpen className="w-4 h-4 text-white/90" aria-hidden="true" />}
             >
-              {/* Shimmer light effect */}
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-
-              {isOpeningAnimation ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="tracking-wide">...</span>
-                </>
-              ) : (
-                <>
-                  <Heart className="w-4 h-4 fill-white text-white group-hover:scale-125 transition-transform" />
-                  <span className="tracking-wide text-sm font-bold">{gt.openEnvelope}</span>
-                  <MailOpen className="w-4 h-4 text-white/90" />
-                </>
-              )}
-            </button>
+              {gt.openEnvelope}
+            </GlassButton>
             <span
-              className={`text-[11px] mt-2 block font-medium ${
-                isDarkTheme ? 'text-amber-200/80' : 'text-[#8A7C74]'
+              className={`text-[11px] block font-medium ${
+                isDarkTheme ? 'text-amber-200/85' : 'text-[#4A383F]'
               }`}
             >
-              ✨ {gt.clickToOpen}
+              {gt.clickToOpen}
             </span>
           </div>
 
           {/* Taklifim Platform Badge at bottom of Cover */}
           <div className="pt-2 flex items-center justify-center">
-            <div
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-semibold shadow-xs ${
-                isDarkTheme
-                  ? 'bg-slate-900/80 border-white/10 text-amber-200'
-                  : 'bg-white/70 border-black/5 text-[#8A7C74]'
-              }`}
-            >
-              <TaklifimLogo className="w-3.5 h-3.5" />
-              <span>{gt.createdOn}</span>
-            </div>
+            {isDarkTheme ? (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-amber-200 shadow-xs">
+                <TaklifimLogo className="w-3.5 h-3.5" />
+                <span>{gt.createdOn}</span>
+              </div>
+            ) : (
+              <GlassSurface
+                variant="subtle"
+                rounded="full"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 text-[11px] font-semibold text-[#4A383F]"
+              >
+                <TaklifimLogo className="w-3.5 h-3.5" />
+                <span>{gt.createdOn}</span>
+              </GlassSurface>
+            )}
           </div>
         </div>
       </div>
@@ -966,76 +954,37 @@ export const InvitationGuestPage: React.FC = () => {
       className="min-h-screen transition-colors pb-24 relative"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      {/* Floating Invitation Header: Language switch, Music, Share */}
-      <div className="fixed top-1.5 sm:top-2 left-1.5 sm:left-2.5 right-2 sm:right-4 z-40 max-w-4xl mx-auto flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-2">
-          {/* Independent invitation language switcher */}
-          <div
-            className={`rounded-2xl px-2.5 py-1.5 flex items-center gap-1.5 border shadow-xs ${
-              isDarkTheme
-                ? 'bg-[#0E1A2B]/90 border-white/15 text-white'
-                : 'glass-panel border-white/80'
-            }`}
-          >
-            <Globe className={`w-3.5 h-3.5 ${isDarkTheme ? 'text-amber-300' : 'text-[#5C4F48]'}`} />
-            <button
-              onClick={() => setInvLang('uz')}
-              className={`text-[11px] font-bold px-1.5 py-0.5 rounded transition-all ${
-                invLang === 'uz'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 font-black'
-                    : 'bg-[#231E1B] text-white'
-                  : isDarkTheme
-                  ? 'text-slate-400'
-                  : 'text-[#7A6A63]'
-              }`}
-            >
-              UZ
-            </button>
-            <button
-              onClick={() => setInvLang('ru')}
-              className={`text-[11px] font-bold px-1.5 py-0.5 rounded transition-all ${
-                invLang === 'ru'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 font-black'
-                    : 'bg-[#231E1B] text-white'
-                  : isDarkTheme
-                  ? 'text-slate-400'
-                  : 'text-[#7A6A63]'
-              }`}
-            >
-              RU
-            </button>
-            <button
-              onClick={() => setInvLang('en')}
-              className={`text-[11px] font-bold px-1.5 py-0.5 rounded transition-all ${
-                invLang === 'en'
-                  ? isDarkTheme
-                    ? 'bg-amber-400 text-slate-950 font-black'
-                    : 'bg-[#231E1B] text-white'
-                  : isDarkTheme
-                  ? 'text-slate-400'
-                  : 'text-[#7A6A63]'
-              }`}
-            >
-              EN
-            </button>
-          </div>
+      {/* Floating Invitation Header: Liquid Glass Language switch & Share */}
+      <div className="fixed top-2.5 sm:top-3 left-2.5 sm:left-4 right-2.5 sm:right-4 z-40 max-w-4xl mx-auto flex items-center justify-between gap-2 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GlassSegmented<Language>
+            value={invLang}
+            onChange={setInvLang}
+            ariaLabel="UZ / RU / EN"
+            options={[
+              { value: 'uz', label: 'UZ' },
+              { value: 'ru', label: 'RU' },
+              { value: 'en', label: 'EN' },
+            ]}
+          />
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2">
-          <button
+          <GlassButton
+            tone="light"
+            size="sm"
             onClick={() => setShowShareModal(true)}
-            className={`p-2.5 rounded-2xl border shadow-xs transition-colors ${
-              isDarkTheme
-                ? 'bg-[#0E1A2B]/90 border-white/15 text-white hover:bg-slate-800'
-                : 'glass-panel border-white/80 text-[#231E1B] hover:bg-white'
-            }`}
+            className="!min-w-[44px] !min-h-[40px] !px-3.5 shadow-[0_10px_28px_-6px_rgba(30,20,24,0.2)]"
             title={activeLocaleT.common.share}
             aria-label={activeLocaleT.common.share}
           >
-            <Share2 className="w-4 h-4" />
-          </button>
+            <span className="inline-flex items-center sm:gap-2">
+              <Share2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline text-xs font-semibold">
+                {activeLocaleT.common.share}
+              </span>
+            </span>
+          </GlassButton>
         </div>
       </div>
 

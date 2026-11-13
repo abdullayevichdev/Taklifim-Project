@@ -27,4 +27,15 @@ export type { GlassAccordionProps, GlassAccordionItemData } from './GlassAccordi
 export { GlassInput, GlassTextarea } from './GlassInput';
 export type { GlassInputProps, GlassTextareaProps } from './GlassInput';
 
+export { GlassModal } from './GlassModal';
+export type { GlassModalProps } from './GlassModal';
+
+export {
+  GlassSkeleton,
+  GlassStatSkeletonGrid,
+  GlassCardSkeletonGrid,
+  GlassTableSkeleton,
+} from './GlassSkeleton';
+export type { GlassSkeletonProps } from './GlassSkeleton';
+
 export { loadLiquidGlass, isLiquidGlassLoaded, useLiquidGlassReady, showLiquidToast } from './loader';
