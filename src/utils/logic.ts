@@ -1,4 +1,5 @@
-import { Template, GuestRSVP } from '../types';
+import { Template, GuestRSVP, Language } from '../types';
+import { translations, uz } from '../locales';
 
 export interface CountdownResult {
   days: number;
@@ -50,32 +51,35 @@ export function calculateCountdown(targetDate?: string, targetTime?: string, now
 /**
  * Validates RSVP form fields
  */
-export function validateRSVPForm(data: {
-  fullName: string;
-  attending: boolean;
-  guestCount: number;
-  phone?: string;
-  isPhoneValid?: boolean;
-}): { isValid: boolean; errors: Record<string, string> } {
+export function validateRSVPForm(
+  data: {
+    fullName: string;
+    attending: boolean;
+    guestCount: number;
+    phone?: string;
+    isPhoneValid?: boolean;
+  },
+  language: Language = 'uz'
+): { isValid: boolean; errors: Record<string, string> } {
+  const v = translations[language]?.validation || uz.validation;
   const errors: Record<string, string> = {};
 
   if (!data.fullName || data.fullName.trim().length < 2) {
-    errors.fullName = 'Iltimos, ism va familiyangizni kiriting';
+    errors.fullName = v.rsvpNameRequired;
   }
 
-  // Telefon raqam tekshiruvi
   if (data.phone && data.phone.trim()) {
     const rawDigits = data.phone.replace(/\D/g, '');
-    if (rawDigits.length < 8 || (data.isPhoneValid === false)) {
-      errors.phone = 'Telefon raqami to‘liq kiritilmadi';
+    if (rawDigits.length < 8 || data.isPhoneValid === false) {
+      errors.phone = v.rsvpPhoneIncomplete;
     }
   }
 
   if (data.attending) {
     if (!data.guestCount || data.guestCount < 1) {
-      errors.guestCount = 'Kamida 1 nafar mehmon bo‘lishi lozim';
+      errors.guestCount = v.rsvpMinGuests;
     } else if (data.guestCount > 10) {
-      errors.guestCount = 'Maksimal 10 nafar mehmon kiritish mumkin';
+      errors.guestCount = v.rsvpMaxGuests;
     }
   }
 
@@ -86,12 +90,13 @@ export function validateRSVPForm(data: {
 }
 
 /**
- * Formats monetary amounts in Uzbek So'm
+ * Formats monetary amounts in UZS according to UI language
  */
-export function formatPriceUZS(amount: number): string {
-  if (amount === 0) return '0 so‘m';
+export function formatPriceUZS(amount: number, language: Language = 'uz'): string {
+  const unit = translations[language]?.common.priceUzs || uz.common.priceUzs;
+  if (amount === 0) return `0 ${unit}`;
   const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${formatted} so‘m`;
+  return `${formatted} ${unit}`;
 }
 
 /**

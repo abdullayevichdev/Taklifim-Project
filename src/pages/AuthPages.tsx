@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../locales';
 import {
-  Loader2,
+  GlassSurface,
+  GlassInput,
+  GlassButton,
+  GlassSegmented,
+  GlassSwitch,
+  GlassSegmentedOption,
+} from '../components/glass';
+import {
   Eye,
   EyeOff,
   ArrowRight,
@@ -11,17 +19,17 @@ import {
   Mail,
   User,
   ShieldCheck,
-  Gift,
   Smartphone,
   KeyRound,
   RefreshCw,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 import { PhoneInput } from '../components/PhoneInput';
 
 // Official Google 4-color SVG
 const GoogleIcon: React.FC = () => (
-  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
     <path
       fill="#4285F4"
       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -42,18 +50,22 @@ const GoogleIcon: React.FC = () => (
 );
 
 // Official Apple SVG
-const AppleIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5 fill-current shrink-0" }) => (
-  <svg className={className} viewBox="0 0 170 170">
+const AppleIcon: React.FC<{ className?: string }> = ({
+  className = 'w-5 h-5 fill-current shrink-0',
+}) => (
+  <svg className={className} viewBox="0 0 170 170" aria-hidden="true">
     <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.67-7.81-11.96-14.34-6.3-9.67-11.08-20.9-14.34-33.69-3.26-12.79-4.89-24.97-4.89-36.54 0-14.34 3.58-26.17 10.74-35.5 7.16-9.33 16.27-14.07 27.32-14.22 4.8 0 10.3 1.34 16.51 4.02 6.21 2.68 10.15 4.08 11.83 4.2 2.01-.22 6.15-1.68 12.43-4.39 6.28-2.7 11.84-3.95 16.69-3.76 12.63.65 22.84 5.34 30.63 14.07-11.08 6.74-16.51 16.08-16.29 28.02.22 9.35 3.8 17.18 10.74 23.51 6.94 6.33 15.19 10.05 24.75 11.16-2.18 6.74-4.89 13.91-8.14 21.52zM119.22 31.85c0-7.17 2.58-13.88 7.74-20.13 5.16-6.25 11.66-10.28 19.5-12.09.43 1.09.65 2.28.65 3.58 0 7.39-2.72 14.32-8.16 20.79-5.43 6.47-11.95 10.3-19.55 11.49-.11-1.2-.18-2.41-.18-3.64z" />
   </svg>
 );
 
 type AuthTab = 'social' | 'phone' | 'email';
+type AuthModeToggle = 'login' | 'register';
 
 export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot' }> = ({
   initialMode = 'login',
 }) => {
   const { path, navigate } = useRouter();
+  const { language, t } = useLanguage();
   const {
     user,
     isLoggedIn,
@@ -64,10 +76,8 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     loginWithEmail,
     registerWithEmail,
     showToast,
-    canUseFreePlan,
   } = useAuth();
 
-  // If already logged in, automatically redirect to My Invitations
   useEffect(() => {
     if (isLoggedIn && user) {
       const timer = setTimeout(() => {
@@ -85,7 +95,6 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
 
   const [activeTab, setActiveTab] = useState<AuthTab>('social');
 
-  // Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -100,12 +109,42 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   const [acceptTerms, setAcceptTerms] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recoverySent, setRecoverySent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const isEligibleForFree = canUseFreePlan();
+  const modeOptions: GlassSegmentedOption<AuthModeToggle>[] = useMemo(
+    () => [
+      { value: 'login', label: t.auth.loginTab },
+      { value: 'register', label: t.auth.registerTab },
+    ],
+    [t]
+  );
+
+  const methodOptions: GlassSegmentedOption<AuthTab>[] = useMemo(
+    () => [
+      { value: 'social', label: t.auth.socialTabLabel },
+      {
+        value: 'phone',
+        label: t.auth.phoneTab,
+        icon: <Smartphone className="w-3.5 h-3.5 text-[#3B88C3]" aria-hidden="true" />,
+      },
+      {
+        value: 'email',
+        label: t.auth.emailTab,
+        icon: <Mail className="w-3.5 h-3.5 text-[#C94F79]" aria-hidden="true" />,
+      },
+    ],
+    [t]
+  );
+
+  const reportError = (msg: string) => {
+    setFormError(msg);
+    showToast(msg, 'error');
+  };
 
   // 1. Google Auth
   const handleGoogleAuth = async () => {
     if (isSubmitting) return;
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const success = await loginWithGoogle();
@@ -120,6 +159,7 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   // 2. Apple Auth
   const handleAppleAuth = async () => {
     if (isSubmitting) return;
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const success = await loginWithApple();
@@ -133,8 +173,9 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
 
   // 3. Phone OTP Send
   const handleSendOtp = async () => {
+    setFormError(null);
     if (!phone.trim() || !isPhoneValid) {
-      showToast('Iltimos, telefon raqamingizni to‘liq kiriting', 'error');
+      reportError(t.auth.errPhoneRequired);
       return;
     }
     setIsSubmitting(true);
@@ -152,18 +193,21 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
           return prev - 1;
         });
       }, 1000);
+    } else if (res.message) {
+      setFormError(res.message);
     }
   };
 
   // 4. Phone OTP Verify
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!otpCode.trim()) {
-      showToast('Iltimos, 6 xonali SMS kodni kiriting', 'error');
+      reportError(t.auth.errOtpInvalid);
       return;
     }
-    if (mode === 'register' && !name.trim()) {
-      showToast('Iltimos, to‘liq ismingizni kiriting', 'error');
+    if (mode === 'register' && name.trim().length < 2) {
+      reportError(t.auth.errNameMin);
       return;
     }
 
@@ -172,6 +216,8 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     setIsSubmitting(false);
     if (res.success) {
       navigate('/my-invitations');
+    } else if (res.message) {
+      setFormError(res.message);
     }
   };
 
@@ -179,20 +225,21 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    setFormError(null);
 
     if (mode === 'forgot') {
       if (!email.trim() || !email.includes('@')) {
-        showToast('Iltimos, to‘g‘ri elektron pochtangizni kiriting', 'error');
+        reportError(t.auth.errEmailInvalid);
         return;
       }
       setRecoverySent(true);
-      showToast('Parolni tiklash havolasi elektron pochtangizga yuborildi', 'info');
+      showToast(t.auth.toastResetSent, 'info');
       return;
     }
 
     if (mode === 'login') {
       if (!email.trim() || !password) {
-        showToast('Elektron pochta va parolni kiriting', 'error');
+        reportError(t.auth.errEmailOrPassMissing);
         return;
       }
       setIsSubmitting(true);
@@ -200,29 +247,31 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
       setIsSubmitting(false);
       if (res.success) {
         navigate('/my-invitations');
+      } else if (res.message) {
+        setFormError(res.message);
       }
       return;
     }
 
     // Register
-    if (!name.trim()) {
-      showToast('Iltimos, ism va familiyangizni kiriting', 'error');
+    if (name.trim().length < 2) {
+      reportError(t.auth.errNameMin);
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      showToast('Iltimos, to‘g‘ri elektron pochtangizni kiriting', 'error');
+      reportError(t.auth.errEmailInvalid);
       return;
     }
     if (password.length < 6) {
-      showToast('Parol kamida 6 ta belgidan iborat bo‘lishi lozim', 'error');
+      reportError(t.auth.errPasswordMin);
       return;
     }
     if (password !== confirmPassword) {
-      showToast('Kiritilgan parollar bir-biriga mos kelmadi', 'error');
+      reportError(t.auth.errPasswordMismatch);
       return;
     }
     if (!acceptTerms) {
-      showToast('Foydalanish shartlariga rozilik bildiring', 'error');
+      reportError(t.auth.errAcceptTerms);
       return;
     }
 
@@ -236,197 +285,177 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     setIsSubmitting(false);
     if (res.success) {
       navigate('/my-invitations');
+    } else if (res.message) {
+      setFormError(res.message);
     }
   };
 
-  // If already logged in, show instant confirmation card and navigate
+  // If already logged in, show instant confirmation glass card and navigate
   if (isLoggedIn && user) {
     return (
       <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
-        <div className="w-full max-w-md glass-panel-elevated rounded-[36px] p-8 sm:p-10 border border-white/95 shadow-[0_24px_64px_rgba(226,123,155,0.18)] space-y-6 text-center bg-white/95 backdrop-blur-2xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#F5C9D8] to-[#E27B9B] text-white flex items-center justify-center mx-auto shadow-lg text-2xl font-bold">
-            ✓
+        <GlassSurface
+          variant="elevated"
+          rounded="3xl"
+          className="w-full max-w-md p-8 sm:p-10 space-y-6 text-center animate-fadeIn"
+        >
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#F5C9D8] to-[#C94F79] text-white flex items-center justify-center mx-auto shadow-lg">
+            <CheckCircle2 className="w-8 h-8" aria-hidden="true" />
           </div>
           <div className="space-y-1.5">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 block">
-              Muvaffaqiyatli kirdingiz
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+              {t.auth.alreadyLoggedSub}
             </span>
-            <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-[#1E1418]">
-              Xush kelibsiz, {user.name}!
-            </h2>
-            <p className="text-xs text-[#7A6A63]">{user.email || user.phone}</p>
+            <h1 className="font-playfair text-2xl sm:text-3xl font-bold text-[#1E1418]">
+              {t.auth.alreadyLoggedWelcomePrefix} {user.name}!
+            </h1>
+            <p className="text-xs text-[#5C4F48]">{user.email || user.phone}</p>
           </div>
           <div className="pt-2">
-            <button
+            <GlassButton
+              tone="tinted"
+              size="lg"
               onClick={() => navigate('/my-invitations')}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#1E1418] to-[#3A242B] text-white font-bold text-xs tracking-wider uppercase shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-2 group cursor-pointer"
+              rightIcon={<ArrowRight className="w-4 h-4 shrink-0" />}
+              className="w-full justify-center"
             >
-              <span>Taklifnomalarimga o‘tish</span>
-              <ArrowRight className="w-4 h-4 text-[#E27B9B] group-hover:translate-x-1 transition-transform" />
-            </button>
+              {t.auth.goMyInvitationsCta}
+            </GlassButton>
           </div>
-        </div>
+        </GlassSurface>
       </div>
     );
   }
 
   return (
     <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Background ambient orbs */}
-      <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-tr from-[#F5C9D8]/35 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-bl from-[#B9DFFA]/35 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
-
-      <div className="w-full max-w-md glass-panel-elevated rounded-[36px] p-7 sm:p-9 border border-white/95 shadow-[0_24px_64px_rgba(226,123,155,0.18)] space-y-6 relative bg-white/92 backdrop-blur-2xl">
+      <GlassSurface
+        variant="elevated"
+        rounded="3xl"
+        className="w-full max-w-md p-6 sm:p-9 space-y-5 relative"
+      >
         {/* Header with Logo */}
         <div className="text-center space-y-2">
           <Link to="/" className="inline-flex items-center gap-2 group">
-            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-[#F5C9D8] via-white to-[#B9DFFA] shadow-md transition-transform duration-300 group-hover:scale-105 border border-white">
-              <img src="/logo.jpg" alt="Taklifim" className="w-full h-full object-cover rounded-[14px]" />
+            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-[#F5C9D8] via-white to-[#B9DFFA] shadow-md border border-white">
+              <img
+                src="/logo.jpg"
+                alt={t.brandName}
+                className="w-full h-full object-cover rounded-[14px]"
+              />
             </div>
           </Link>
           <h1 className="font-playfair text-2xl sm:text-3xl font-extrabold text-[#1E1418]">
             {mode === 'login'
-              ? 'Tizimga Kirish'
+              ? t.auth.loginTitle
               : mode === 'register'
-              ? 'Ro‘yxatdan O‘tish'
-              : 'Parolni Tiklash'}
+              ? t.auth.registerTitle
+              : t.auth.forgotTitle}
           </h1>
-          <p className="text-xs text-[#5C4F48]">
+          <p className="text-xs text-[#4A383F]">
             {mode === 'login'
-              ? 'O‘z taklifnomalaringiz va mehmonlar javoblarini boshqaring'
+              ? t.auth.loginSubtitle
               : mode === 'register'
-              ? 'Tezkor va xavfsiz hisob oching'
-              : 'Elektron pochtangizni kiriting'}
+              ? t.auth.registerSubtitle
+              : t.auth.forgotSubtitle}
           </p>
         </div>
 
         {/* Welcome Banner */}
         {mode === 'register' && (
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#FFF5F8] to-[#F0F8FF] border border-[#E27B9B]/30 flex items-center gap-3 animate-fadeIn">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#F5C9D8] to-[#E27B9B] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Sparkles className="w-5 h-5" />
+          <GlassSurface
+            variant="tinted-pink"
+            rounded="2xl"
+            className="p-3.5 flex items-center gap-3 animate-fadeIn"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#F5C9D8] to-[#C94F79] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles className="w-5 h-5" aria-hidden="true" />
             </div>
-            <div className="text-xs">
+            <div className="text-xs min-w-0">
               <span className="font-extrabold text-[#1E1418] block">
-                Xush kelibsiz!
+                {t.auth.welcomeCardTitle}
               </span>
-              <span className="text-[11px] text-[#5C4F48]">
-                Zamonaviy va nafis interaktiv taklifnomalar xizmatiga ulaning.
-              </span>
+              <span className="text-[11px] text-[#4A383F]">{t.auth.welcomeCardDesc}</span>
             </div>
-          </div>
+          </GlassSurface>
         )}
 
-        {/* Kirish / Ro'yxatdan o'tish rejimi tugmalari */}
+        {/* Mode toggle buttons (GlassSegmented) */}
         {mode !== 'forgot' && (
-          <div className="grid grid-cols-2 p-1 rounded-2xl bg-black/5 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                navigate('/login');
-              }}
-              className={`py-2 rounded-xl transition-all ${
-                mode === 'login'
-                  ? 'bg-white text-[#1E1418] shadow-xs font-extrabold'
-                  : 'text-[#7A6A63] hover:text-black'
-              }`}
-            >
-              Kirish
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                navigate('/register');
-              }}
-              className={`py-2 rounded-xl transition-all ${
-                mode === 'register'
-                  ? 'bg-white text-[#1E1418] shadow-xs font-extrabold'
-                  : 'text-[#7A6A63] hover:text-black'
-              }`}
-            >
-              Ro‘yxatdan o‘tish
-            </button>
-          </div>
+          <GlassSegmented<AuthModeToggle>
+            fullWidth
+            options={modeOptions}
+            value={mode === 'register' ? 'register' : 'login'}
+            onChange={(val) => {
+              setFormError(null);
+              setMode(val);
+              navigate(val === 'register' ? '/register' : '/login');
+            }}
+            ariaLabel={`${t.auth.loginTab} / ${t.auth.registerTab}`}
+            className="taklifim-auth-seg"
+          />
         )}
 
-        {/* AUTH METHOD TABS: 1. Tezkor (Google & Apple) | 2. Telefon (SMS) | 3. Email */}
+        {/* Auth Method Tabs (GlassSegmented) */}
         {mode !== 'forgot' && (
           <div className="space-y-2">
-            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#7A6A63] text-center">
-              Kirish usulini tanlang:
+            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#5C4F48] text-center">
+              {t.auth.chooseMethodLabel}
             </div>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-black/5 text-xs">
-              <button
-                type="button"
-                onClick={() => setActiveTab('social')}
-                className={`py-2 px-1 rounded-xl flex items-center justify-center gap-1.5 transition-all text-center ${
-                  activeTab === 'social'
-                    ? 'bg-white text-[#1E1418] shadow-xs font-extrabold ring-1 ring-black/5'
-                    : 'text-[#5C4F48] hover:text-black font-semibold'
-                }`}
-              >
-                <span className="text-[11px]">Google / Apple</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('phone')}
-                className={`py-2 px-1 rounded-xl flex items-center justify-center gap-1.5 transition-all text-center ${
-                  activeTab === 'phone'
-                    ? 'bg-white text-[#1E1418] shadow-xs font-extrabold ring-1 ring-black/5'
-                    : 'text-[#5C4F48] hover:text-black font-semibold'
-                }`}
-              >
-                <Smartphone className="w-3.5 h-3.5 text-[#4A9BD4]" />
-                <span className="text-[11px]">Telefon (SMS)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('email')}
-                className={`py-2 px-1 rounded-xl flex items-center justify-center gap-1.5 transition-all text-center ${
-                  activeTab === 'email'
-                    ? 'bg-white text-[#1E1418] shadow-xs font-extrabold ring-1 ring-black/5'
-                    : 'text-[#5C4F48] hover:text-black font-semibold'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5 text-[#D9658B]" />
-                <span className="text-[11px]">Email</span>
-              </button>
+            <div className="w-full overflow-x-auto pb-1 no-scrollbar flex justify-center">
+              <GlassSegmented<AuthTab>
+                options={methodOptions}
+                value={activeTab}
+                onChange={(val) => {
+                  setFormError(null);
+                  setActiveTab(val);
+                }}
+                ariaLabel={t.auth.chooseMethodLabel}
+                className="taklifim-auth-seg w-max sm:w-full"
+                fullWidth
+              />
             </div>
           </div>
         )}
 
-        {/* ========================================================
-            TAB 1: PROFESSIONAL GOOGLE & APPLE AUTH
-        ======================================================== */}
+        {/* Glass Inline Error Alert */}
+        {formError && (
+          <GlassSurface
+            variant="tinted-pink"
+            rounded="2xl"
+            className="p-3 flex items-center gap-2.5 border border-rose-300/80 text-xs font-semibold text-rose-800 animate-fadeIn"
+            role="alert"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{formError}</span>
+          </GlassSurface>
+        )}
+
+        {/* TAB 1: GOOGLE & APPLE AUTH */}
         {mode !== 'forgot' && activeTab === 'social' && (
-          <div className="space-y-3.5 pt-1 animate-fadeIn">
-            {/* Google Button */}
-            <button
+          <div className="space-y-3 pt-1 animate-fadeIn">
+            <GlassButton
+              tone="light"
+              size="lg"
               type="button"
               disabled={isSubmitting}
+              loading={isSubmitting}
               onClick={handleGoogleAuth}
-              className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-gray-50 text-[#1E1418] font-bold text-xs border border-black/15 shadow-sm hover:shadow transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-75 group cursor-pointer"
+              leftIcon={<GoogleIcon />}
+              className="w-full justify-center"
             >
-              {isSubmitting ? (
-                <div className="w-4 h-4 border-2 border-[#E27B9B] border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
-              <span>
-                {isSubmitting ? 'Tizimga ulanmoqda...' : mode === 'login' ? 'Google orqali kirish' : 'Google orqali ro‘yxatdan o‘tish'}
-              </span>
-            </button>
+              {isSubmitting
+                ? t.auth.googleConnecting
+                : mode === 'login'
+                ? t.auth.googleLoginBtn
+                : t.auth.googleRegisterBtn}
+            </GlassButton>
 
-            {/* Apple Button */}
             <button
               type="button"
               disabled={isSubmitting}
               onClick={handleAppleAuth}
-              className="w-full py-3.5 px-4 rounded-2xl bg-[#000000] hover:bg-neutral-900 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-75 group border border-white/10 cursor-pointer"
+              className="w-full min-h-[48px] py-3 px-4 rounded-full bg-[#1E1418] hover:bg-black text-white font-semibold text-sm shadow-md hover:shadow-lg transition-colors flex items-center justify-center gap-2.5 disabled:opacity-60 border border-white/15 cursor-pointer"
             >
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -434,142 +463,142 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
                 <AppleIcon className="w-4 h-4 fill-white" />
               )}
               <span>
-                {isSubmitting ? 'Tizimga ulanmoqda...' : mode === 'login' ? 'Apple ID orqali kirish' : 'Apple ID bilan davom etish'}
+                {isSubmitting
+                  ? t.auth.googleConnecting
+                  : mode === 'login'
+                  ? t.auth.appleLoginBtn
+                  : t.auth.appleRegisterBtn}
               </span>
             </button>
 
-            <div className="p-3 rounded-2xl bg-black/[0.02] border border-black/5 text-[11px] text-[#7A6A63] text-center space-y-1">
-              <div>✓ Parol eslab qolish shart emas</div>
-              <div>✓ Real-time ma’lumotlar bazasi bilan 100% integratsiya</div>
-            </div>
+            <GlassSurface
+              variant="subtle"
+              rounded="2xl"
+              className="p-3 text-[11px] text-[#5C4F48] text-center space-y-1"
+            >
+              <div>{t.auth.noPasswordNeeded}</div>
+              <div>{t.auth.realtimeSyncBadge}</div>
+            </GlassSurface>
           </div>
         )}
 
-        {/* ========================================================
-            TAB 2: PROFESSIONAL PHONE (SMS OTP) AUTH
-        ======================================================== */}
+        {/* TAB 2: PHONE (SMS OTP) AUTH */}
         {mode !== 'forgot' && activeTab === 'phone' && (
           <div className="space-y-4 pt-1 animate-fadeIn">
             {!isOtpSent ? (
               <div className="space-y-3.5 text-xs">
                 {mode === 'register' && (
-                  <div className="space-y-1">
-                    <label className="font-bold text-[#3A2D28] block">To‘liq ismingiz</label>
-                    <div className="relative">
-                      <User className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Masalan: Dilnoza Karimova"
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-black/10 outline-none focus:border-[#4A9BD4] text-xs text-[#1E1418]"
-                      />
-                    </div>
-                  </div>
+                  <GlassInput
+                    type="text"
+                    required
+                    label={t.auth.fullNameLabel}
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
+                    placeholder={t.auth.fullNamePlaceholder}
+                    leftIcon={<User className="w-4 h-4" aria-hidden="true" />}
+                  />
                 )}
 
                 <div className="space-y-1">
-                  <label className="font-bold text-[#3A2D28] block">Telefon raqamingiz</label>
+                  <label className="font-bold text-[#3A2D28] block text-[11px]">
+                    {t.auth.phoneLabel}
+                  </label>
                   <PhoneInput
                     value={phone}
                     onChange={(fullVal, valid) => {
                       setPhone(fullVal);
                       setIsPhoneValid(valid);
+                      if (formError) setFormError(null);
                     }}
+                    language={language}
                     required
                   />
-                  <span className="text-[10px] text-[#7A6A63] block">
-                    Ushbu raqamga 6 xonali tasdiqlash kodi yuboriladi.
+                  <span className="text-[10px] text-[#5C4F48] block pt-0.5">
+                    {t.auth.smsCodeHint}
                   </span>
                 </div>
 
-                <button
+                <GlassButton
                   type="button"
+                  tone="tinted"
+                  size="lg"
                   disabled={isSubmitting || !phone}
+                  loading={isSubmitting}
                   onClick={handleSendOtp}
-                  className="w-full py-3.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-[#4A9BD4] to-[#2563EB] shadow-md hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  leftIcon={<Smartphone className="w-4 h-4" aria-hidden="true" />}
+                  rightIcon={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
+                  className="w-full justify-center"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>SMS kod yuborilmoqda...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Smartphone className="w-4 h-4" />
-                      <span>SMS Kod Olish</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                  {isSubmitting ? t.auth.sendingOtpBtn : t.auth.sendOtpBtn}
+                </GlassButton>
               </div>
             ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs animate-fadeIn">
-                <div className="p-3 rounded-2xl bg-sky-50 border border-sky-200 text-sky-900 text-xs flex items-center justify-between">
-                  <div>
-                    <span className="font-bold block">SMS kod yuborildi:</span>
-                    <span className="text-[11px] opacity-80">{phone}</span>
+              <form noValidate onSubmit={handleVerifyOtp} className="space-y-4 text-xs animate-fadeIn">
+                <GlassSurface
+                  variant="tinted-sky"
+                  rounded="2xl"
+                  className="p-3 text-[#1E3A5F] text-xs flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <span className="font-bold block">{t.auth.otpSentDescPrefix}</span>
+                    <span className="text-[11px] opacity-85 truncate block">{phone}</span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsOtpSent(false)}
-                    className="text-[11px] font-bold text-[#4A9BD4] hover:underline"
+                    onClick={() => {
+                      setIsOtpSent(false);
+                      setFormError(null);
+                    }}
+                    className="min-h-[36px] px-2.5 text-[11px] font-bold text-[#2B6EA3] hover:underline shrink-0 cursor-pointer"
                   >
-                    Raqamni o‘zgartirish
+                    {t.auth.changePhoneBtn}
                   </button>
-                </div>
+                </GlassSurface>
 
-                <div className="space-y-1.5 text-center">
-                  <label className="font-bold text-[#3A2D28] block text-xs">
-                    6 xonali SMS kodni kiriting
-                  </label>
-                  <div className="relative max-w-xs mx-auto">
-                    <KeyRound className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      maxLength={6}
-                      autoFocus
-                      required
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                      placeholder="• • • • • •"
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-black/15 outline-none focus:border-[#4A9BD4] text-center text-base tracking-[0.4em] font-extrabold text-[#1E1418]"
-                    />
-                  </div>
-                </div>
+                <GlassInput
+                  type="text"
+                  maxLength={6}
+                  autoFocus
+                  required
+                  label={t.auth.otpCodeTitle}
+                  value={otpCode}
+                  onChange={(e) => {
+                    setOtpCode(e.target.value.replace(/\D/g, ''));
+                    if (formError) setFormError(null);
+                  }}
+                  placeholder="• • • • • •"
+                  leftIcon={<KeyRound className="w-4 h-4" aria-hidden="true" />}
+                  className="text-center text-base tracking-[0.4em] font-extrabold"
+                />
 
-                <button
+                <GlassButton
                   type="submit"
+                  tone="tinted"
+                  size="lg"
                   disabled={isSubmitting || otpCode.length < 4}
-                  className="w-full py-3.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 shadow-md hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  loading={isSubmitting}
+                  leftIcon={<CheckCircle2 className="w-4 h-4" aria-hidden="true" />}
+                  className="w-full justify-center"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Tekshirilmoqda...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Kodni Tasdiqlash va Kirish</span>
-                    </>
-                  )}
-                </button>
+                  {isSubmitting ? t.auth.verifyingBtn : t.auth.verifyLoginBtn}
+                </GlassButton>
 
                 <div className="text-center pt-1">
                   {countdown > 0 ? (
-                    <span className="text-[11px] text-[#7A6A63]">
-                      Qayta yuborish: {countdown} soniya
+                    <span className="text-[11px] text-[#5C4F48]">
+                      {t.auth.resendOtpPrefix} {countdown} {t.auth.resendSecUnit}
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={handleSendOtp}
-                      className="text-[11px] font-bold text-[#4A9BD4] hover:underline inline-flex items-center gap-1"
+                      className="min-h-[36px] px-3 text-[11px] font-bold text-[#2B6EA3] hover:underline inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Kodni qaytadan yuborish</span>
+                      <RefreshCw className="w-3 h-3" aria-hidden="true" />
+                      <span>{t.auth.resendOtpBtn}</span>
                     </button>
                   )}
                 </div>
@@ -578,162 +607,183 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
           </div>
         )}
 
-        {/* ========================================================
-            TAB 3: TRADITIONAL EMAIL / PASSWORD
-        ======================================================== */}
+        {/* TAB 3: EMAIL / PASSWORD */}
         {(mode === 'forgot' || activeTab === 'email') && (
           <>
             {recoverySent && mode === 'forgot' ? (
               <div className="text-center py-6 space-y-4 animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-xs">
-                  <CheckCircle2 className="w-8 h-8" />
+                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center border border-white shadow-xs">
+                  <CheckCircle2 className="w-8 h-8" aria-hidden="true" />
                 </div>
-                <h3 className="font-bold text-sm text-[#1E1418]">Havola jo‘natildi!</h3>
-                <p className="text-xs text-[#5C4F48] max-w-xs mx-auto">
-                  «{email}» manziliga parolingizni tiklash bo‘yicha ko‘rsatmalar yuborildi.
+                <h2 className="font-bold text-sm text-[#1E1418]">{t.auth.resetLinkSentTitle}</h2>
+                <p className="text-xs text-[#4A383F] max-w-xs mx-auto leading-relaxed">
+                  «{email}» {t.auth.resetLinkSentDescSuffix}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setMode('login')}
-                  className="px-6 py-2.5 rounded-xl bg-[#1E1418] text-white text-xs font-bold hover:bg-black"
-                >
-                  Kirish sahifasiga qaytish
-                </button>
+                <div className="flex justify-center">
+                  <GlassButton
+                    type="button"
+                    tone="tinted"
+                    size="md"
+                    onClick={() => {
+                      setRecoverySent(false);
+                      setFormError(null);
+                      setMode('login');
+                    }}
+                  >
+                    {t.auth.backToLoginBtn}
+                  </GlassButton>
+                </div>
               </div>
             ) : (
-              <form onSubmit={handleEmailSubmit} className="space-y-3.5 text-xs animate-fadeIn">
+              <form noValidate onSubmit={handleEmailSubmit} className="space-y-3.5 text-xs animate-fadeIn">
                 {mode === 'register' && (
-                  <div className="space-y-1">
-                    <label className="font-bold text-[#3A2D28] block">To‘liq ismingiz</label>
-                    <div className="relative">
-                      <User className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Masalan: Nodirbek Salimov"
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-black/10 outline-none focus:border-[#E27B9B] text-xs text-[#1E1418]"
-                      />
-                    </div>
-                  </div>
+                  <GlassInput
+                    type="text"
+                    required
+                    label={t.auth.fullNameLabel}
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
+                    placeholder={t.auth.fullNamePlaceholder}
+                    leftIcon={<User className="w-4 h-4" aria-hidden="true" />}
+                  />
                 )}
 
-                <div className="space-y-1">
-                  <label className="font-bold text-[#3A2D28] block">
-                    Elektron pochta manzili
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="masalan: nodirbek@gmail.com"
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-black/10 outline-none focus:border-[#E27B9B] text-xs text-[#1E1418]"
-                    />
-                  </div>
-                </div>
+                <GlassInput
+                  type="email"
+                  required
+                  label={t.auth.emailLabel}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
+                  placeholder={t.auth.emailPlaceholder}
+                  leftIcon={<Mail className="w-4 h-4" aria-hidden="true" />}
+                />
 
                 {mode !== 'forgot' && (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-[#3A2D28]">Parol</label>
+                      <span className="font-bold text-[#3A2D28] text-[11px]">
+                        {t.auth.passwordLabel}
+                      </span>
                       {mode === 'login' && (
                         <button
                           type="button"
-                          onClick={() => setMode('forgot')}
-                          className="text-[11px] text-[#E27B9B] hover:underline font-bold"
+                          onClick={() => {
+                            setFormError(null);
+                            setMode('forgot');
+                          }}
+                          className="text-[11px] text-[#C94F79] hover:underline font-bold cursor-pointer"
                         >
-                          Parolni unutdingizmi?
+                          {t.auth.forgotPasswordBtn}
                         </button>
                       )}
                     </div>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Kamida 6 ta belgi"
-                        className="w-full pl-10 pr-10 py-3 rounded-2xl bg-white border border-black/10 outline-none focus:border-[#E27B9B] text-xs text-[#1E1418]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#7A6A63] hover:text-black"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {mode === 'register' && (
-                  <div className="space-y-1">
-                    <label className="font-bold text-[#3A2D28] block">Parolni tasdiqlang</label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Parolni qayta kiriting"
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-black/10 outline-none focus:border-[#E27B9B] text-xs text-[#1E1418]"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {mode === 'register' && (
-                  <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={acceptTerms}
-                      onChange={(e) => setAcceptTerms(e.target.checked)}
-                      className="w-4 h-4 mt-0.5 rounded text-[#E27B9B]"
+                    <GlassInput
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      aria-label={t.auth.passwordLabel}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      placeholder={t.auth.passwordPlaceholder}
+                      leftIcon={<Lock className="w-4 h-4" aria-hidden="true" />}
+                      rightElement={
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={t.auth.togglePasswordVisibility}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg text-[#5C4F48] hover:text-[#1E1418] cursor-pointer"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="w-4 h-4" aria-hidden="true" />
+                          )}
+                        </button>
+                      }
                     />
-                    <span className="text-[11px] text-[#5C4F48] leading-tight">
-                      Men{' '}
-                      <Link to="/terms" className="text-[#E27B9B] underline font-bold">
-                        Foydalanish shartlari
+                  </div>
+                )}
+
+                {mode === 'register' && (
+                  <GlassInput
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    label={t.auth.confirmPasswordLabel}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
+                    placeholder={t.auth.confirmPasswordPlaceholder}
+                    leftIcon={<Lock className="w-4 h-4" aria-hidden="true" />}
+                  />
+                )}
+
+                {mode === 'register' && (
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <span className="text-[11px] text-[#4A383F] leading-snug">
+                      {t.auth.termsAgreePrefix}{' '}
+                      <Link to="/terms" className="text-[#C94F79] underline font-bold">
+                        {t.auth.termsLinkText}
                       </Link>{' '}
-                      va{' '}
-                      <Link to="/privacy" className="text-[#E27B9B] underline font-bold">
-                        Maxfiylik siyosati
+                      {t.auth.termsAndText}{' '}
+                      <Link to="/privacy" className="text-[#C94F79] underline font-bold">
+                        {t.auth.privacyLinkText}
                       </Link>
-                      ga roziman.
+                      {t.auth.termsAgreeSuffix}
                     </span>
-                  </label>
+                    <GlassSwitch
+                      checked={acceptTerms}
+                      onChange={(checked) => {
+                        setAcceptTerms(checked);
+                        if (formError) setFormError(null);
+                      }}
+                      name="acceptTerms"
+                    />
+                  </div>
+                )}
+
+                {mode === 'forgot' && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormError(null);
+                        setMode('login');
+                      }}
+                      className="text-[11px] font-bold text-[#2B6EA3] hover:underline cursor-pointer"
+                    >
+                      {t.auth.backToLoginBtn}
+                    </button>
+                  </div>
                 )}
 
                 <div className="pt-2">
-                  <button
+                  <GlassButton
                     type="submit"
+                    tone="tinted"
+                    size="lg"
                     disabled={isSubmitting}
-                    className="w-full py-3.5 rounded-2xl text-xs font-extrabold text-white bg-gradient-to-r from-[#E27B9B] via-[#D9658B] to-[#B9DFFA] shadow-[0_10px_30px_rgba(226,123,155,0.4)] hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-60"
+                    loading={isSubmitting}
+                    rightIcon={<ArrowRight className="w-4 h-4" aria-hidden="true" />}
+                    className="w-full justify-center"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Yuklanmoqda...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          {mode === 'login'
-                            ? 'Email orqali kirish'
-                            : mode === 'register'
-                            ? 'Ro‘yxatdan o‘tish'
-                            : 'Tiklash havolasini yuborish'}
-                        </span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </button>
+                    {isSubmitting
+                      ? t.auth.loggingInBtn
+                      : mode === 'login'
+                      ? t.auth.loginBtn
+                      : mode === 'register'
+                      ? t.auth.registerBtn
+                      : t.auth.sendResetBtn}
+                  </GlassButton>
                 </div>
               </form>
             )}
@@ -741,11 +791,11 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
         )}
 
         {/* Security badge */}
-        <div className="pt-2 border-t border-black/5 flex items-center justify-center gap-2 text-[11px] text-[#7A6A63]">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Real-time ma’lumotlar 100% himoyalangan</span>
+        <div className="pt-3 border-t border-black/8 flex items-center justify-center gap-2 text-[11px] text-[#5C4F48]">
+          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden="true" />
+          <span>{t.auth.securityBadgeAlt}</span>
         </div>
-      </div>
+      </GlassSurface>
     </div>
   );
 };

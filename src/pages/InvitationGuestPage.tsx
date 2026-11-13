@@ -14,6 +14,7 @@ import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { Language, GuestRSVP, InvitationData } from '../types';
+import { translations, translateCategory } from '../locales';
 import confetti from 'canvas-confetti';
 import {
   Gem,
@@ -431,7 +432,8 @@ export const InvitationGuestPage: React.FC = () => {
       invitation.invitationMessage
     )}&location=${encodeURIComponent(invitation.venueName + ', ' + invitation.venueAddress)}`;
     window.open(gcalUrl, '_blank');
-    showToast('Google Taqvim havolasi ochildi!', 'success');
+    const gateT = (translations[invLang] || translations.uz).guestGate;
+    showToast(gateT.calendarOpenedToast, 'success');
   };
 
   // Real-time Countdown timer
@@ -474,13 +476,16 @@ export const InvitationGuestPage: React.FC = () => {
 
   const handleRSVPSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateRSVPForm({
-      fullName: rsvpFullName,
-      attending: rsvpAttending,
-      guestCount: rsvpGuestCount,
-      phone: rsvpPhone,
-      isPhoneValid: isRsvpPhoneValid,
-    });
+    const validation = validateRSVPForm(
+      {
+        fullName: rsvpFullName,
+        attending: rsvpAttending,
+        guestCount: rsvpGuestCount,
+        phone: rsvpPhone,
+        isPhoneValid: isRsvpPhoneValid,
+      },
+      invLang
+    );
 
     if (!validation.isValid) {
       setFormErrors(validation.errors);
@@ -518,15 +523,18 @@ export const InvitationGuestPage: React.FC = () => {
         // ignore
       }
 
-      showToast('Tashrifingiz muvaffaqiyatli qayd etildi! Rahmat!', 'success');
+      const gateT = (translations[invLang] || translations.uz).guestGate;
+      showToast(gateT.rsvpSuccessToast, 'success');
     } catch {
-      showToast('Xatolik yuz berdi, iltimos qayta urinib ko‘ring', 'error');
+      const gateT = (translations[invLang] || translations.uz).guestGate;
+      showToast(gateT.genericErrorToast, 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleGuestRSVP = async (data: Partial<GuestRSVP>): Promise<boolean> => {
+    const gateT = (translations[invLang] || translations.uz).guestGate;
     try {
       const newGuest = await api.submitRSVP({
         invitationId: invitation?.id || 'inv-1',
@@ -551,15 +559,16 @@ export const InvitationGuestPage: React.FC = () => {
       } catch {
         // ignore
       }
-      showToast('Tashrifingiz muvaffaqiyatli qayd etildi! Rahmat!', 'success');
+      showToast(gateT.rsvpSuccessToast, 'success');
       return true;
     } catch {
-      showToast('Xatolik yuz berdi, iltimos qayta urinib ko‘ring', 'error');
+      showToast(gateT.genericErrorToast, 'error');
       return false;
     }
   };
 
   const handleGuestWish = async (wish: { name: string; message: string }): Promise<boolean> => {
+    const gateT = (translations[invLang] || translations.uz).guestGate;
     try {
       const newGuest = await api.submitRSVP({
         invitationId: invitation?.id || 'inv-1',
@@ -582,13 +591,15 @@ export const InvitationGuestPage: React.FC = () => {
       } catch {
         // ignore
       }
-      showToast('Ezgu tilagingiz uchun tashakkur!', 'success');
+      showToast(gateT.wishSuccessToast, 'success');
       return true;
     } catch {
-      showToast('Xatolik yuz berdi, qaytadan urinib ko‘ring', 'error');
+      showToast(gateT.genericErrorToast, 'error');
       return false;
     }
   };
+
+  const activeLocaleT = translations[invLang] || translations.uz;
 
   if (loading || !invitation) {
     return (
@@ -596,7 +607,7 @@ export const InvitationGuestPage: React.FC = () => {
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 text-[#B48B47] animate-spin mx-auto" />
           <p className="font-playfair text-sm font-semibold text-[#231E1B]">
-            Taklifnoma ochilmoqda...
+            {activeLocaleT.guestGate.loading}
           </p>
         </div>
       </div>
@@ -609,24 +620,30 @@ export const InvitationGuestPage: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[#FAF6F0]">
         <div className="max-w-md w-full glass-panel-elevated rounded-3xl p-8 text-center space-y-4 border border-amber-200 shadow-xl animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 text-2xl shadow-sm">
-            ⏳
+          <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 shadow-sm">
+            <Clock className="w-8 h-8" />
           </div>
           <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-200/60 px-3 py-1 rounded-full">
-              To'lov Kutilmoqda
+              {activeLocaleT.guestGate.pendingBadge}
             </span>
             <h2 className="font-playfair text-xl font-bold text-[#231E1B]">
-              Taklifnoma Hali Faollashtirilmagan
+              {activeLocaleT.guestGate.pendingTitle}
             </h2>
           </div>
           <p className="text-xs text-[#5C4F48] leading-relaxed">
-            Ushbu taklifnoma to‘lovi hozirda admin tomonidan tekshirilmoqda. To‘lov tasdiqlangach, taklifnoma mehmonlar uchun avtomatik ochiladi.
+            {activeLocaleT.guestGate.pendingDesc}
           </p>
           <div className="p-3.5 rounded-2xl bg-white/80 border border-black/5 text-[11px] text-[#7A6A63] text-left space-y-1">
-            <div><strong>Tadbir:</strong> {invitation.eventTitle}</div>
-            <div><strong>Sana:</strong> {invitation.eventDate}</div>
+            <div><strong>{activeLocaleT.guestGate.eventLabel}:</strong> {invitation.eventTitle}</div>
+            <div><strong>{activeLocaleT.guestGate.dateLabel}:</strong> {invitation.eventDate}</div>
           </div>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold hover:bg-black transition-colors"
+          >
+            {activeLocaleT.guestGate.backHomeBtn}
+          </Link>
         </div>
       </div>
     );
@@ -867,7 +884,7 @@ export const InvitationGuestPage: React.FC = () => {
                   {getMonogram(invitation)}
                 </span>
               </div>
-              <div className="absolute inset-0 rounded-full border border-white/80 animate-ping opacity-30 pointer-events-none" />
+              <div className="absolute inset-0 rounded-full border border-white/60 opacity-40 pointer-events-none" />
             </div>
           </div>
 
@@ -895,9 +912,7 @@ export const InvitationGuestPage: React.FC = () => {
             <button
               disabled={isOpeningAnimation}
               onClick={handleOpenInvitation}
-              className={`w-full py-4 sm:py-5 px-8 rounded-2xl text-sm font-extrabold text-white shadow-[0_12px_35px_rgba(226,123,155,0.45)] hover:shadow-[0_18px_45px_rgba(226,123,155,0.65)] hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden group ${
-                !isOpeningAnimation ? 'animate-pulse' : ''
-              }`}
+              className="w-full py-4 sm:py-5 px-8 rounded-2xl text-sm font-extrabold text-white shadow-[0_12px_35px_rgba(226,123,155,0.45)] hover:shadow-[0_18px_45px_rgba(226,123,155,0.65)] hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden group"
               style={{
                 background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
               }}
@@ -1016,8 +1031,8 @@ export const InvitationGuestPage: React.FC = () => {
                 ? 'bg-[#0E1A2B]/90 border-white/15 text-white hover:bg-slate-800'
                 : 'glass-panel border-white/80 text-[#231E1B] hover:bg-white'
             }`}
-            title="Ulashish"
-            aria-label="Ulashish"
+            title={activeLocaleT.common.share}
+            aria-label={activeLocaleT.common.share}
           >
             <Share2 className="w-4 h-4" />
           </button>
@@ -1062,6 +1077,7 @@ export const InvitationGuestPage: React.FC = () => {
           title={invitation.musicTitle}
           autoPlay={true}
           delaySeconds={5}
+          language={invLang}
         />
       )}
 
@@ -1069,7 +1085,8 @@ export const InvitationGuestPage: React.FC = () => {
       {showShareModal && (
         <ShareModal
           url={`/i/${slug}`}
-          title={`${invitation.hostNames} — ${invitation.eventType}`}
+          title={`${invitation.hostNames} — ${invitation.eventTitle || translateCategory(invitation.eventType, invLang)}`}
+          language={invLang}
           onClose={() => setShowShareModal(false)}
         />
       )}

@@ -5,12 +5,13 @@
 
 import React from 'react';
 import { RouterProvider, useRouter } from './context/RouterContext';
-import { LanguageProvider } from './locales';
+import { LanguageProvider, useLanguage } from './locales';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ToastContainer } from './components/ToastContainer';
-import { BackgroundCarousel } from './components/BackgroundCarousel';
+import { GlassBackground } from './components/glass/GlassBackground';
+import { GlassBottomNav } from './components/glass/GlassBottomNav';
 
 // Pages
 import { HomePage } from './pages/HomePage';
@@ -31,6 +32,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isLoggedIn } = useAuth();
   const { navigate } = useRouter();
+  const { t } = useLanguage();
 
   React.useEffect(() => {
     if (!isLoggedIn) {
@@ -43,7 +45,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       <div className="pt-28 pb-20 min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin w-8 h-8 border-4 border-[#E27B9B] border-t-transparent rounded-full mx-auto" />
-          <p className="text-sm text-[#5C4F48]">Tizimga kirilmoqda...</p>
+          <p className="text-sm text-[#5C4F48]">{t.auth.googleConnecting}</p>
         </div>
       </div>
     );
@@ -127,8 +129,11 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between selection:bg-[#F5C9D8] selection:text-[#231E1B] relative">
-      {!isGuestInvitation && <BackgroundCarousel />}
+    <div
+      data-lg-backdrop={!isGuestInvitation ? '#taklifim-backdrop' : undefined}
+      className="min-h-screen flex flex-col justify-between selection:bg-[#F5C9D8] selection:text-[#231E1B] relative"
+    >
+      {!isGuestInvitation && <GlassBackground />}
       {!isGuestInvitation && <Header />}
 
       <main className="flex-1 relative z-10">
@@ -136,6 +141,7 @@ const AppContent: React.FC = () => {
       </main>
 
       {!isGuestInvitation && <Footer />}
+      {!isGuestInvitation && <GlassBottomNav />}
 
       <ToastContainer />
     </div>

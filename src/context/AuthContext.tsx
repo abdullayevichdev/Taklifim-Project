@@ -13,6 +13,9 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref as rtdbRef, set as rtdbSet, get as rtdbGet } from 'firebase/database';
+import { getStoredLanguage, translations } from '../locales';
+
+const getAuthT = () => translations[getStoredLanguage()]?.auth || translations.uz.auth;
 
 export interface ToastMessage {
   id: string;
@@ -80,32 +83,34 @@ const getDeviceFingerprint = (): string => {
   }
 };
 
-// Firebase xatolarini o'zbek tiliga tushunarli tarjima qilish
 function translateAuthError(errCode: string): string {
+  const errT = getAuthT().errors;
   switch (errCode) {
     case 'auth/invalid-email':
-      return 'Elektron pochta manzili noto‘g‘ri formatda kiritilgan';
+      return errT.invalidEmail;
     case 'auth/user-disabled':
-      return 'Ushbu hisob tizim tomonidan to‘xtatilgan';
+      return errT.userDisabled;
     case 'auth/user-not-found':
-      return 'Bunday hisob topilmadi. Iltimos ro‘yxatdan o‘ting';
+      return errT.userNotFound;
     case 'auth/wrong-password':
+      return errT.wrongPassword;
     case 'auth/invalid-credential':
-      return 'Kiritilgan parol noto‘g‘ri';
+      return errT.invalidCredential;
     case 'auth/email-already-in-use':
-      return 'Ushbu elektron pochta orqali allaqachon ro‘yxatdan o‘tilgan. Tizimga kiring';
+      return errT.emailInUse;
     case 'auth/weak-password':
-      return 'Parol juda oddiy. Kamida 6 ta belgi kiriting';
+      return errT.weakPassword;
+    case 'auth/too-many-requests':
+      return errT.tooManyRequests;
     case 'auth/popup-closed-by-user':
-      return 'Avtorizatsiya oynasi yopildi';
-    case 'auth/popup-blocked':
-      return 'Brauzeringiz avtorizatsiya oynasini blokladi. Ruxsat bering';
     case 'auth/cancelled-popup-request':
-      return 'Avtorizatsiya bekor qilindi';
+      return errT.popupClosed;
+    case 'auth/popup-blocked':
+      return errT.popupBlocked;
     case 'auth/network-request-failed':
-      return 'Internet bilan aloqa yo‘q. Tarmoqni tekshiring';
+      return errT.networkFailed;
     default:
-      return 'Xatolik yuz berdi. Iltimos qaytadan urinib ko‘ring';
+      return errT.generic;
   }
 }
 
@@ -187,7 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const resolvedUser: UserProfile = {
             id: fbUser.uid,
-            name: profileData.name || fbUser.displayName || 'Foydalanuvchi',
+            name: profileData.name || fbUser.displayName || getAuthT().alreadyLoggedUser,
             email: fbUser.email || profileData.email || '',
             phone: cleanPhone,
             photoURL: fbUser.photoURL || profileData.photoURL,
@@ -278,10 +283,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fp = getDeviceFingerprint();
       const resolvedUser: UserProfile = {
         id: googleUser?.uid || `google_${Date.now()}`,
-        name: googleUser?.displayName || 'Abdulxay Avazxanov',
-        email: googleUser?.email || 'abdulxayavazxanov2012@gmail.com',
+        name: googleUser?.displayName || getAuthT().alreadyLoggedUser,
+        email: googleUser?.email || 'user@taklifim.uz',
         phone: googleUser?.phoneNumber || '',
-        photoURL: googleUser?.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+        photoURL: googleUser?.photoURL || undefined,
         authProvider: 'google',
         freePlanUsed: !canUseFreePlan(),
         createdAt: new Date().toISOString(),
@@ -289,25 +294,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       await persistUser(resolvedUser);
-      showToast(`Google orqali xush kelibsiz, ${resolvedUser.name}! 🎉`, 'success');
+      showToast(`${getAuthT().toastGoogleWelcomePrefix} ${resolvedUser.name}!`, 'success');
       return true;
     } catch (err: any) {
       console.error('Google login error:', err);
-      // Fallback guarantees user is never stuck
       const fp = getDeviceFingerprint();
       const fallbackUser: UserProfile = {
         id: `google_${Date.now()}`,
-        name: 'Abdulxay Avazxanov',
-        email: 'abdulxayavazxanov2012@gmail.com',
+        name: getAuthT().alreadyLoggedUser,
+        email: 'user@taklifim.uz',
         phone: '',
-        photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+        photoURL: undefined,
         authProvider: 'google',
         freePlanUsed: !canUseFreePlan(),
         createdAt: new Date().toISOString(),
         deviceFingerprint: fp,
       };
       await persistUser(fallbackUser);
-      showToast(`Google orqali xush kelibsiz, ${fallbackUser.name}! 🎉`, 'success');
+      showToast(`${getAuthT().toastGoogleWelcomePrefix} ${fallbackUser.name}!`, 'success');
       return true;
     }
   };
@@ -331,7 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fp = getDeviceFingerprint();
       const resolvedUser: UserProfile = {
         id: appleUser?.uid || `apple_${Date.now()}`,
-        name: appleUser?.displayName || 'Apple Foydalanuvchisi',
+        name: appleUser?.displayName || getAuthT().appleUserDefault,
         email: appleUser?.email || `apple_user_${Date.now().toString().slice(-6)}@apple.com`,
         phone: appleUser?.phoneNumber || '',
         photoURL: appleUser?.photoURL || undefined,
@@ -342,14 +346,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       await persistUser(resolvedUser);
-      showToast('Apple ID orqali muvaffaqiyatli kirdingiz! 🍏', 'success');
+      showToast(getAuthT().toastAppleSuccess, 'success');
       return true;
     } catch (err: any) {
       console.error('Apple login error:', err);
       const fp = getDeviceFingerprint();
       const fallbackUser: UserProfile = {
         id: `apple_${Date.now()}`,
-        name: 'Apple Foydalanuvchisi',
+        name: getAuthT().appleUserDefault,
         email: `apple_user_${Date.now().toString().slice(-6)}@apple.com`,
         phone: '',
         authProvider: 'apple',
@@ -358,7 +362,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deviceFingerprint: fp,
       };
       await persistUser(fallbackUser);
-      showToast('Apple ID orqali muvaffaqiyatli kirdingiz! 🍏', 'success');
+      showToast(getAuthT().toastAppleSuccess, 'success');
       return true;
     }
   };
@@ -367,19 +371,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const sendPhoneOtp = async (phone: string): Promise<{ success: boolean; message: string; otpCode?: string }> => {
     const cleanPhone = phone.replace(/[^\d+]/g, '');
     if (!cleanPhone || cleanPhone.length < 9) {
-      return { success: false, message: 'Iltimos, telefon raqamingizni to‘g‘ri kiriting' };
+      return { success: false, message: getAuthT().errPhoneRequired };
     }
 
-    // Har doim tezkor va ishonchli 6 xonali SMS kod generatsiya qilish
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
       sessionStorage.setItem(`taklifim_otp_${cleanPhone}`, otp);
     } catch {}
 
-    showToast(`SMS tasdiqlash kodi: ${otp}`, 'info');
+    showToast(`${getAuthT().toastOtpCodeValuePrefix} ${otp}`, 'info');
     return {
       success: true,
-      message: `SMS tasdiqlash kodi telefoningizga yuborildi`,
+      message: getAuthT().toastOtpSent,
       otpCode: otp,
     };
   };
@@ -392,16 +395,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanPhone = phone.replace(/[^\d+]/g, '');
     const savedOtp = sessionStorage.getItem(`taklifim_otp_${cleanPhone}`);
 
-    // Test yoki generatsiya qilingan OTP kodini tekshirish
     if (otp !== '123456' && otp !== savedOtp) {
-      showToast('Kiritilgan SMS kod noto‘g‘ri yoki muddati o‘tgan', 'error');
-      return { success: false, message: 'SMS kod noto‘g‘ri' };
+      showToast(getAuthT().toastOtpWrong, 'error');
+      return { success: false, message: getAuthT().errors.invalidOtp };
     }
 
     const fp = getDeviceFingerprint();
     const resolvedUser: UserProfile = {
       id: `phone_${cleanPhone.replace(/\+/g, '')}`,
-      name: name?.trim() || `Foydalanuvchi (${cleanPhone.slice(-4)})`,
+      name: name?.trim() || `${getAuthT().alreadyLoggedUser} (${cleanPhone.slice(-4)})`,
       email: `${cleanPhone.replace(/\+/g, '')}@taklifim.uz`,
       phone: cleanPhone,
       authProvider: 'phone',
@@ -411,7 +413,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     await persistUser(resolvedUser);
-    showToast(`Telefoningiz orqali muvaffaqiyatli kirdingiz! 📱`, 'success');
+    showToast(getAuthT().toastPhoneSuccess, 'success');
     return { success: true };
   };
 
@@ -447,7 +449,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         await persistUser(newUser);
-        showToast(`Ro‘yxatdan muvaffaqiyatli o‘tdingiz, ${newUser.name}!`, 'success');
+        showToast(getAuthT().toastRegisterSuccess, 'success');
         return { success: true };
       } catch (err: any) {
         if (err.code === 'auth/configuration-not-found' || err.message?.includes('configuration-not-found')) {
@@ -463,7 +465,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             deviceFingerprint: fp,
           };
           await persistUser(newUser);
-          showToast(`Ro‘yxatdan muvaffaqiyatli o‘tdingiz, ${newUser.name}!`, 'success');
+          showToast(getAuthT().toastRegisterSuccess, 'success');
           return { success: true };
         }
 
@@ -484,7 +486,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       deviceFingerprint: fp,
     };
     await persistUser(newUser);
-    showToast(`Ro‘yxatdan muvaffaqiyatli o‘tdingiz, ${newUser.name}!`, 'success');
+    showToast(getAuthT().toastRegisterSuccess, 'success');
     return { success: true };
   };
 
@@ -497,7 +499,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured() && auth && password) {
       try {
         await signInWithEmailAndPassword(auth, email, password);
-        showToast('Muvaffaqiyatli kirdingiz!', 'success');
+        showToast(getAuthT().toastLoginSuccess, 'success');
         return { success: true };
       } catch (err: any) {
         if (err.code === 'auth/configuration-not-found' || err.message?.includes('configuration-not-found')) {
@@ -507,7 +509,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (found) {
             await persistUser(found);
-            showToast(`Xush kelibsiz, ${found.name}!`, 'success');
+            showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${found.name}!`, 'success');
             return { success: true };
           }
 
@@ -522,7 +524,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             deviceFingerprint: getDeviceFingerprint(),
           };
           await persistUser(newUser);
-          showToast(`Xush kelibsiz, ${newUser.name}!`, 'success');
+          showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${newUser.name}!`, 'success');
           return { success: true };
         }
 
@@ -582,7 +584,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('taklifim_registered_users', JSON.stringify(registeredList));
     } catch {}
 
-    showToast(`Ro‘yxatdan muvaffaqiyatli o‘tdingiz, ${newUser.name}!`, 'success');
+    showToast(getAuthT().toastRegisterSuccess, 'success');
     return { success: true };
   };
 
@@ -593,7 +595,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured() && auth && password) {
       try {
         await signInWithEmailAndPassword(auth, email, password);
-        showToast('Muvaffaqiyatli kirdingiz!', 'success');
+        showToast(getAuthT().toastLoginSuccess, 'success');
         return true;
       } catch (err: any) {
         console.warn('Firebase login attempt fallback to local auth:', err.message);
@@ -607,14 +609,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (found) {
         await persistUser(found);
-        showToast(`Xush kelibsiz, ${found.name}!`, 'success');
+        showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${found.name}!`, 'success');
         return true;
       }
     } catch {}
 
     const newUser: UserProfile = {
       id: `usr_${Date.now()}`,
-      name: emailOrPhone.split('@')[0] || 'Foydalanuvchi',
+      name: emailOrPhone.split('@')[0] || getAuthT().alreadyLoggedUser,
       email: emailOrPhone.includes('@') ? emailOrPhone : 'user@taklifim.uz',
       phone: !emailOrPhone.includes('@') ? emailOrPhone : '',
       authProvider: 'simple',
@@ -624,7 +626,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     await persistUser(newUser);
-    showToast(`Xush kelibsiz, ${newUser.name}!`, 'success');
+    showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${newUser.name}!`, 'success');
     return true;
   };
 
@@ -650,10 +652,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem('taklifim_active_user');
     } catch {}
-    showToast('Tizimdan muvaffaqiyatli chiqildi', 'info');
+    showToast(getAuthT().toastLoggedOut, 'info');
   };
 
-  // Admin Code (5648291730)
+  // Admin Code
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem('taklifim_admin_unlocked') === 'true';
@@ -669,18 +671,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAdminUnlocked(true);
       setAdminCodeError(null);
       sessionStorage.setItem('taklifim_admin_unlocked', 'true');
-      showToast('Admin paneli muvaffaqiyatli ochildi', 'success');
+      showToast(getAuthT().toastAdminUnlocked, 'success');
       return true;
     }
-    setAdminCodeError('Noto‘g‘ri maxfiy kod');
-    showToast('Noto‘g‘ri admin kodi!', 'error');
+    setAdminCodeError(getAuthT().toastAdminInvalidCode);
+    showToast(getAuthT().toastAdminInvalidCode, 'error');
     return false;
   };
 
   const lockAdmin = () => {
     setIsAdminUnlocked(false);
     sessionStorage.removeItem('taklifim_admin_unlocked');
-    showToast('Admin paneli qulflangan', 'info');
+    showToast(getAuthT().toastAdminLocked, 'info');
   };
 
   // Toastlar boshqaruvi

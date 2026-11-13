@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter, Link } from '../context/RouterContext';
+import { Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage, formatPersonCount, formatItemCount, translateCategory } from '../locales';
 import { api } from '../services/api';
 import { InvitationData, GuestRSVP } from '../types';
 import { ShareModal } from '../components/ShareModal';
@@ -13,21 +14,16 @@ import {
   Share2,
   Calendar,
   MapPin,
-  Users,
   CheckCircle2,
   XCircle,
-  Clock,
   Search,
   FileSpreadsheet,
-  Trash2,
-  MessageSquare,
-  QrCode,
   Radio,
 } from 'lucide-react';
 
 export const MyInvitationsPage: React.FC = () => {
-  const { navigate } = useRouter();
   const { user, showToast } = useAuth();
+  const { language, t } = useLanguage();
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   const [guests, setGuests] = useState<GuestRSVP[]>([]);
@@ -40,7 +36,6 @@ export const MyInvitationsPage: React.FC = () => {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [activeShare, setActiveShare] = useState<{ url: string; title: string } | null>(null);
 
-  // 1. Dastlabki yuklash va REAL-TIME sinxronizatsiya (F5 shart emas!)
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -55,13 +50,11 @@ export const MyInvitationsPage: React.FC = () => {
     }
     init();
 
-    // Jonli Firebase / Realtime Hub obunasi (mehmon javob yozsa darhol bu yerga keladi)
     const unsubGuests = api.subscribe<GuestRSVP[]>('guests', (updatedGuests) => {
       if (user) {
-        // Faqat bu foydalanuvchi taklifnomalariga tegishli mehmonlar
         setGuests(updatedGuests.filter((g) => g.invitationOwnerId === user.id));
       }
-      showToast('Yangi mehmon javobi kelib tushdi! 🎉', 'info');
+      showToast(t.myInvitations.newGuestToast, 'info');
     });
 
     const unsubInvitations = api.subscribe<InvitationData[]>('invitations', (updatedInv) => {
@@ -76,7 +69,6 @@ export const MyInvitationsPage: React.FC = () => {
     };
   }, [user?.id]);
 
-  // Tanlangan taklifnomaga tegishli mehmonlar (yoki barchasi)
   const currentSelectedInv = selectedInvitationId !== 'all'
     ? invitations.find((i) => i.id === selectedInvitationId)
     : null;
@@ -85,17 +77,13 @@ export const MyInvitationsPage: React.FC = () => {
     ? guests.filter((g) => g.invitationId === currentSelectedInv.id || g.invitationSlug === currentSelectedInv.slug)
     : guests;
 
-  // Ushbu tanlangan taklifnoma bo'yicha ko'rsatkichlar
   const scopeAttendingGuests = scopeGuests.filter((g) => g.attending);
   const scopeDeclinedGuests = scopeGuests.filter((g) => !g.attending);
 
-  // Filterlangan mehmonlar ro'yxati (jadval uchun)
   const filteredGuests = scopeGuests.filter((g) => {
-    // Holat bo'yicha filter
     if (guestStatusFilter === 'attending' && !g.attending) return false;
     if (guestStatusFilter === 'declined' && g.attending) return false;
 
-    // Qidiruv
     if (searchGuest.trim()) {
       const q = searchGuest.toLowerCase();
       const matchName = g.fullName.toLowerCase().includes(q);
@@ -107,32 +95,29 @@ export const MyInvitationsPage: React.FC = () => {
     return true;
   });
 
-  // Umumiy statistika hisobi (yuqori kartalar uchun)
   const attendingGuests = guests.filter((g) => g.attending);
   const declinedGuests = guests.filter((g) => !g.attending);
   const totalAttendingPersons = attendingGuests.reduce((sum, g) => sum + (g.guestCount || 1), 0);
 
-  // Havolani nusxalash
   const handleCopyLink = (slug: string) => {
     const fullUrl = `${window.location.origin}/i/${slug}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedSlug(slug);
-    showToast('Havola nusxalandi! Mehmonlarga ulashing 💌', 'success');
+    showToast(t.myInvitations.toastLinkShareCopied, 'success');
     setTimeout(() => setCopiedSlug(null), 2500);
   };
 
-  // Excel / CSV eksport
   const handleExportCSV = () => {
     if (filteredGuests.length === 0) {
-      showToast('Eksport qilish uchun mehmonlar mavjud emas', 'error');
+      showToast(t.myInvitations.toastNoGuestsCsv, 'error');
       return;
     }
 
-    const headers = ['F.I.SH', 'Telefon', 'Holat (Javob)', 'Kishi Soni', 'Taom Tanlovi', 'Tilak va Xabar', 'Yuborilgan Vaqt'];
+    const headers = t.myInvitations.csvHeaders;
     const rows = filteredGuests.map((g) => [
       `"${g.fullName}"`,
       `"${g.phone || ''}"`,
-      `"${g.attending ? 'Ha, kela olaman' : 'Kela olmayman'}"`,
+      `"${g.attending ? t.myInvitations.csvAttendingYes : t.myInvitations.csvAttendingNo}"`,
       g.attending ? g.guestCount || 1 : 0,
       `"${g.mealPreference || ''}"`,
       `"${(g.message || '').replace(/"/g, '""')}"`,
@@ -148,7 +133,7 @@ export const MyInvitationsPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Mehmonlar ro‘yxati Excel faylga yuklab olindi!', 'success');
+    showToast(t.myInvitations.toastExcelSuccess, 'success');
   };
 
   return (
@@ -157,14 +142,14 @@ export const MyInvitationsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-2">
-            <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span>Real-Time Jonli Sinxronizatsiya (Firebase)</span>
+            <Radio className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{t.myInvitations.liveSyncFull}</span>
           </div>
           <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#1E1418]">
-            Mening Taklifnomalarim
+            {t.myInvitations.title}
           </h1>
           <p className="text-xs sm:text-sm text-[#5C4F48] mt-1">
-            Yaratgan taklifnomalaringiz va mehmonlaringiz yozgan barcha javoblar (RSVP)
+            {t.myInvitations.subtitle}
           </p>
         </div>
 
@@ -173,70 +158,70 @@ export const MyInvitationsPage: React.FC = () => {
           className="flex items-center gap-2 px-6 py-3.5 rounded-2xl text-xs font-extrabold text-white bg-gradient-to-r from-[#E27B9B] via-[#D9658B] to-[#B9DFFA] shadow-[0_8px_25px_rgba(226,123,155,0.35)] hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           <Plus className="w-4 h-4" />
-          <span>Yangi Taklifnoma Yaratish</span>
+          <span>{t.myInvitations.createNewCta}</span>
         </Link>
       </div>
 
-      {/* 2. Jonli Statistika Kartalari */}
+      {/* 2. Live Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="glass-panel-elevated rounded-3xl p-5 border border-white/95 shadow-xs">
-          <div className="text-[11px] font-bold text-[#7A6A63] uppercase tracking-wider">Taklifnomalar</div>
+          <div className="text-[11px] font-bold text-[#7A6A63] uppercase tracking-wider">{t.myInvitations.statInvitations}</div>
           <div className="text-2xl sm:text-3xl font-extrabold text-[#1E1418] mt-1">
-            {invitations.length} <span className="text-xs font-normal text-[#7A6A63]">ta</span>
+            {formatItemCount(invitations.length, language)}
           </div>
         </div>
 
         <div className="glass-panel-elevated rounded-3xl p-5 border border-white/95 shadow-xs">
-          <div className="text-[11px] font-bold text-[#7A6A63] uppercase tracking-wider">Jami Javoblar</div>
+          <div className="text-[11px] font-bold text-[#7A6A63] uppercase tracking-wider">{t.myInvitations.statResponses}</div>
           <div className="text-2xl sm:text-3xl font-extrabold text-[#1E1418] mt-1">
-            {guests.length} <span className="text-xs font-normal text-[#7A6A63]">kishi</span>
+            {formatPersonCount(guests.length, language)}
           </div>
         </div>
 
         <div className="rounded-3xl p-5 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 shadow-xs">
           <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Kutilyotgan Mehmon</span>
+            <span>{t.myInvitations.statGuestsCount}</span>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-emerald-800 mt-1">
-            {totalAttendingPersons} <span className="text-xs font-normal text-emerald-700">kishi</span>
+            {formatPersonCount(totalAttendingPersons, language)}
           </div>
-          <div className="text-[10px] text-emerald-600 mt-0.5">({attendingGuests.length} ta tasdiq)</div>
+          <div className="text-[10px] text-emerald-600 mt-0.5">({attendingGuests.length} {t.myInvitations.attendingResponsesSuffix})</div>
         </div>
 
         <div className="rounded-3xl p-5 bg-gradient-to-br from-rose-500/10 to-rose-500/5 border border-rose-500/20 shadow-xs">
           <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1">
             <XCircle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Kela olmaydigan</span>
+            <span>{t.myInvitations.declinedBadge}</span>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-rose-800 mt-1">
-            {declinedGuests.length} <span className="text-xs font-normal text-rose-700">kishi</span>
+            {formatPersonCount(declinedGuests.length, language)}
           </div>
-          <div className="text-[10px] text-rose-600 mt-0.5">Uzr so‘raganlar</div>
+          <div className="text-[10px] text-rose-600 mt-0.5">{t.myInvitations.declinedSub}</div>
         </div>
       </div>
 
-      {/* 3. Yaratilgan Taklifnomalar Ro'yxati */}
+      {/* 3. Created Invitations List */}
       <section className="space-y-4">
         <h2 className="font-playfair text-xl font-bold text-[#1E1418] flex items-center gap-2">
-          <span>Faol Taklifnomalar</span>
+          <span>{t.myInvitations.activeListTitle}</span>
           <span className="text-xs font-normal text-[#7A6A63]">({invitations.length})</span>
         </h2>
 
-        {invitations.length === 0 ? (
+        {!loading && invitations.length === 0 ? (
           <div className="glass-panel-elevated rounded-3xl p-10 text-center space-y-4 border border-white/95">
             <div className="w-16 h-16 rounded-full bg-[#FFF5F8] text-[#E27B9B] mx-auto flex items-center justify-center">
               <Sparkles className="w-8 h-8" />
             </div>
-            <h3 className="font-playfair text-lg font-bold text-[#1E1418]">Hozircha yaratilgan taklifnomalar yo‘q</h3>
+            <h3 className="font-playfair text-lg font-bold text-[#1E1418]">{t.myInvitations.emptyTitle}</h3>
             <p className="text-xs text-[#5C4F48] max-w-sm mx-auto">
-              O‘z to‘yingiz yoki unutilmas marosimingiz uchun 1 daqiqada go‘zal interaktiv taklifnoma yarating!
+              {t.myInvitations.emptyDesc}
             </p>
             <Link
               to="/templates"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-bold text-white bg-[#1E1418] hover:bg-black"
             >
-              Shablon tanlash
+              {t.myInvitations.emptyBtn}
             </Link>
           </div>
         ) : (
@@ -244,6 +229,7 @@ export const MyInvitationsPage: React.FC = () => {
             {invitations.map((inv) => {
               const invGuests = guests.filter((g) => g.invitationSlug === inv.slug);
               const invAttending = invGuests.filter((g) => g.attending).length;
+              const coverSrc = inv.coverImage || inv.galleryImages?.[0];
 
               return (
                 <div
@@ -251,16 +237,22 @@ export const MyInvitationsPage: React.FC = () => {
                   className="glass-panel-elevated rounded-3xl overflow-hidden border border-white/95 shadow-md flex flex-col justify-between group hover:shadow-xl transition-all duration-300"
                 >
                   <div>
-                    {/* Cover Preview Image */}
-                    <div className="relative h-44 overflow-hidden">
-                      <img
-                        src={inv.coverImage || inv.galleryImages?.[0] || 'https://images.unsplash.com/photo-1519741497674-611481863552'}
-                        alt={inv.hostNames}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
+                    {/* Cover Preview Image or Elegant Placeholder */}
+                    <div className="relative h-44 overflow-hidden bg-gradient-to-br from-[#F5C9D8]/50 via-[#F5EBDD] to-[#B9DFFA]/50">
+                      {coverSrc ? (
+                        <img
+                          src={coverSrc}
+                          alt={inv.hostNames}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Sparkles className="w-10 h-10 text-[#D9658B]/60" />
+                        </div>
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                       <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-extrabold text-[#1E1418] shadow-xs">
-                        {inv.eventType}
+                        {translateCategory(inv.eventType, language)}
                       </div>
 
                       <div className="absolute bottom-3 left-3 right-3 text-white">
@@ -283,12 +275,12 @@ export const MyInvitationsPage: React.FC = () => {
                     {/* Stats inside Card */}
                     <div className="p-4 grid grid-cols-2 gap-2 border-b border-black/5 text-xs">
                       <div className="p-2.5 rounded-xl bg-black/5 text-center">
-                        <div className="text-[10px] font-bold text-[#7A6A63] uppercase">Jami RSVP</div>
-                        <div className="text-base font-extrabold text-[#1E1418]">{invGuests.length} kishi</div>
+                        <div className="text-[10px] font-bold text-[#7A6A63] uppercase">{t.myInvitations.tableTotalRsvp}</div>
+                        <div className="text-base font-extrabold text-[#1E1418]">{formatPersonCount(invGuests.length, language)}</div>
                       </div>
                       <div className="p-2.5 rounded-xl bg-emerald-50 text-center text-emerald-800">
-                        <div className="text-[10px] font-bold text-emerald-700 uppercase">Keluvchilar</div>
-                        <div className="text-base font-extrabold">{invAttending} kishi</div>
+                        <div className="text-[10px] font-bold text-emerald-700 uppercase">{t.myInvitations.tableIncoming}</div>
+                        <div className="text-base font-extrabold">{formatPersonCount(invAttending, language)}</div>
                       </div>
                     </div>
                   </div>
@@ -304,12 +296,12 @@ export const MyInvitationsPage: React.FC = () => {
                         {copiedSlug === inv.slug ? (
                           <>
                             <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-600">Nusxalandi!</span>
+                            <span className="text-emerald-600">{t.myInvitations.copiedShortBtn}</span>
                           </>
                         ) : (
                           <>
                             <Copy className="w-3.5 h-3.5 text-[#E27B9B]" />
-                            <span>Havolani nusxalash</span>
+                            <span>{t.myInvitations.copyLinkBtn}</span>
                           </>
                         )}
                       </button>
@@ -317,16 +309,16 @@ export const MyInvitationsPage: React.FC = () => {
                       <Link
                         to={`/i/${inv.slug}`}
                         className="p-2.5 rounded-xl bg-white border border-black/10 hover:border-[#4A9BD4] text-[#1E1418] shadow-xs"
-                        title="Ochib ko‘rish"
+                        title={t.myInvitations.viewCardTitle}
                       >
                         <Eye className="w-4 h-4 text-[#4A9BD4]" />
                       </Link>
 
                       <button
                         type="button"
-                        onClick={() => setActiveShare({ url: `/i/${inv.slug}`, title: `${inv.hostNames} to‘y taklifnomasi` })}
+                        onClick={() => setActiveShare({ url: `/i/${inv.slug}`, title: `${inv.hostNames} ${t.myInvitations.inviteShareSuffix}` })}
                         className="p-2.5 rounded-xl bg-white border border-black/10 hover:border-emerald-500 text-[#1E1418] shadow-xs"
-                        title="Ulashish / QR kod"
+                        title={t.myInvitations.shareCardTitle}
                       >
                         <Share2 className="w-4 h-4 text-emerald-600" />
                       </button>
@@ -341,7 +333,7 @@ export const MyInvitationsPage: React.FC = () => {
                           : 'bg-black/5 text-[#5C4F48] hover:bg-black/10'
                       }`}
                     >
-                      {selectedInvitationId === inv.id ? '✓ Mehmonlari tanlandi (Barchasini ko‘rish uchun bosing)' : 'Ushbu taklifnoma mehmonlarini ko‘rish'}
+                      {selectedInvitationId === inv.id ? t.myInvitations.selectGuestsSelectedBtn : t.myInvitations.selectGuestsBtn}
                     </button>
                   </div>
                 </div>
@@ -351,22 +343,22 @@ export const MyInvitationsPage: React.FC = () => {
         )}
       </section>
 
-      {/* 4. MEHMONLAR JAVOBLARI (RSVP) JADVALI — REAL-TIME */}
+      {/* 4. GUEST RSVP RESPONSES TABLE */}
       <section className="space-y-4 pt-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-playfair text-2xl font-bold text-[#1E1418] flex items-center gap-2">
-                <span>Mehmonlarning RSVP Javoblari</span>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span>{t.myInvitations.rsvpTableTitle}</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               </h2>
               {currentSelectedInv && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/10 text-xs font-bold text-[#1E1418]">
-                  <span>Faqat: «{currentSelectedInv.hostNames}»</span>
+                  <span>{t.myInvitations.onlyForPrefix} «{currentSelectedInv.hostNames}»</span>
                   <button
                     onClick={() => setSelectedInvitationId('all')}
                     className="ml-1 w-4 h-4 rounded-full bg-black/20 hover:bg-black/40 text-black flex items-center justify-center text-[10px]"
-                    title="Barcha taklifnomalarni ko‘rish"
+                    title={t.myInvitations.clearFilterTitle}
                   >
                     ✕
                   </button>
@@ -375,24 +367,22 @@ export const MyInvitationsPage: React.FC = () => {
             </div>
             <p className="text-xs text-[#5C4F48]">
               {currentSelectedInv
-                ? `«${currentSelectedInv.hostNames}» taklifnomasi bo‘yicha kelib tushgan javoblar`
-                : 'Barcha taklifnomalar bo‘yicha mehmonlar yuborgan javoblar'}
+                ? `«${currentSelectedInv.hostNames}» ${t.myInvitations.rsvpTableSubSingleSuffix}`
+                : t.myInvitations.rsvpTableSubAll}
             </p>
           </div>
 
-          {/* Export to Excel */}
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-xs transition-all"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Excel (CSV) Yuklab Olish</span>
+            <span>{t.myInvitations.exportExcelBtn}</span>
           </button>
         </div>
 
         {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          {/* Status filter buttons */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setGuestStatusFilter('all')}
@@ -402,7 +392,7 @@ export const MyInvitationsPage: React.FC = () => {
                   : 'glass-panel text-[#5C4F48] hover:bg-white'
               }`}
             >
-              Barchasi ({scopeGuests.length})
+              {t.myInvitations.filterAll} ({scopeGuests.length})
             </button>
             <button
               onClick={() => setGuestStatusFilter('attending')}
@@ -412,7 +402,7 @@ export const MyInvitationsPage: React.FC = () => {
                   : 'glass-panel text-emerald-800 hover:bg-emerald-50'
               }`}
             >
-              ✓ Keladi ({scopeAttendingGuests.length})
+              {t.myInvitations.filterAttendingTick} ({scopeAttendingGuests.length})
             </button>
             <button
               onClick={() => setGuestStatusFilter('declined')}
@@ -422,18 +412,17 @@ export const MyInvitationsPage: React.FC = () => {
                   : 'glass-panel text-rose-800 hover:bg-rose-50'
               }`}
             >
-              ✗ Kela olmaydi ({scopeDeclinedGuests.length})
+              {t.myInvitations.filterDeclinedTick} ({scopeDeclinedGuests.length})
             </button>
           </div>
 
-          {/* Search box */}
           <div className="relative max-w-xs w-full">
             <Search className="w-4 h-4 text-[#7A6A63] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchGuest}
               onChange={(e) => setSearchGuest(e.target.value)}
-              placeholder="Ism yoki telefon bo‘yicha qidiruv..."
+              placeholder={t.myInvitations.searchGuestPlaceholder}
               className="w-full pl-9 pr-4 py-2 rounded-xl bg-white border border-black/10 text-xs outline-none focus:border-[#E27B9B]"
             />
           </div>
@@ -445,21 +434,21 @@ export const MyInvitationsPage: React.FC = () => {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-black/10 text-[#7A6A63] bg-black/5 uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4 font-bold text-[#1E1418]">#</th>
-                  <th className="py-3.5 px-4 font-bold text-[#1E1418]">Mehmon Ismi (F.I.SH)</th>
-                  <th className="py-3.5 px-4 font-bold">Telefon Raqami</th>
-                  <th className="py-3.5 px-4 font-bold">Kishi Soni</th>
-                  <th className="py-3.5 px-4 font-bold">Taom Afzalligi</th>
-                  <th className="py-3.5 px-4 font-bold">Tilak & Tabrik</th>
-                  <th className="py-3.5 px-4 font-bold text-center">YAKUNIY JAVOB</th>
-                  <th className="py-3.5 px-4 font-bold text-right">Yuborilgan Vaqt</th>
+                  <th className="py-3.5 px-4 font-bold text-[#1E1418]">{t.myInvitations.colOrderIdx}</th>
+                  <th className="py-3.5 px-4 font-bold text-[#1E1418]">{t.myInvitations.colGuestName}</th>
+                  <th className="py-3.5 px-4 font-bold">{t.myInvitations.colPhoneHeader}</th>
+                  <th className="py-3.5 px-4 font-bold">{t.myInvitations.colPartySize}</th>
+                  <th className="py-3.5 px-4 font-bold">{t.myInvitations.colMeal}</th>
+                  <th className="py-3.5 px-4 font-bold">{t.dashboard.colWishNote}</th>
+                  <th className="py-3.5 px-4 font-bold text-center">{t.myInvitations.colFinalReply}</th>
+                  <th className="py-3.5 px-4 font-bold text-right">{t.myInvitations.colSubmittedAt}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
                 {filteredGuests.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-xs text-[#7A6A63]">
-                      Hozircha mehmon javoblari kelib tushmadi. Havolani mehmonlarga ulashing!
+                      {t.myInvitations.tableNoGuests}
                     </td>
                   </tr>
                 ) : (
@@ -483,7 +472,7 @@ export const MyInvitationsPage: React.FC = () => {
                       <td className="py-3.5 px-4">
                         {g.attending ? (
                           <span className="font-bold text-[#1E1418] bg-black/5 px-2 py-0.5 rounded-full font-mono">
-                            {g.guestCount || 1} kishi
+                            {formatPersonCount(g.guestCount || 1, language)}
                           </span>
                         ) : (
                           <span className="text-[#7A6A63] font-mono">0</span>
@@ -504,23 +493,22 @@ export const MyInvitationsPage: React.FC = () => {
                         {g.message ? `«${g.message}»` : '—'}
                       </td>
 
-                      {/* YAKUNIY JAVOB (Yirik va yaqqol ko'rinadigan nishon) */}
                       <td className="py-3.5 px-4 text-center">
                         {g.attending ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xs shadow-xs border border-emerald-200">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span>Ha, kela olaman</span>
+                            <span>{t.myInvitations.csvAttendingYes}</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-100 text-rose-800 font-extrabold text-xs shadow-xs border border-rose-200">
                             <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                            <span>Kela olmayman</span>
+                            <span>{t.myInvitations.csvAttendingNo}</span>
                           </span>
                         )}
                       </td>
 
                       <td className="py-3.5 px-4 text-right text-[11px] font-mono text-[#7A6A63]">
-                        {g.submittedAt || 'Yaqinda'}
+                        {g.submittedAt || t.myInvitations.justSubmitted}
                       </td>
                     </tr>
                   ))
@@ -536,6 +524,7 @@ export const MyInvitationsPage: React.FC = () => {
         <ShareModal
           url={activeShare.url}
           title={activeShare.title}
+          language={language}
           onClose={() => setActiveShare(null)}
         />
       )}

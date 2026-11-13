@@ -41,7 +41,7 @@ test('validateRSVPForm validates full name and guest count', () => {
 });
 
 test('formatPriceUZS formats prices with Uzbek So‘m', () => {
-  assert.equal(formatPriceUZS(0), 'Bepul');
+  assert.equal(formatPriceUZS(0), '0 so‘m');
   assert.equal(formatPriceUZS(150000).includes('150 000'), true);
   assert.equal(formatPriceUZS(150000).includes('so‘m'), true);
 });

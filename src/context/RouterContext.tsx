@@ -124,6 +124,7 @@ export const Link: React.FC<{
       href={to}
       onClick={handleClick}
       title={title}
+      aria-current={isActive ? 'page' : undefined}
       className={`${className} ${isActive ? activeClassName : ''}`}
     >
       {children}

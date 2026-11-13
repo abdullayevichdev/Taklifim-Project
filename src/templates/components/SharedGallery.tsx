@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Language } from '../../types';
-import { Camera, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { translations } from '../../locales';
 
 interface SharedGalleryProps {
   images: string[];
@@ -23,6 +24,7 @@ export const SharedGallery: React.FC<SharedGalleryProps> = ({
 
   if (!images || images.length === 0) return null;
 
+  const t = translations[language] || translations.uz;
   const labels = {
     uz: { defaultTitle: 'Bizning baxtli lahzalarimiz', photos: 'Suratlar' },
     ru: { defaultTitle: 'Наши счастливые моменты', photos: 'Фотографии' },
@@ -52,14 +54,14 @@ export const SharedGallery: React.FC<SharedGalleryProps> = ({
             <button
               onClick={() => setActiveIdx((p) => (p > 0 ? p - 1 : images.length - 1))}
               className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md opacity-80 hover:opacity-100 transition-opacity"
-              aria-label="Oldingi surat"
+              aria-label={t.shared.prevPhotoAria}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => setActiveIdx((p) => (p < images.length - 1 ? p + 1 : 0))}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md opacity-80 hover:opacity-100 transition-opacity"
-              aria-label="Keyingi surat"
+              aria-label={t.shared.nextPhotoAria}
             >
               <ChevronRight className="w-4 h-4" />
             </button>

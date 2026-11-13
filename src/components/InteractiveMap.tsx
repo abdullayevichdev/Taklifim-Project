@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { MapPin, ExternalLink, Navigation } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
+import { useLanguage, translations } from '../locales';
+import { Language } from '../types';
 
 interface InteractiveMapProps {
   latitude?: number;
@@ -9,9 +11,9 @@ interface InteractiveMapProps {
   mapUrl?: string;
   primaryColor?: string;
   className?: string;
+  language?: Language;
 }
 
-// Toshkent markazi — standart koordinatalar
 const DEFAULT_LAT = 41.2995;
 const DEFAULT_LNG = 69.2401;
 
@@ -23,7 +25,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   mapUrl,
   primaryColor = '#B48B47',
   className = '',
+  language,
 }) => {
+  const { language: ctxLanguage } = useLanguage();
+  const activeLang = language || ctxLanguage;
+  const t = translations[activeLang] || translations.uz;
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
 
@@ -38,7 +45,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       try {
         L = await import('leaflet');
 
-        // Leaflet default icon fix (Vite bundler issue)
         const DefaultIcon = L.icon({
           iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
           iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -52,12 +58,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
         if (!mapRef.current) return;
 
-        // Agar avval xarita yaratilgan bo'lsa, yo'q qilish
         if (mapInstanceRef.current) {
           (mapInstanceRef.current as ReturnType<typeof L.map>).remove();
         }
 
-        // Yangi xaritani yaratish
         map = L.map(mapRef.current, {
           center: [lat, lng],
           zoom: 15,
@@ -67,14 +71,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
         mapInstanceRef.current = map;
 
-        // OpenStreetMap tiles (bepul, ro'yxatdan o'tish kerak emas)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
         }).addTo(map);
 
-        // Custom marker HTML
         const customIcon = L.divIcon({
           html: `
             <div style="
@@ -103,14 +105,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           className: '',
         });
 
-        // Marker va popup
         const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
         marker
           .bindPopup(
             `
             <div style="font-family: system-ui, sans-serif; min-width: 160px;">
               <strong style="font-size: 13px; color: #231E1B; display: block; margin-bottom: 4px;">
-                📍 ${venueName}
+                ${venueName}
               </strong>
               <p style="font-size: 11px; color: #7A6A63; margin: 0;">
                 ${venueAddress}
@@ -121,10 +122,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           )
           .openPopup();
 
-        // Xaritani markazga qaratish
         map.setView([lat, lng], 15);
       } catch (err) {
-        console.warn("Leaflet xaritasini yuklab bo'lmadi:", err);
+        console.warn('Leaflet map init note:', err);
       }
     };
 
@@ -142,22 +142,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [lat, lng, venueName, venueAddress, primaryColor]);
 
-  const googleMapsUrl = mapUrl && mapUrl.includes('google')
+  const googleRouteUrl = mapUrl && mapUrl.includes('google')
     ? mapUrl
-    : `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  const googleRouteUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   const yandexMapsUrl = mapUrl && mapUrl.includes('yandex')
     ? mapUrl
     : `https://yandex.uz/maps/?rtext=~${lat}%2C${lng}&rtt=auto`;
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Xarita konteyner */}
       <div
         className="relative rounded-2xl overflow-hidden border border-black/10 shadow-sm"
         style={{ height: '280px' }}
       >
-        {/* Leaflet CSS */}
         <link
           rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -166,7 +163,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
-        {/* Overlay gradient (pastki qism) */}
         <div
           className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none"
           style={{
@@ -175,7 +171,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         />
       </div>
 
-      {/* Xarita havolalar (Google Maps & Yandex Navigator) */}
       <div className="grid grid-cols-2 gap-2.5">
         <a
           href={googleRouteUrl}
@@ -184,7 +179,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-[#4285F4] text-white hover:bg-[#3367D6] shadow-sm transition-all text-xs font-bold"
         >
           <Navigation className="w-4 h-4" />
-          <span>Google Maps (Marshrut)</span>
+          <span>{t.shared.mapGoogleBtn}</span>
         </a>
 
         <a
@@ -194,11 +189,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-[#FC3F1D] text-white hover:bg-[#D92C0D] shadow-sm transition-all text-xs font-bold"
         >
           <MapPin className="w-4 h-4" />
-          <span>Yandex Go & Xarita</span>
+          <span>{t.shared.mapYandexBtn}</span>
         </a>
       </div>
 
-      {/* Manzil info */}
       <div className="flex items-center gap-2 text-xs text-[#5C4F48] bg-black/5 p-2.5 rounded-xl border border-black/5">
         <MapPin className="w-4 h-4 shrink-0 text-[#E27B9B]" />
         <span className="font-medium truncate">{venueName}: {venueAddress}</span>

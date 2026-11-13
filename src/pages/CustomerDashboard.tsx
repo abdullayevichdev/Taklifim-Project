@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../locales';
+import {
+  useLanguage,
+  formatPersonCount,
+  formatItemCount,
+  translateCategory,
+  translateOrderStatus,
+} from '../locales';
 import { api } from '../services/api';
 import { InvitationData, GuestRSVP, OrderItem, Language } from '../types';
 import { calculateRSVPStats, formatPriceUZS } from '../utils/logic';
@@ -55,8 +61,9 @@ export const CustomerDashboard: React.FC = () => {
   // Invitations view mode: grid or list
   const [invitationViewMode, setInvitationViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Deletion modal
+  // Deletion modals
   const [invitationToDelete, setInvitationToDelete] = useState<InvitationData | null>(null);
+  const [guestToDelete, setGuestToDelete] = useState<GuestRSVP | null>(null);
 
   // Share modal
   const [shareData, setShareData] = useState<{ url: string; title: string } | null>(null);
@@ -114,14 +121,14 @@ export const CustomerDashboard: React.FC = () => {
 
   const handleExportCSV = () => {
     if (filteredGuests.length === 0) {
-      showToast('Eksport qilish uchun mehmonlar mavjud emas', 'info');
+      showToast(t.dashboard.toastExportEmpty, 'info');
       return;
     }
-    const headers = ['F.I.Sh.', 'Telefon', 'Holat', 'Kishi soni', 'Taom afzalligi', 'Tilak va tabrik', 'Sana'];
+    const headers = t.dashboard.csvHeaders;
     const rows = filteredGuests.map((g) => [
       `"${g.fullName.replace(/"/g, '""')}"`,
       `"${(g.phone || '').replace(/"/g, '""')}"`,
-      g.attending ? 'Keladi' : 'Kela olmaydi',
+      g.attending ? t.dashboard.csvAttendingYes : t.dashboard.csvAttendingNo,
       g.guestCount,
       `"${(g.mealPreference || '').replace(/"/g, '""')}"`,
       `"${(g.message || '').replace(/"/g, '""')}"`,
@@ -133,18 +140,18 @@ export const CustomerDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `mehmonlar_royxati_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `guests_list_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Mehmonlar ro‘yxati Excel (CSV) formatida muvaffaqiyatli yuklab olindi!', 'success');
+    showToast(t.dashboard.toastCsvDownloaded, 'success');
   };
 
-  const handleDeleteGuest = async (id: string) => {
-    if (confirm('Ushbu mehmonni ro‘yxatdan o‘chirishni tasdiqlaysizmi?')) {
-      await api.deleteGuest(id);
-      showToast('Mehmon ro‘yxatdan o‘chirildi', 'info');
-    }
+  const handleDeleteGuestConfirm = async () => {
+    if (!guestToDelete) return;
+    await api.deleteGuest(guestToDelete.id);
+    setGuestToDelete(null);
+    showToast(t.dashboard.toastGuestDeleted, 'info');
   };
 
   // Aggregated RSVP stats
@@ -156,14 +163,14 @@ export const CustomerDashboard: React.FC = () => {
       ...inv,
       id: `inv-${Date.now()}`,
       slug: generateInvitationSlug(inv.partner1Name || inv.hostNames, inv.partner2Name),
-      eventTitle: `${inv.eventTitle} (Nusxa)`,
+      eventTitle: `${inv.eventTitle} ${t.dashboard.duplicateTitleSuffix}`,
       status: 'draft',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     await api.saveInvitation(duplicated);
     setInvitations((prev) => [duplicated, ...prev]);
-    showToast('Taklifnoma muvaffaqiyatli nusxalandi!', 'success');
+    showToast(t.dashboard.toastDuplicated, 'success');
   };
 
   // Confirm delete invitation
@@ -172,7 +179,7 @@ export const CustomerDashboard: React.FC = () => {
     await api.deleteInvitation(invitationToDelete.id);
     setInvitations((prev) => prev.filter((i) => i.id !== invitationToDelete.id));
     setInvitationToDelete(null);
-    showToast('Taklifnoma o‘chirildi', 'info');
+    showToast(t.dashboard.toastDeleted, 'info');
   };
 
   // Filtered guests
@@ -203,7 +210,7 @@ export const CustomerDashboard: React.FC = () => {
         email: profileEmail.trim() || user.email,
         phone: profilePhone.trim(),
       });
-      showToast('Profil ma’lumotlari muvaffaqiyatli yangilandi!', 'success');
+      showToast(t.dashboard.toastProfileSaved, 'success');
     }
   };
 
@@ -217,10 +224,10 @@ export const CustomerDashboard: React.FC = () => {
               {t.dashboard.title}
             </span>
             <h1 className="font-playfair text-3xl font-extrabold text-[#231E1B]">
-              {t.dashboard.welcome}, {user?.name || 'Hurmatli Mijoz'}!
+              {t.dashboard.welcome}, {user?.name || t.dashboard.defaultCustomerName}!
             </h1>
             <p className="text-xs text-[#7A6A63]">
-              Barcha raqamli taklifnomalaringiz va mehmonlaringiz ro‘yxatini bir joyda boshqaring.
+              {t.dashboard.subtitle}
             </p>
           </div>
 
@@ -268,7 +275,7 @@ export const CustomerDashboard: React.FC = () => {
                 <div className="font-playfair text-3xl font-extrabold text-[#231E1B] mt-1">
                   {invitations.length}
                 </div>
-                <span className="text-[11px] text-emerald-600 font-medium">Faol loyihalar</span>
+                <span className="text-[11px] text-emerald-600 font-medium">{t.dashboard.heroSubActive}</span>
               </div>
 
               <div className="glass-panel rounded-3xl p-5 border border-white/80 shadow-xs">
@@ -278,7 +285,7 @@ export const CustomerDashboard: React.FC = () => {
                 <div className="font-playfair text-3xl font-extrabold text-[#D9658B] mt-1">
                   {rsvpStats.totalGuests}
                 </div>
-                <span className="text-[11px] text-[#7A6A63]">Tasdiqlangan mehmonlar</span>
+                <span className="text-[11px] text-[#7A6A63]">{t.dashboard.heroSubConfirmed}</span>
               </div>
 
               <div className="glass-panel rounded-3xl p-5 border border-white/80 shadow-xs">
@@ -289,7 +296,7 @@ export const CustomerDashboard: React.FC = () => {
                   {rsvpStats.total}
                 </div>
                 <span className="text-[11px] text-emerald-600 font-medium">
-                  {rsvpStats.acceptanceRate}% qatnashish darajasi
+                  {rsvpStats.acceptanceRate}% {t.dashboard.heroSubAcceptanceSuffix}
                 </span>
               </div>
 
@@ -300,7 +307,7 @@ export const CustomerDashboard: React.FC = () => {
                 <div className="font-playfair text-3xl font-extrabold text-[#B48B47] mt-1">
                   {invitations.filter((i) => i.status === 'draft').length}
                 </div>
-                <span className="text-[11px] text-[#7A6A63]">Tahrir kutilayotgan</span>
+                <span className="text-[11px] text-[#7A6A63]">{t.dashboard.heroSubPendingEdit}</span>
               </div>
             </div>
 
@@ -308,13 +315,13 @@ export const CustomerDashboard: React.FC = () => {
             <div className="glass-panel-elevated rounded-3xl p-6 border border-white/95 shadow-md space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
-                  Mening so‘nggi taklifnomalarim
+                  {t.dashboard.recentInvitationsTitle}
                 </h3>
                 <Link
                   to="/dashboard/invitations"
                   className="text-xs font-semibold text-[#D9658B] hover:underline"
                 >
-                  Barchasini ko‘rish →
+                  {t.dashboard.viewAllLink}
                 </Link>
               </div>
 
@@ -326,7 +333,7 @@ export const CustomerDashboard: React.FC = () => {
                   >
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-bold">
-                        <span className="uppercase text-[#8A7C74]">{inv.eventType}</span>
+                        <span className="uppercase text-[#8A7C74]">{translateCategory(inv.eventType, language)}</span>
                         <span
                           className={`px-2 py-0.5 rounded-full ${
                             inv.status === 'published'
@@ -334,7 +341,7 @@ export const CustomerDashboard: React.FC = () => {
                               : 'bg-amber-50 text-amber-700'
                           }`}
                         >
-                          {inv.status === 'published' ? 'Faol' : 'Qoralama'}
+                          {inv.status === 'published' ? t.dashboard.statusActive : t.dashboard.statusDraft}
                         </span>
                       </div>
                       <h4 className="font-playfair text-base font-bold text-[#231E1B] mt-1">
@@ -350,17 +357,17 @@ export const CustomerDashboard: React.FC = () => {
                         to={`/i/${inv.slug}`}
                         className="flex-1 py-1.5 px-2 rounded-xl bg-[#231E1B] text-white text-center font-semibold hover:bg-black transition-colors"
                       >
-                        Ochish
+                        {t.dashboard.openBtn}
                       </Link>
                       <button
                         onClick={() =>
                           setShareData({
                             url: `/i/${inv.slug}`,
-                            title: `${inv.hostNames} — ${inv.eventType}`,
+                            title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
                           })
                         }
                         className="p-1.5 rounded-xl glass-panel hover:bg-white text-[#5C4F48]"
-                        title="Ulashish"
+                        title={t.common.share}
                       >
                         <Share2 className="w-3.5 h-3.5" />
                       </button>
@@ -378,10 +385,10 @@ export const CustomerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-playfair text-2xl font-bold text-[#231E1B]">
-                  Mening Taklifnomalarim
+                  {t.myInvitations.title}
                 </h2>
                 <p className="text-xs text-[#7A6A63]">
-                  Jami {invitations.length} ta yaratilgan taklifnoma
+                  {formatItemCount(invitations.length, language)}
                 </p>
               </div>
 
@@ -392,7 +399,7 @@ export const CustomerDashboard: React.FC = () => {
                   className={`p-1.5 rounded-lg transition-colors ${
                     invitationViewMode === 'grid' ? 'bg-white shadow-xs text-[#231E1B]' : 'text-[#7A6A63]'
                   }`}
-                  aria-label="Katak ko‘rinishi"
+                  aria-label={t.dashboard.gridViewAria}
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
@@ -401,7 +408,7 @@ export const CustomerDashboard: React.FC = () => {
                   className={`p-1.5 rounded-lg transition-colors ${
                     invitationViewMode === 'list' ? 'bg-white shadow-xs text-[#231E1B]' : 'text-[#7A6A63]'
                   }`}
-                  aria-label="Ro‘yxat ko‘rinishi"
+                  aria-label={t.dashboard.listViewAria}
                 >
                   <ListIcon className="w-4 h-4" />
                 </button>
@@ -419,7 +426,7 @@ export const CustomerDashboard: React.FC = () => {
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>Taklifnoma yaratish</span>
+                  <span>{t.dashboard.createBtn}</span>
                 </Link>
               </div>
             ) : invitationViewMode === 'grid' ? (
@@ -445,14 +452,14 @@ export const CustomerDashboard: React.FC = () => {
                                 : 'bg-amber-500/90 text-white'
                             }`}
                           >
-                            {inv.status === 'published' ? 'Faol' : 'Qoralama'}
+                            {inv.status === 'published' ? t.dashboard.statusActive : t.dashboard.statusDraft}
                           </span>
                         </div>
                       )}
 
                       <div className="p-5 space-y-2">
                         <span className="text-[10px] uppercase font-bold text-[#8A7C74]">
-                          {inv.eventType}
+                          {translateCategory(inv.eventType, language)}
                         </span>
                         <h3 className="font-playfair text-lg font-bold text-[#231E1B]">
                           {inv.hostNames}
@@ -469,19 +476,19 @@ export const CustomerDashboard: React.FC = () => {
                           to={`/i/${inv.slug}`}
                           className="px-3 py-1.5 rounded-xl bg-[#231E1B] text-white font-semibold hover:bg-black transition-colors"
                         >
-                          Ko‘rish
+                          {t.dashboard.viewActionTitle}
                         </Link>
                         <Link
                           to={`/create/${inv.templateSlug}`}
                           className="p-2 rounded-xl glass-panel hover:bg-white text-[#5C4F48]"
-                          title="Tahrirlash"
+                          title={t.dashboard.editActionTitle}
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </Link>
                         <button
                           onClick={() => handleDuplicate(inv)}
                           className="p-2 rounded-xl glass-panel hover:bg-white text-[#5C4F48]"
-                          title="Nusxa olish"
+                          title={t.dashboard.duplicateActionTitle}
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>
@@ -489,11 +496,11 @@ export const CustomerDashboard: React.FC = () => {
                           onClick={() =>
                             setShareData({
                               url: `/i/${inv.slug}`,
-                              title: `${inv.hostNames} — ${inv.eventType}`,
+                              title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
                             })
                           }
                           className="p-2 rounded-xl glass-panel hover:bg-white text-[#5C4F48]"
-                          title="Ulashish / QR kod"
+                          title={t.myInvitations.shareCardTitle}
                         >
                           <Share2 className="w-3.5 h-3.5" />
                         </button>
@@ -502,7 +509,7 @@ export const CustomerDashboard: React.FC = () => {
                       <button
                         onClick={() => setInvitationToDelete(inv)}
                         className="p-2 rounded-xl text-rose-600 hover:bg-rose-50"
-                        title="O‘chirish"
+                        title={t.dashboard.deleteActionTitle}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -516,10 +523,10 @@ export const CustomerDashboard: React.FC = () => {
                 <table className="w-full text-xs text-left">
                   <thead>
                     <tr className="border-b border-black/10 text-[#7A6A63] bg-black/5">
-                      <th className="py-3 px-4 font-bold text-[#231E1B]">Taklifnoma</th>
-                      <th className="py-3 px-4 font-bold">Sana</th>
-                      <th className="py-3 px-4 font-bold">Holat</th>
-                      <th className="py-3 px-4 text-right font-bold">Amallar</th>
+                      <th className="py-3 px-4 font-bold text-[#231E1B]">{t.dashboard.colInvitation}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colDate}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colStatus}</th>
+                      <th className="py-3 px-4 text-right font-bold">{t.dashboard.colActions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
@@ -527,7 +534,7 @@ export const CustomerDashboard: React.FC = () => {
                       <tr key={inv.id} className="hover:bg-white/40">
                         <td className="py-3 px-4">
                           <strong className="text-[#231E1B] block">{inv.hostNames}</strong>
-                          <span className="text-[11px] text-[#8A7C74]">{inv.eventType}</span>
+                          <span className="text-[11px] text-[#8A7C74]">{translateCategory(inv.eventType, language)}</span>
                         </td>
                         <td className="py-3 px-4 text-[#5C4F48]">{inv.eventDate}</td>
                         <td className="py-3 px-4">
@@ -538,7 +545,7 @@ export const CustomerDashboard: React.FC = () => {
                                 : 'bg-amber-100 text-amber-800'
                             }`}
                           >
-                            {inv.status === 'published' ? 'Faol' : 'Qoralama'}
+                            {inv.status === 'published' ? t.dashboard.statusActive : t.dashboard.statusDraft}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
@@ -547,26 +554,26 @@ export const CustomerDashboard: React.FC = () => {
                               to={`/i/${inv.slug}`}
                               className="px-2.5 py-1 rounded-lg bg-[#231E1B] text-white font-semibold"
                             >
-                              Ko‘rish
+                              {t.dashboard.viewActionTitle}
                             </Link>
                             <Link
                               to={`/create/${inv.templateSlug}`}
                               className="p-1.5 rounded-lg glass-panel hover:bg-white"
-                              title="Tahrirlash"
+                              title={t.dashboard.editActionTitle}
                             >
                               <Edit className="w-3.5 h-3.5" />
                             </Link>
                             <button
                               onClick={() => handleDuplicate(inv)}
                               className="p-1.5 rounded-lg glass-panel hover:bg-white"
-                              title="Nusxa olish"
+                              title={t.dashboard.duplicateActionTitle}
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setInvitationToDelete(inv)}
                               className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
-                              title="O‘chirish"
+                              title={t.dashboard.deleteActionTitle}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -587,10 +594,10 @@ export const CustomerDashboard: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-playfair text-2xl font-bold text-[#231E1B]">
-                  Mehmonlar Ro‘yxati (RSVP)
+                  {t.dashboard.rsvpSectionTitle}
                 </h2>
                 <p className="text-xs text-[#7A6A63]">
-                  Mehmonlarning qatnashish tasdig‘i va ezgu tilaklari
+                  {t.dashboard.rsvpSectionSubtitle}
                 </p>
               </div>
 
@@ -605,7 +612,7 @@ export const CustomerDashboard: React.FC = () => {
                         : 'glass-panel text-[#5C4F48]'
                     }`}
                   >
-                    Barchasi ({guests.length})
+                    {t.common.all} ({guests.length})
                   </button>
                   <button
                     onClick={() => setGuestFilterStatus('attending')}
@@ -615,7 +622,7 @@ export const CustomerDashboard: React.FC = () => {
                         : 'glass-panel text-emerald-800'
                     }`}
                   >
-                    Keladi ({rsvpStats.attendingCount})
+                    {t.dashboard.attendingShort} ({rsvpStats.attendingCount})
                   </button>
                   <button
                     onClick={() => setGuestFilterStatus('declined')}
@@ -625,17 +632,17 @@ export const CustomerDashboard: React.FC = () => {
                         : 'glass-panel text-rose-800'
                     }`}
                   >
-                    Kela olmaydi ({rsvpStats.declinedCount})
+                    {t.dashboard.declinedShort} ({rsvpStats.declinedCount})
                   </button>
                 </div>
 
                 <button
                   onClick={handleExportCSV}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/90 hover:bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs transition-colors"
-                  title="Excel (CSV) formatida yuklab olish"
+                  title={t.dashboard.exportCsvBtn}
                 >
                   <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Excel (CSV)</span>
+                  <span>{t.dashboard.exportCsvBtn}</span>
                 </button>
               </div>
             </div>
@@ -647,7 +654,7 @@ export const CustomerDashboard: React.FC = () => {
                 type="text"
                 value={guestSearch}
                 onChange={(e) => setGuestSearch(e.target.value)}
-                placeholder="Mehmon ismi yoki telefoni bo‘yicha qidirish..."
+                placeholder={t.dashboard.guestSearchPlaceholder}
                 className="w-full pl-10 pr-4 py-2 rounded-2xl glass-panel text-xs text-[#231E1B] outline-none border border-black/5"
               />
             </div>
@@ -658,13 +665,13 @@ export const CustomerDashboard: React.FC = () => {
                 <table className="w-full text-xs text-left">
                   <thead>
                     <tr className="border-b border-black/10 text-[#7A6A63] bg-black/5">
-                      <th className="py-3 px-4 font-bold text-[#231E1B]">Mehmon</th>
-                      <th className="py-3 px-4 font-bold">Telefon</th>
-                      <th className="py-3 px-4 font-bold">Holat</th>
-                      <th className="py-3 px-4 font-bold">Kishi soni</th>
-                      <th className="py-3 px-4 font-bold">Taom afzalligi</th>
-                      <th className="py-3 px-4 font-bold">Tilak va tabrik</th>
-                      <th className="py-3 px-4 font-bold text-right">Amal</th>
+                      <th className="py-3 px-4 font-bold text-[#231E1B]">{t.dashboard.colGuestName}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colPhone}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colAttending}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colPeopleCount}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colMeal}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colWishNote}</th>
+                      <th className="py-3 px-4 font-bold text-right">{t.dashboard.colActionSingle}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
@@ -672,9 +679,9 @@ export const CustomerDashboard: React.FC = () => {
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-[#7A6A63]">
                           <Users className="w-8 h-8 mx-auto mb-2 opacity-30 text-[#D9658B]" />
-                          <p className="font-semibold text-sm text-[#231E1B]">Mehmonlar ro‘yxati bo‘sh</p>
+                          <p className="font-semibold text-sm text-[#231E1B]">{t.dashboard.guestsEmptyTitle}</p>
                           <p className="text-xs mt-1 text-[#8A7C74]">
-                            Taklifnomangiz havolasi orqali mehmonlar RSVP tasdig‘i qoldirganda bu yerda real-vaqtda paydo bo‘ladi.
+                            {t.dashboard.guestsEmptyDesc}
                           </p>
                         </td>
                       </tr>
@@ -689,17 +696,17 @@ export const CustomerDashboard: React.FC = () => {
                             {g.attending ? (
                               <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Keladi</span>
+                                <span>{t.dashboard.attendingShort}</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded-full">
                                 <XCircle className="w-3 h-3" />
-                                <span>Kela olmaydi</span>
+                                <span>{t.dashboard.declinedShort}</span>
                               </span>
                             )}
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-[#231E1B]">
-                            {g.attending ? `${g.guestCount} kishi` : '0'}
+                            {g.attending ? formatPersonCount(g.guestCount, language) : '0'}
                           </td>
                           <td className="py-3 px-4 text-[#5C4F48]">
                             {g.mealPreference || '—'}
@@ -709,9 +716,9 @@ export const CustomerDashboard: React.FC = () => {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <button
-                              onClick={() => handleDeleteGuest(g.id)}
+                              onClick={() => setGuestToDelete(g)}
                               className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="O‘chirish"
+                              title={t.dashboard.deleteActionTitle}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -731,10 +738,10 @@ export const CustomerDashboard: React.FC = () => {
           <div className="space-y-6 animate-fadeIn">
             <div>
               <h2 className="font-playfair text-2xl font-bold text-[#231E1B]">
-                Buyurtmalar Tarixi
+                {t.dashboard.ordersHistoryTitle}
               </h2>
               <p className="text-xs text-[#7A6A63]">
-                Xarid qilingan xizmatlar va to‘lov yozuvlari
+                {t.dashboard.ordersHistorySubtitle}
               </p>
             </div>
 
@@ -743,12 +750,12 @@ export const CustomerDashboard: React.FC = () => {
                 <table className="w-full text-xs text-left">
                   <thead>
                     <tr className="border-b border-black/10 text-[#7A6A63] bg-black/5">
-                      <th className="py-3 px-4 font-bold text-[#231E1B]">Buyurtma №</th>
-                      <th className="py-3 px-4 font-bold">Xizmat</th>
-                      <th className="py-3 px-4 font-bold">Tarif</th>
-                      <th className="py-3 px-4 font-bold">Sana</th>
-                      <th className="py-3 px-4 font-bold">Qiymat</th>
-                      <th className="py-3 px-4 font-bold">Holat</th>
+                      <th className="py-3 px-4 font-bold text-[#231E1B]">{t.dashboard.colOrderNum}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colService}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colPlan}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colOrderDate}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colAmount}</th>
+                      <th className="py-3 px-4 font-bold">{t.dashboard.colStatus}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
@@ -756,9 +763,9 @@ export const CustomerDashboard: React.FC = () => {
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-[#7A6A63]">
                           <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30 text-[#D9658B]" />
-                          <p className="font-semibold text-sm text-[#231E1B]">Hozircha buyurtmalar mavjud emas</p>
+                          <p className="font-semibold text-sm text-[#231E1B]">{t.dashboard.emptyOrders}</p>
                           <p className="text-xs mt-1 text-[#8A7C74]">
-                            Siz xarid qilgan barcha tariflar va xizmatlar tarixi shu yerda ko‘rinadi.
+                            {t.dashboard.emptyOrdersDesc}
                           </p>
                         </td>
                       </tr>
@@ -774,19 +781,21 @@ export const CustomerDashboard: React.FC = () => {
                           <td className="py-3 px-4 text-[#5C4F48]">{ord.planName}</td>
                           <td className="py-3 px-4 text-[#7A6A63]">{ord.date}</td>
                           <td className="py-3 px-4 font-bold text-[#231E1B]">
-                            {formatPriceUZS(ord.price)}
+                            {formatPriceUZS(ord.price, language)}
                           </td>
                           <td className="py-3 px-4">
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                ord.status === 'confirmed'
+                                ord.status === 'confirmed' || ord.status === 'paid'
                                   ? 'bg-emerald-100 text-emerald-800'
+                                  : ord.status === 'rejected'
+                                  ? 'bg-rose-100 text-rose-800'
                                   : ord.status === 'demo'
                                   ? 'bg-sky-100 text-sky-800'
                                   : 'bg-amber-100 text-amber-800'
                               }`}
                             >
-                              {ord.status.toUpperCase()}
+                              {translateOrderStatus(ord.status, language)}
                             </span>
                           </td>
                         </tr>
@@ -804,16 +813,16 @@ export const CustomerDashboard: React.FC = () => {
           <div className="max-w-xl mx-auto glass-panel-elevated rounded-3xl p-6 sm:p-8 border border-white/95 shadow-md space-y-6 animate-fadeIn">
             <div>
               <h2 className="font-playfair text-2xl font-bold text-[#231E1B]">
-                Kabinet Sozlamalari
+                {t.dashboard.settingsTitle}
               </h2>
               <p className="text-xs text-[#7A6A63]">
-                Shaxsiy profil va interfeys parametrlarini sozlang
+                {t.dashboard.settingsSubtitle}
               </p>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-[#3A2D28] block mb-1">Ism va familiya</label>
+                <label className="font-bold text-[#3A2D28] block mb-1">{t.dashboard.nameLabel}</label>
                 <input
                   type="text"
                   value={profileName}
@@ -823,15 +832,16 @@ export const CustomerDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#3A2D28] block mb-1">Telefon raqam</label>
+                <label className="font-bold text-[#3A2D28] block mb-1">{t.dashboard.phoneLabel}</label>
                 <PhoneInput
                   value={profilePhone}
                   onChange={(fullVal) => setProfilePhone(fullVal)}
+                  language={language}
                 />
               </div>
 
               <div>
-                <label className="font-bold text-[#3A2D28] block mb-1">Elektron pochta</label>
+                <label className="font-bold text-[#3A2D28] block mb-1">{t.dashboard.emailLabel}</label>
                 <input
                   type="email"
                   value={profileEmail}
@@ -841,7 +851,7 @@ export const CustomerDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-[#3A2D28] block mb-1">Asosiy til</label>
+                <label className="font-bold text-[#3A2D28] block mb-1">{t.dashboard.settingsUiLangLabel}</label>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value as Language)}
@@ -858,14 +868,14 @@ export const CustomerDashboard: React.FC = () => {
                   type="submit"
                   className="w-full py-3 rounded-2xl bg-[#231E1B] text-white font-bold text-xs hover:bg-black transition-colors"
                 >
-                  O‘zgarishlarni saqlash
+                  {t.dashboard.saveChangesBtn}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Delete Confirmation Modal */}
+        {/* Delete Invitation Confirmation Modal */}
         {invitationToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
             <div className="w-full max-w-sm glass-panel-elevated rounded-3xl p-6 shadow-2xl border border-white/95 space-y-4 text-center">
@@ -873,23 +883,54 @@ export const CustomerDashboard: React.FC = () => {
                 <Trash2 className="w-6 h-6" />
               </div>
               <h3 className="font-playfair text-lg font-bold text-[#231E1B]">
-                Taklifnomani o‘chirasizmi?
+                {t.dashboard.deleteModalTitle}
               </h3>
               <p className="text-xs text-[#7A6A63]">
-                «{invitationToDelete.hostNames}» taklifnomasi butunlay o‘chiriladi va uning havolasi ishlamay qoladi.
+                {t.dashboard.deleteModalDescPrefix}{invitationToDelete.hostNames}{t.dashboard.deleteModalDescSuffix}
               </p>
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <button
                   onClick={() => setInvitationToDelete(null)}
                   className="py-2.5 px-3 rounded-xl glass-panel text-xs font-semibold text-[#5C4F48] hover:bg-white"
                 >
-                  Bekor qilish
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
                   className="py-2.5 px-3 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"
                 >
-                  O‘chirish
+                  {t.dashboard.confirmDeleteBtn}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Guest Confirmation Modal */}
+        {guestToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-sm glass-panel-elevated rounded-3xl p-6 shadow-2xl border border-white/95 space-y-4 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 mx-auto flex items-center justify-center text-rose-600">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="font-playfair text-lg font-bold text-[#231E1B]">
+                {guestToDelete.fullName}
+              </h3>
+              <p className="text-xs text-[#7A6A63]">
+                {t.dashboard.confirmDeleteGuest}
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  onClick={() => setGuestToDelete(null)}
+                  className="py-2.5 px-3 rounded-xl glass-panel text-xs font-semibold text-[#5C4F48] hover:bg-white"
+                >
+                  {t.common.cancel}
+                </button>
+                <button
+                  onClick={handleDeleteGuestConfirm}
+                  className="py-2.5 px-3 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"
+                >
+                  {t.dashboard.confirmDeleteBtn}
                 </button>
               </div>
             </div>
@@ -901,6 +942,7 @@ export const CustomerDashboard: React.FC = () => {
           <ShareModal
             url={shareData.url}
             title={shareData.title}
+            language={language}
             onClose={() => setShareData(null)}
           />
         )}

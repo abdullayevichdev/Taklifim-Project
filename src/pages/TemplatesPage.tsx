@@ -1,25 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter, Link } from '../context/RouterContext';
-import { useLanguage } from '../locales';
+import { Link } from '../context/RouterContext';
+import { useLanguage, formatItemCount, translateCategory } from '../locales';
 import { mockTemplates } from '../data/mockTemplates';
 import { api } from '../services/api';
 import { filterTemplates, formatPriceUZS } from '../utils/logic';
 import { EventCategory, Template } from '../types';
 import { CustomDropdown } from '../components/CustomDropdown';
 import {
+  GlassSurface,
+  GlassInput,
+  GlassSegmented,
+  GlassSlider,
+  GlassButton,
+  GlassSegmentedOption,
+} from '../components/glass';
+import {
   Search,
-  Filter,
   ArrowUpDown,
   Eye,
   ArrowRight,
   Sparkles,
   SlidersHorizontal,
   X,
-  Palette,
 } from 'lucide-react';
 
 export const TemplatesPage: React.FC = () => {
-  const { navigate } = useRouter();
   const { t, language } = useLanguage();
 
   const [templates, setTemplates] = useState<Template[]>(mockTemplates);
@@ -42,15 +47,18 @@ export const TemplatesPage: React.FC = () => {
     return () => unsub();
   }, []);
 
-  const categories: { id: EventCategory; label: Record<string, string> }[] = [
-    { id: 'all', label: { uz: 'Barchasi', ru: 'Все', en: 'All' } },
-    { id: 'weddings', label: { uz: 'To‘y va Nikoh', ru: 'Свадьбы', en: 'Weddings' } },
-    { id: 'engagements', label: { uz: 'Fotixa / Unashtiruv', ru: 'Помолвки', en: 'Engagements' } },
-    { id: 'traditional', label: { uz: 'Milliy marosimlar', ru: 'Традиционные', en: 'Traditional' } },
-    { id: 'birthdays', label: { uz: 'Tug‘ilgan kun / Yubiley', ru: 'Дни рождения', en: 'Birthdays' } },
-    { id: 'baby_showers', label: { uz: 'Beshik to‘y / Chaqaloq', ru: 'Бешик туй', en: 'Baby Showers' } },
-    { id: 'anniversaries', label: { uz: 'Nikoh yilligi', ru: 'Годовщины', en: 'Anniversaries' } },
-  ];
+  const categories: GlassSegmentedOption<EventCategory>[] = useMemo(
+    () => [
+      { value: 'all', label: t.categories.all },
+      { value: 'weddings', label: t.categories.weddings },
+      { value: 'engagements', label: t.categories.engagements },
+      { value: 'traditional', label: t.categories.traditional },
+      { value: 'birthdays', label: t.categories.birthdays },
+      { value: 'baby_showers', label: t.categories.baby_showers },
+      { value: 'anniversaries', label: t.categories.anniversaries },
+    ],
+    [t]
+  );
 
   const filteredTemplates = useMemo(() => {
     return filterTemplates(templates, {
@@ -61,248 +69,222 @@ export const TemplatesPage: React.FC = () => {
     });
   }, [templates, category, searchQuery, sortBy, maxPrice]);
 
+  const resetAllFilters = () => {
+    setCategory('all');
+    setSearchQuery('');
+    setMaxPrice(70000);
+  };
+
   return (
     <div className="pt-28 pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Header Title */}
         <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-panel border border-white/80 text-xs font-bold text-[#D9658B]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Katalog</span>
-          </div>
-          <h1 className="font-playfair text-4xl sm:text-5xl font-extrabold text-[#231E1B] tracking-tight">
-            Nafis Taklifnoma Shablonlari
+          <GlassSurface
+            variant="tinted-pink"
+            rounded="full"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1 text-xs font-bold text-[#9E3E60]"
+          >
+            <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{t.templatesPage.script}</span>
+          </GlassSurface>
+          <h1 className="font-playfair text-4xl sm:text-5xl font-extrabold text-[#1E1418] tracking-tight">
+            {t.templatesPage.title}
           </h1>
-          <p className="text-sm text-[#5C4F48] leading-relaxed">
-            Har bir marosimning o‘zgacha muhitini ifodalovchi, yuqori sifatli va zamonaviy raqamli shablonlar to‘plami.
-          </p>
+          <p className="text-sm text-[#4A383F] leading-relaxed">{t.templatesPage.subtitle}</p>
         </div>
 
-        {/* Search & Filter Bar */}
-        <div className="glass-panel-elevated rounded-3xl p-4 sm:p-5 border border-white/95 shadow-md space-y-4">
-          <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-            {/* Search Input */}
-            <div className="relative w-full md:w-96">
-              <Search className="w-4 h-4 text-[#8A7C74] absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
+        {/* Search & Filter Bar (<lg-*> web components used ONLY here, never on every template card) */}
+        <GlassSurface variant="elevated" rounded="3xl" className="p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="w-full md:w-96">
+              <GlassInput
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Shablon nomi yoki uslubi bo‘yicha qidirish..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-panel text-xs text-[#231E1B] placeholder-[#8A7C74] focus:outline-none focus:ring-2 focus:ring-[#D9658B]/40 transition-all border border-black/5"
+                placeholder={t.templatesPage.searchPlaceholder}
+                aria-label={t.templatesPage.searchPlaceholder}
+                leftIcon={<Search className="w-4 h-4" aria-hidden="true" />}
+                rightElement={
+                  searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-[#5C4F48] hover:text-[#1E1418] hover:bg-white/70 cursor-pointer"
+                      aria-label={t.common.close}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  ) : undefined
+                }
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A7C74] hover:text-[#231E1B]"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
 
-            {/* Sorting & Filter toggle */}
-            <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+            <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
               <CustomDropdown
                 value={sortBy}
-                onChange={(val) => setSortBy(val as any)}
+                onChange={(val) => setSortBy(val as typeof sortBy)}
                 icon={<ArrowUpDown className="w-3.5 h-3.5" />}
+                buttonClassName="min-h-[44px] px-4"
                 options={[
-                  {
-                    value: 'popular',
-                    label: language === 'ru' ? 'Популярные' : language === 'en' ? 'Most Popular' : 'Ommaboplar',
-                  },
-                  {
-                    value: 'newest',
-                    label: language === 'ru' ? 'Новые' : language === 'en' ? 'Newest' : 'Yangi qo‘shilganlar',
-                  },
-                  {
-                    value: 'price_asc',
-                    label: language === 'ru' ? 'Цена: по возрастанию' : language === 'en' ? 'Price: Low to High' : 'Narx: arzondan qimmatga',
-                  },
-                  {
-                    value: 'price_desc',
-                    label: language === 'ru' ? 'Цена: по убыванию' : language === 'en' ? 'Price: High to Low' : 'Narx: qimmatdan arzonga',
-                  },
+                  { value: 'popular', label: t.templatesPage.sortPopular },
+                  { value: 'newest', label: t.templatesPage.sortNewest },
+                  { value: 'price_asc', label: t.templatesPage.sortPriceAsc },
+                  { value: 'price_desc', label: t.templatesPage.sortPriceDesc },
                 ]}
               />
 
               <button
                 type="button"
+                aria-expanded={showFiltersMobile}
                 onClick={() => setShowFiltersMobile(!showFiltersMobile)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-2xl glass-panel text-xs font-semibold text-[#4A3E39] hover:bg-white border border-black/5"
+                className={`flex items-center gap-1.5 min-h-[44px] px-4 py-2 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                  showFiltersMobile
+                    ? 'bg-white text-[#C94F79] shadow-xs border border-white'
+                    : 'glass-surface text-[#1E1418] hover:bg-white/90'
+                }`}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Filtrlar</span>
+                <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>{t.templatesPage.filtersTitle}</span>
               </button>
             </div>
           </div>
 
-          {/* Category Chips Scroll */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setCategory(cat.id)}
-                className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
-                  category === cat.id
-                    ? 'bg-[#231E1B] text-white shadow-xs'
-                    : 'glass-panel text-[#5C4F48] hover:bg-white hover:text-[#231E1B] border border-black/5'
-                }`}
-              >
-                {cat.label[language] || cat.label.uz}
-              </button>
-            ))}
+          {/* Category Filter via GlassSegmented (horizontally scrollable cleanly down to 320px) */}
+          <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+            <GlassSegmented<EventCategory>
+              options={categories}
+              value={category as EventCategory}
+              onChange={(val) => setCategory(val)}
+              ariaLabel={t.templatesSection.allCategories}
+              className="w-max"
+            />
           </div>
 
-          {/* Collapsible advanced filters */}
+          {/* Collapsible Price Slider via GlassSlider */}
           {showFiltersMobile && (
-            <div className="pt-3 border-t border-black/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-[#5C4F48]">
-              <div>
-                <label className="font-semibold block mb-1">
-                  Maksimal narx: {formatPriceUZS(maxPrice)}
-                </label>
-                <input
-                  type="range"
-                  min="50000"
-                  max="70000"
-                  step="5000"
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full accent-[#D9658B] cursor-pointer"
-                />
-              </div>
+            <div className="pt-4 border-t border-black/8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center animate-fadeIn">
+              <GlassSlider
+                min={50000}
+                max={70000}
+                step={5000}
+                value={maxPrice}
+                onChange={setMaxPrice}
+                label={t.templatesPage.maxPriceLabel}
+                valueDisplay={formatPriceUZS(maxPrice, language)}
+              />
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center sm:justify-end">
                 {(category !== 'all' || searchQuery || maxPrice < 70000) && (
                   <button
-                    onClick={() => {
-                      setCategory('all');
-                      setSearchQuery('');
-                      setMaxPrice(70000);
-                    }}
-                    className="text-rose-600 hover:underline text-xs ml-auto"
+                    type="button"
+                    onClick={resetAllFilters}
+                    className="min-h-[44px] px-4 rounded-full glass-surface text-xs font-bold text-[#9E3E60] hover:bg-white cursor-pointer"
                   >
-                    Filtrlarni tozalash
+                    {t.templatesPage.resetFilters}
                   </button>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </GlassSurface>
 
         {/* Results Count bar */}
-        <div className="flex items-center justify-between text-xs text-[#7A6A63] px-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5C4F48] px-2">
           <span>
-            Topilgan shablonlar soni:{' '}
-            <strong className="text-[#231E1B] font-bold">
-              {filteredTemplates.length} ta
+            {t.templatesPage.foundCountLabel}:{' '}
+            <strong className="text-[#1E1418] font-bold">
+              {formatItemCount(filteredTemplates.length, language)}
             </strong>
           </span>
-          <span className="text-[11px]">Barcha shablonlar mobil va kompyuterga to‘liq moslashtirilgan</span>
+          <span className="text-[11px]">{t.templatesPage.responsiveHint}</span>
         </div>
 
-        {/* Templates Grid */}
+        {/* Templates Grid — lightweight CSS glass cards (.glass-card-lite) for 60fps scroll on 20 items */}
         {filteredTemplates.length === 0 ? (
-          <div className="glass-panel-elevated rounded-3xl p-12 text-center max-w-md mx-auto space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#F5EBDD] mx-auto flex items-center justify-center text-[#8A7C74]">
-              <Search className="w-6 h-6" />
+          <GlassSurface variant="elevated" rounded="3xl" className="p-10 sm:p-12 text-center max-w-md mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#F5EBDD] mx-auto flex items-center justify-center text-[#5C4F48]">
+              <Search className="w-6 h-6" aria-hidden="true" />
             </div>
-            <h3 className="font-playfair text-xl font-bold text-[#231E1B]">
-              Shablon topilmadi
-            </h3>
-            <p className="text-xs text-[#7A6A63]">
-              Kiritilgan parametrlar bo‘yicha natija yo‘q. Qidiruv so‘zini o‘zgartiring yoki filtrlarni tozalang.
-            </p>
-            <button
-              onClick={() => {
-                setCategory('all');
-                setSearchQuery('');
-                setMaxPrice(70000);
-              }}
-              className="px-5 py-2.5 rounded-xl bg-[#231E1B] text-white text-xs font-semibold hover:bg-black transition-colors"
-            >
-              Barcha shablonlarni ko‘rsatish
-            </button>
-          </div>
+            <h3 className="font-playfair text-xl font-bold text-[#1E1418]">{t.templatesPage.emptyTitle}</h3>
+            <p className="text-xs text-[#4A383F]">{t.templatesPage.emptyDesc}</p>
+            <div className="pt-1 flex justify-center">
+              <GlassButton tone="tinted" size="md" onClick={resetAllFilters}>
+                {t.templatesPage.showAllBtn}
+              </GlassButton>
+            </div>
+          </GlassSurface>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                className="glass-panel rounded-3xl overflow-hidden border border-white/90 shadow-xs glass-card-hover flex flex-col justify-between group"
+                className="glass-card-lite glass-card-hover rounded-3xl overflow-hidden flex flex-col justify-between group"
               >
                 <div>
-                  {/* Image and badges */}
                   <div className="relative h-64 overflow-hidden bg-[#ECE4D8]">
                     <img
                       src={template.previewImage}
                       alt={template.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-95"
                       loading="lazy"
                     />
 
-                    {/* Tags */}
+                    {/* Crisp non-blurred badges over image (no nested backdrop-filter) */}
                     <div className="absolute top-3 left-3 flex gap-1.5">
                       {template.isPopular && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#F5C9D8]/95 text-[#3A2D28] backdrop-blur-md shadow-xs">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#F5C9D8]/95 text-[#2E141E] shadow-xs border border-white/80">
                           {t.templatesSection.popular}
                         </span>
                       )}
                       {template.isNew && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#B9DFFA]/95 text-[#1E3A5F] backdrop-blur-md shadow-xs">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#B9DFFA]/95 text-[#142636] shadow-xs border border-white/80">
                           {t.templatesSection.newBadge}
                         </span>
                       )}
                     </div>
 
-                    {/* Price tag */}
-                    <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/60 text-white backdrop-blur-md">
-                      {formatPriceUZS(template.price)}
+                    <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#1E1418]/85 text-white border border-white/30 tabular-nums">
+                      {formatPriceUZS(template.price, language)}
                     </div>
                   </div>
 
-                  {/* Body Content */}
                   <div className="p-5">
-                    <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-[#A89A92] mb-1">
-                      <span>{template.category}</span>
-                      {/* Color swatches hint */}
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-[#9E3E60] mb-1">
+                      <span>{translateCategory(template.category, language)}</span>
+                      <div className="flex items-center gap-1" aria-hidden="true">
                         <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/10"
+                          className="w-2.5 h-2.5 rounded-full border border-black/15"
                           style={{ backgroundColor: template.colorStyle.primary }}
                         />
                         <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/10"
+                          className="w-2.5 h-2.5 rounded-full border border-black/15"
                           style={{ backgroundColor: template.colorStyle.accent }}
                         />
                       </div>
                     </div>
-                    <h3 className="font-playfair text-lg font-bold text-[#231E1B] mb-1.5">
-                      {template.name}
-                    </h3>
-                    <p className="text-xs text-[#5C4F48] line-clamp-2 leading-relaxed">
+                    <h3 className="font-playfair text-lg font-bold text-[#1E1418] mb-1.5">{template.name}</h3>
+                    <p className="text-xs text-[#4A383F] line-clamp-2 leading-relaxed">
                       {template.description[language] || template.description.uz}
                     </p>
                   </div>
                 </div>
 
-                {/* Card Actions */}
                 <div className="p-5 pt-0 grid grid-cols-2 gap-2 border-t border-black/5 mt-2">
                   <Link
                     to={`/templates/${template.slug}`}
-                    className="py-2.5 px-3 rounded-xl text-xs font-semibold text-[#4A3E39] glass-panel hover:bg-white text-center transition-colors flex items-center justify-center gap-1.5"
+                    className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-semibold text-[#1E1418] bg-white/85 hover:bg-white border border-black/8 text-center transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
                   >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Ko‘rish</span>
+                    <Eye className="w-3.5 h-3.5 text-[#3B88C3] shrink-0" aria-hidden="true" />
+                    <span>{t.templatesSection.shortPreview}</span>
                   </Link>
 
                   <Link
                     to={`/create/${template.slug}`}
-                    className="py-2.5 px-3 rounded-xl text-xs font-bold text-[#231E1B] bg-gradient-to-r from-[#F5C9D8] to-[#F5EBDD] hover:shadow-xs text-center transition-all flex items-center justify-center gap-1"
+                    className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold text-[#1E1418] bg-gradient-to-r from-[#F5C9D8] to-[#B9DFFA] hover:brightness-105 text-center transition-all flex items-center justify-center gap-1 whitespace-nowrap"
                   >
-                    <span>Tanlash</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <span>{t.templatesSection.selectShort}</span>
+                    <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
                   </Link>
                 </div>
               </div>

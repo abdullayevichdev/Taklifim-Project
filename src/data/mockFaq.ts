@@ -66,9 +66,9 @@ export const mockFaq: FAQItem[] = [
       en: 'What payment methods are supported?',
     },
     answer: {
-      uz: 'Platformada Payme, Click va Uzum Bank orqali xavfsiz onlayn to‘lovlar yo‘lga qo‘yilgan. Shuningdek, 1 martalik bepul tarifdan darhol foydalanishingiz mumkin.',
-      ru: 'На платформе поддерживаются безопасные платежи через Payme, Click и Uzum Bank. Также доступен 1 бесплатный пробный тариф.',
-      en: 'Secure online checkouts via Payme, Click, and Uzum Bank are integrated. A complimentary 1-time free invitation tier is also available immediately.',
+      uz: 'Tanlangan tarifga (50 000 – 70 000 so‘m) ko‘ra karta orqali to‘lov o‘tkazib, chek skrinshoti yoki PDF faylini yuklaysiz. Admin tasdig‘idan so‘ng taklifnomangiz faollashadi.',
+      ru: 'Оплата производится переводом на карту согласно выбранному тарифу (50 000 – 70 000 сум), после чего загружается скриншот или PDF-чек. После проверки администратором приглашение сразу активируется.',
+      en: 'You can pay via card transfer according to your selected plan (50,000 – 70,000 UZS) and upload the receipt screenshot or PDF. Your invitation activates right after admin verification.',
     },
   },
 ];

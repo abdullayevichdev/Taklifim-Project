@@ -9,6 +9,12 @@ interface LuxuryEnvelopeProps {
   venueName?: string;
   className?: string;
   buttonLabel?: string;
+  headerLabel?: string;
+  ceremonyLabel?: string;
+  scriptSubtitle?: string;
+  quote?: string;
+  viewSiteLabel?: string;
+  sealHint?: string;
   onViewFullSite?: () => void;
 }
 
@@ -20,6 +26,12 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
   venueName = '«Versal» Saroyi, Toshkent',
   className = '',
   buttonLabel = 'Taklifnomani ochish',
+  headerLabel = 'Taklifnoma',
+  ceremonyLabel = 'To‘y & Nikoh Marosimi',
+  scriptSubtitle = 'Visol Oqshomi',
+  quote = '«Hayotimizning eng quvonchli va unutilmas kunida siz azizlarni faxriy mehmonimiz bo‘lishga taklif etamiz!»',
+  viewSiteLabel = 'Saytni To‘liq Ko‘rish',
+  sealHint = 'Taklifnomani ochish uchun muhr ustiga bosing',
   onViewFullSite,
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
@@ -141,13 +153,13 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           <linearGradient id="left-fold-grad" x1="0%" y1="50%" x2="100%" y2="50%">
             <stop offset="0%" stopColor="#FAF7F1" stopOpacity="0.4" />
             <stop offset="85%" stopColor="#F2ECE0" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#E5DC Flora" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#E5DCCF" stopOpacity="0.9" />
           </linearGradient>
 
           <linearGradient id="right-fold-grad" x1="100%" y1="50%" x2="0%" y2="50%">
             <stop offset="0%" stopColor="#FAF7F1" stopOpacity="0.4" />
             <stop offset="85%" stopColor="#F2ECE0" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#E5DC Flora" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#E5DCCF" stopOpacity="0.9" />
           </linearGradient>
 
           <linearGradient id="bottom-fold-grad" x1="50%" y1="100%" x2="50%" y2="0%">
@@ -183,12 +195,12 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
         }}
       />
 
-      {/* Layer 2: Inner Luxury Wedding Invitation Card (Slides out smoothly when opened) */}
+      {/* Layer 2: Inner Luxury Wedding Invitation Card (Slides out cleanly below notch) */}
       <div
-        className={`absolute inset-x-3 sm:inset-x-5 top-7 bottom-14 rounded-2xl bg-[#FFFDFB] border border-[#E8DEC8] flex flex-col justify-between p-5 sm:p-7 text-center transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`absolute inset-x-3 sm:inset-x-4 top-12 bottom-6 rounded-2xl bg-[#FFFDFB] border border-[#E8DEC8] flex flex-col justify-between p-4 sm:p-6 text-center transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isOpened
-            ? 'translate-y-[-20px] opacity-100 scale-100 z-30 shadow-[0_25px_50px_-12px_rgba(80,50,30,0.3)]'
-            : 'translate-y-10 opacity-0 scale-95 pointer-events-none z-10'
+            ? 'translate-y-0 opacity-100 scale-100 z-30 shadow-[0_25px_50px_-12px_rgba(80,50,30,0.3)]'
+            : 'translate-y-8 opacity-0 scale-95 pointer-events-none z-10'
         }`}
       >
         {/* Ornate Gold Border Inner Frame */}
@@ -196,36 +208,36 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
         <div className="absolute inset-2.5 rounded-lg border border-[#D4AF37]/15 pointer-events-none" />
 
         {/* Card Header */}
-        <div className="pt-2 relative z-10">
-          <div className="flex items-center justify-center gap-1.5 text-[9px] tracking-[0.28em] uppercase text-[#B8860B] font-extrabold mb-1">
+        <div className="pt-1 relative z-10">
+          <div className="flex items-center justify-center gap-1.5 text-[9px] tracking-[0.26em] uppercase text-[#B8860B] font-extrabold mb-1">
             <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
-            <span>Taklifnoma</span>
+            <span>{headerLabel}</span>
             <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
           </div>
           <div className="w-12 h-[1px] mx-auto bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
         </div>
 
         {/* Couple Names & Ceremony */}
-        <div className="py-2 space-y-1.5 relative z-10">
-          <p className="text-[11px] uppercase tracking-widest text-[#8A776A] font-medium">
-            To‘y & Nikoh Marosimi
+        <div className="py-1.5 space-y-1 relative z-10">
+          <p className="text-[10px] uppercase tracking-widest text-[#8A776A] font-medium">
+            {ceremonyLabel}
           </p>
-          <h2 className="font-playfair text-2xl sm:text-[28px] font-bold text-[#2A1820] leading-tight">
+          <h2 className="font-playfair text-2xl sm:text-[26px] font-bold text-[#2A1820] leading-tight">
             {hostNames}
           </h2>
-          <p className="font-script text-2xl sm:text-3xl text-[#C0607D]">
-            Visol Oqshomi
+          <p className="font-script text-2xl sm:text-[28px] text-[#C0607D]">
+            {scriptSubtitle}
           </p>
         </div>
 
         {/* Invitation Message Snippet */}
-        <div className="text-[11px] leading-relaxed text-[#6E5E58] italic px-2 relative z-10">
-          «Hayotimizning eng quvonchli va unutilmas kunida siz azizlarni faxriy mehmonimiz bo‘lishga taklif etamiz!»
+        <div className="text-[10.5px] leading-relaxed text-[#6E5E58] italic px-2 relative z-10">
+          {quote}
         </div>
 
         {/* Event Details: Date & Venue */}
-        <div className="border-t border-[#EFE7D8] pt-2.5 space-y-1.5 text-xs text-[#52443E] relative z-10">
-          <div className="inline-flex items-center gap-1.5 font-bold text-[#8A5A1B] text-[11px]">
+        <div className="border-t border-[#EFE7D8] pt-2 space-y-1 text-xs text-[#52443E] relative z-10">
+          <div className="inline-flex items-center gap-1.5 font-bold text-[#8A5A1B] text-[11px] tabular-nums">
             <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
             <span>{eventDate}</span>
           </div>
@@ -237,14 +249,14 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
 
         {/* Action Button: Open Full Interactive Website */}
         {onViewFullSite && (
-          <div className="pt-2 relative z-10">
+          <div className="pt-1.5 relative z-10">
             <button
               type="button"
               onClick={handleSiteClick}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#2B1B22] to-[#42212E] hover:from-[#3D2530] hover:to-[#542B3B] text-[#FFF4E4] font-bold text-xs tracking-wider uppercase shadow-md flex items-center justify-center gap-2 group transition-all"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#2B1B22] to-[#42212E] hover:from-[#3D2530] hover:to-[#542B3B] text-[#FFF4E4] font-bold text-[11px] tracking-wider uppercase shadow-md flex items-center justify-center gap-2 group transition-[transform,opacity] duration-200 whitespace-nowrap"
             >
-              <span>Saytni To‘liq Ko‘rish</span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#E27B9B] group-hover:translate-x-1 transition-transform" />
+              <span className="truncate">{viewSiteLabel}</span>
+              <ArrowRight className="w-3.5 h-3.5 text-[#E27B9B] group-hover:translate-x-1 transition-transform shrink-0" />
             </button>
           </div>
         )}
@@ -433,12 +445,12 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
       {/* Layer 7: Realistic Dark Burgundy Wax Seal (Centrally Placed & Interactive) */}
       <div
         onClick={handleOpenClick}
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-700 ease-out group ${
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer transition-[transform,opacity] duration-500 ease-out group ${
           isOpened
             ? 'scale-125 opacity-0 pointer-events-none'
             : 'hover:scale-105 active:scale-95'
         }`}
-        title="Taklifnomani ochish uchun muhr ustiga bosing"
+        title={sealHint}
         style={{
           width: '106px',
           height: '106px',
