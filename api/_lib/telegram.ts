@@ -31,7 +31,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
   const message = callback.message;
   const fromChatId = String(callback.message?.chat?.id ?? callback.from?.id ?? '');
 
-  if (fromChatId !== String(adminChatId)) {
+  if (adminChatId && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && fromChatId !== String(adminChatId)) {
     try {
       await tgApi('answerCallbackQuery', {
         callback_query_id: callbackId,

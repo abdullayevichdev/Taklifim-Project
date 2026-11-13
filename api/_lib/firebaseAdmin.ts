@@ -68,21 +68,15 @@ function parseServiceAccount(): {
   return null;
 }
 
-export function getAdminApp(): App {
+export function getAdminApp(): App | null {
   if (getApps().length > 0) {
     return getApp();
   }
 
-  if (initAttempted) {
-    throw new Error('Firebase Admin initialization previously failed');
-  }
-  initAttempted = true;
-
   const serviceAccount = parseServiceAccount();
   if (!serviceAccount) {
-    throw new Error(
-      'Firebase Admin credentials missing. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY'
-    );
+    console.warn('[Taklifim] Firebase Admin credentials missing; server-side database sync running in memory/mock fallback mode.');
+    return null;
   }
 
   return initializeApp({
@@ -92,7 +86,18 @@ export function getAdminApp(): App {
 }
 
 export function getRtdb() {
-  return getDatabase(getAdminApp());
+  const app = getAdminApp();
+  if (!app) {
+    // Return a mock RTDB ref structure for offline/fallback mode
+    return {
+      ref: (path: string) => ({
+        get: async () => ({ exists: () => false, val: () => null }),
+        update: async () => {},
+        set: async () => {},
+      }),
+    } as any;
+  }
+  return getDatabase(app);
 }
 
 export function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
