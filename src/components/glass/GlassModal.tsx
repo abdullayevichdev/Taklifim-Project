@@ -60,7 +60,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E1418]/35 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-[#1E1418]/35 backdrop-blur-md animate-fadeIn motion-reduce:animate-none"
       onClick={(e) => {
         if (closeOnBackdropClick && e.target === e.currentTarget) {
           onClose();
@@ -74,14 +74,14 @@ export const GlassModal: React.FC<GlassModalProps> = ({
       <GlassSurface
         variant="elevated"
         rounded="3xl"
-        className={`w-full ${SIZE_CLASSES[size]} relative p-6 sm:p-7 max-h-[90vh] overflow-y-auto ${className}`}
+        className={`w-full ${SIZE_CLASSES[size]} relative p-5 sm:p-7 max-h-[90dvh] overflow-y-auto ${className}`}
       >
         {showCloseButton && (
           <button
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full glass-surface-subtle hover:bg-white text-[#4A383F] hover:text-[#1E1418] flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]"
+            className="absolute top-3.5 right-3.5 w-10 h-10 rounded-full glass-surface-subtle hover:bg-white text-[#4A383F] hover:text-[#1E1418] flex items-center justify-center transition-colors cursor-pointer touch-manipulation focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>

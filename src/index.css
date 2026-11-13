@@ -239,16 +239,27 @@
 
 /* Hover transitions use translateY & shadow ONLY — never scale() */
 .glass-card-hover {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, opacity 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.glass-card-hover:hover {
-  transform: translate3d(0, -4px, 0);
-  box-shadow:
-    0 24px 50px -12px rgba(214, 99, 137, 0.2),
-    0 8px 20px -6px rgba(74, 155, 212, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  border-color: rgba(255, 255, 255, 1);
+@media (hover: hover) and (pointer: fine) {
+  .glass-card-hover:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow:
+      0 24px 50px -12px rgba(214, 99, 137, 0.2),
+      0 8px 20px -6px rgba(74, 155, 212, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 1);
+  }
+}
+
+@media (hover: none) {
+  .glass-card-hover:active {
+    transform: translate3d(0, -1px, 0);
+    opacity: 0.96;
+  }
 }
 
 /* Fallback when backdrop-filter is unsupported */
@@ -293,7 +304,7 @@
   }
 }
 
-/* Ensure liquidglass.dev web components adopt Taklifim clarity & never get scale() */
+/* Ensure liquidglass.dev web components adopt Taklifim clarity, touch ergonomics & never get scale() */
 lg-button,
 lg-navbar,
 lg-switch,
@@ -302,6 +313,32 @@ lg-segmented,
 lg-toast {
   transform: none;
   font-family: var(--font-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+lg-button,
+lg-switch,
+lg-segmented {
+  touch-action: manipulation;
+}
+
+lg-slider,
+.lg-slider__input {
+  touch-action: pan-y;
+}
+
+@media (max-width: 639px) {
+  lg-segmented {
+    max-width: 100%;
+  }
+
+  lg-segmented .lg-seg__option {
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 12.5px;
+    min-height: 34px;
+    gap: 5px;
+  }
 }
 
 lg-button .lg-button__el {
@@ -550,6 +587,22 @@ lg-segmented.taklifim-auth-seg .lg-seg__option {
 .animate-bounce-gentle {
   animation: bounceGentle 2.8s ease-in-out infinite;
   will-change: transform;
+}
+
+@media (max-width: 767px) {
+  /* Save mobile GPU & battery: static radial mesh already renders full backdrop colors smoothly */
+  .animate-glass-blob-a,
+  .animate-glass-blob-b,
+  .animate-glass-blob-c,
+  .animate-pulse-glow {
+    animation: none;
+    will-change: auto;
+  }
+
+  /* Snappier micro-transitions on mobile */
+  .animate-fadeIn {
+    animation-duration: 0.2s;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -681,6 +681,7 @@ class LgSegmented extends LgElement {
     return b ? b.value || b.textContent.trim() : this.getAttribute('value');
   }
   set value(v) {
+    if (!this.buttons) return;
     const i = this.buttons.findIndex((b) => (b.value || b.textContent.trim()) === String(v));
     if (i >= 0) this.select(i);
   }
