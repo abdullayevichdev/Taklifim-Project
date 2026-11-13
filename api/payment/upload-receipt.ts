@@ -6,6 +6,7 @@ import {
 } from '../_lib/firebaseAdmin.js';
 import { checkRateLimit } from '../_lib/rateLimit.js';
 import { sendReceiptToTelegram } from '../_lib/telegram.js';
+import { cleanAndValidateUzPhone } from '../_lib/phone.js';
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
@@ -35,10 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileUrl,
     } = req.body || {};
 
-    if (!orderId || !customerPhone || (!fileBase64 && !fileUrl)) {
+    const cleanPhone = cleanAndValidateUzPhone(customerPhone);
+    if (!orderId || !cleanPhone || (!fileBase64 && !fileUrl)) {
       return res.status(400).json({
         success: false,
-        error: "Barcha majburiy maydonlar va chek fayli kiritilishi shart.",
+        error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX) va chek faylini yuklang.",
       });
     }
 
@@ -87,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: orderId,
       orderId,
       customerName: customerName || existing?.customerName || 'Mijoz',
-      customerPhone: customerPhone || existing?.customerPhone || '+998',
+      customerPhone: cleanPhone,
       templateName: templateName || existing?.templateName || 'Standart Shablon',
       weddingDate: weddingDate || existing?.weddingDate || '-',
       venueName: venueName || existing?.venueName || '-',

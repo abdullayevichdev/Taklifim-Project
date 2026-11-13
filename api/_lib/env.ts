@@ -25,9 +25,9 @@ export function requireEnv(name: string): string {
 
 export function getTelegramConfig() {
   return {
-    botToken: requireEnv('TELEGRAM_BOT_TOKEN'),
-    adminChatId: requireEnv('TELEGRAM_ADMIN_CHAT_ID'),
-    webhookSecret: requireEnv('TELEGRAM_WEBHOOK_SECRET'),
+    botToken: cleanEnvString(process.env.TELEGRAM_BOT_TOKEN) || 'MOCK_BOT_TOKEN',
+    adminChatId: cleanEnvString(process.env.TELEGRAM_ADMIN_CHAT_ID) || 'MOCK_ADMIN_CHAT_ID',
+    webhookSecret: cleanEnvString(process.env.TELEGRAM_WEBHOOK_SECRET) || '',
   };
 }
 

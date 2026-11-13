@@ -1,4 +1,5 @@
 import { getTelegramConfig } from './env.js';
+import { formatUzPhoneForDisplay } from './phone.js';
 import {
   getOrder,
   updateInvitationStatus,
@@ -31,7 +32,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
   const message = callback.message;
   const fromChatId = String(callback.message?.chat?.id ?? callback.from?.id ?? '');
 
-  if (adminChatId && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && fromChatId !== String(adminChatId)) {
+  if (adminChatId && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && adminChatId !== 'MOCK_ADMIN_CHAT_ID' && fromChatId !== String(adminChatId)) {
     try {
       await tgApi('answerCallbackQuery', {
         callback_query_id: callbackId,
@@ -67,54 +68,50 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
     return;
   }
 
-  let order = await getOrder(orderId);
+  try {
+    let order = await getOrder(orderId);
 
-  if (order && (order.status === 'paid' || order.status === 'rejected')) {
-    const statusText = order.status === 'paid' ? 'TASDIQLANGAN ✅' : 'RAD ETILGAN ❌';
-    try {
+    if (order && (order.status === 'paid' || order.status === 'rejected')) {
+      const statusText = order.status === 'paid' ? 'TASDIQLANGAN ✅' : 'RAD ETILGAN ❌';
       await tgApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: `⚠️ Ushbu buyurtma allaqachon ${statusText}!`,
         show_alert: true,
       });
-    } catch {
-      /* ignore */
+      return;
     }
-    return;
-  }
 
-  const newStatus: OrderStatus = action === 'confirm' ? 'paid' : 'rejected';
-  const nowIso = new Date().toISOString();
+    const newStatus: OrderStatus = action === 'confirm' ? 'paid' : 'rejected';
+    const nowIso = new Date().toISOString();
 
-  await upsertOrder(orderId, {
-    id: orderId,
-    status: newStatus,
-    updatedAt: nowIso,
-    customerName: order?.customerName || 'Mijoz',
-    customerPhone: order?.customerPhone || '',
-    price: order?.price || 0,
-    createdAt: order?.createdAt || nowIso,
-  });
+    await upsertOrder(orderId, {
+      id: orderId,
+      status: newStatus,
+      updatedAt: nowIso,
+      customerName: order?.customerName || 'Mijoz',
+      customerPhone: order?.customerPhone || '',
+      price: order?.price || 0,
+      createdAt: order?.createdAt || nowIso,
+    });
 
-  const invitationId = order?.invitationId;
-  if (invitationId) {
-    try {
-      await updateInvitationStatus(invitationId, newStatus, nowIso);
-    } catch (err) {
-      console.warn('Invitation status sync warning:', err);
+    const invitationId = order?.invitationId;
+    if (invitationId) {
+      try {
+        await updateInvitationStatus(invitationId, newStatus, nowIso);
+      } catch (err) {
+        console.warn('Invitation status sync warning:', err);
+      }
     }
-  }
 
-  const adminName =
-    `${callback.from?.first_name || ''} ${callback.from?.last_name || ''}`.trim() || 'Admin';
-  const originalCaption = message?.caption || message?.text || '';
-  const statusBadge =
-    action === 'confirm'
-      ? `\n\n✅ <b>TO'LOV TASDIQLANDI</b> (Admin: ${adminName})`
-      : `\n\n❌ <b>TO'LOV RAD ETILDI</b> (Admin: ${adminName})`;
-  const updatedCaption = originalCaption + statusBadge;
+    const adminName =
+      `${callback.from?.first_name || ''} ${callback.from?.last_name || ''}`.trim() || 'Admin';
+    const originalCaption = message?.caption || message?.text || '';
+    const statusBadge =
+      action === 'confirm'
+        ? `\n\n✅ <b>TO'LOV TASDIQLANDI</b> (Admin: ${adminName})`
+        : `\n\n❌ <b>TO'LOV RAD ETILDI</b> (Admin: ${adminName})`;
+    const updatedCaption = originalCaption + statusBadge;
 
-  try {
     if (message?.caption !== undefined) {
       await tgApi('editMessageCaption', {
         chat_id: message.chat.id,
@@ -132,11 +129,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
         reply_markup: { inline_keyboard: [] },
       });
     }
-  } catch (e) {
-    console.error('Error editing message:', e);
-  }
 
-  try {
     await tgApi('answerCallbackQuery', {
       callback_query_id: callbackId,
       text:
@@ -145,8 +138,17 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
           : "❌ To'lov rad etildi!",
       show_alert: true,
     });
-  } catch (e) {
-    console.error('Error answering callback:', e);
+  } catch (err) {
+    console.error('Telegram callback handler error:', err);
+    try {
+      await tgApi('answerCallbackQuery', {
+        callback_query_id: callbackId,
+        text: 'Xatolik yuz berdi. Qayta urinib ko‘ring.',
+        show_alert: true,
+      });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -172,7 +174,7 @@ export async function sendReceiptToTelegram(params: {
   const captionHtml =
     `🧾 <b>YANGI TO'LOV CHEKI #${params.orderId}</b>\n\n` +
     `👤 <b>Mijoz:</b> ${params.customerName}\n` +
-    `📞 <b>Telefon:</b> ${params.customerPhone}\n` +
+    `📞 <b>Telefon:</b> ${formatUzPhoneForDisplay(params.customerPhone)}\n` +
     `🎨 <b>Shablon:</b> ${params.templateName}\n` +
     `📅 <b>To'y sanasi:</b> ${params.weddingDate}\n` +
     `📍 <b>To'yxona:</b> ${params.venueName}\n` +

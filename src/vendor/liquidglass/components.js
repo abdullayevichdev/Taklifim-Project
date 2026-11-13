@@ -677,11 +677,13 @@ class LgSegmented extends LgElement {
   }
 
   get value() {
+    this.buttons = this.buttons || [...this.querySelectorAll(':scope > button')];
     const b = this.buttons?.[this.index];
     return b ? b.value || b.textContent.trim() : this.getAttribute('value');
   }
   set value(v) {
-    if (!this.buttons) return;
+    this.buttons = this.buttons || [...this.querySelectorAll(':scope > button')];
+    if (!this.buttons || !this.buttons.length) return;
     const i = this.buttons.findIndex((b) => (b.value || b.textContent.trim()) === String(v));
     if (i >= 0) this.select(i);
   }

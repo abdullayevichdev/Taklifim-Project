@@ -19,6 +19,7 @@ import {
   validatePdfFile,
   MAX_PDF_BYTES,
 } from '../utils/receiptCompress';
+import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { isFirebaseConfigured, storage } from '../services/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
@@ -408,6 +409,13 @@ export const BuilderPage: React.FC = () => {
       return;
     }
 
+    const rawPhone = invitationState.socialLinks?.phone || user?.phone || '';
+    const cleanPhone = cleanAndValidateUzPhone(rawPhone);
+    if (!cleanPhone) {
+      setUploadError(t.auth?.errors?.invalidPhone || 'Iltimos, to‘g‘ri telefon raqam kiriting (+998 90 123 45 67)');
+      return;
+    }
+
     if (isPdf && selectedFile.size > MAX_PDF_BYTES) {
       setUploadError(t.validation.receiptPdfTooLarge);
       return;
@@ -428,7 +436,7 @@ export const BuilderPage: React.FC = () => {
           planName: `${currentTemplate.name} (${formatPriceUZS(finalPrice, language)})`,
           price: finalPrice,
           customerName: invitationState.hostNames,
-          customerPhone: user?.phone || '+998900000000',
+          customerPhone: cleanPhone,
           invitationId: invitationState.id,
           invitationSlug: invitationState.slug,
           templateName: currentTemplate.name,
@@ -467,7 +475,7 @@ export const BuilderPage: React.FC = () => {
         invitationId: invitationState.id,
         invitationSlug: invitationState.slug,
         customerName: invitationState.hostNames,
-        customerPhone: user?.phone || '+998900000000',
+        customerPhone: cleanPhone,
         templateName: currentTemplate.name,
         weddingDate: invitationState.eventDate,
         venueName: invitationState.venueName,

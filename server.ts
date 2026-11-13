@@ -16,6 +16,7 @@ import {
 import { checkRateLimit } from './api/_lib/rateLimit.js';
 import { handleTelegramUpdate, sendReceiptToTelegram } from './api/_lib/telegram.js';
 import { getTelegramConfig } from './api/_lib/env.js';
+import { cleanAndValidateUzPhone } from './api/_lib/phone.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,10 +52,11 @@ async function startServer() {
         fileUrl,
       } = req.body || {};
 
-      if (!orderId || !customerPhone || (!fileBase64 && !fileUrl)) {
+      const cleanPhone = cleanAndValidateUzPhone(customerPhone);
+      if (!orderId || !cleanPhone || (!fileBase64 && !fileUrl)) {
         return res.status(400).json({
           success: false,
-          error: "Barcha majburiy maydonlar va chek fayli kiritilishi shart.",
+          error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX) va chek faylini yuklang.",
         });
       }
 
@@ -99,7 +101,7 @@ async function startServer() {
         invitationId: invitationId || existing?.invitationId,
         invitationSlug: invitationSlug || existing?.invitationSlug,
         customerName: customerName || existing?.customerName || 'Mijoz',
-        customerPhone: customerPhone || existing?.customerPhone || '+998',
+        customerPhone: cleanPhone,
         templateName: templateName || existing?.templateName || 'Standart Shablon',
         weddingDate: weddingDate || existing?.weddingDate || '-',
         venueName: venueName || existing?.venueName || '-',
