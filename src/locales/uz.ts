@@ -125,6 +125,17 @@ export const uz = {
     free: 'Bepul namuna',
     popular: 'Ommabop',
     newBadge: 'Yangi',
+    exampleBadge: 'Namuna',
+    sampleDateShort: '25.10.2026 • 18:00',
+    sampleVenueShort: '«Versal» Saroyi',
+    sampleTypeByCat: {
+      weddings: 'To‘y taklifnomasi',
+      engagements: 'Fotixa taklifnomasi',
+      traditional: 'Milliy tantana',
+      birthdays: 'Tug‘ilgan kun',
+      baby_showers: 'Beshik to‘yi',
+      anniversaries: 'Yubiley oqshomi',
+    },
   },
 
   // Shablonlar katalogi sahifasi

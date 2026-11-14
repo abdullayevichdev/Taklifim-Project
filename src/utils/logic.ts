@@ -127,7 +127,9 @@ export function filterTemplates(
         t.name.toLowerCase().includes(q) ||
         t.slug.toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q) ||
-        (t.description?.uz && t.description.uz.toLowerCase().includes(q))
+        (t.description?.uz && t.description.uz.toLowerCase().includes(q)) ||
+        (t.description?.ru && t.description.ru.toLowerCase().includes(q)) ||
+        (t.description?.en && t.description.en.toLowerCase().includes(q))
     );
   }
 

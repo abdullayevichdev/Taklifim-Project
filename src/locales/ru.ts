@@ -127,6 +127,17 @@ export const ru: typeof uz = {
     free: 'Демо-версия',
     popular: 'Популярный',
     newBadge: 'Новинка',
+    exampleBadge: 'Образец',
+    sampleDateShort: '25.10.2026 • 18:00',
+    sampleVenueShort: 'Дворец «Versal»',
+    sampleTypeByCat: {
+      weddings: 'Свадебное приглашение',
+      engagements: 'Приглашение на помолвку',
+      traditional: 'Торжественный вечер',
+      birthdays: 'День рождения',
+      baby_showers: 'Бешик-туй',
+      anniversaries: 'Юбилейный вечер',
+    },
   },
 
   // Страница каталога шаблонов

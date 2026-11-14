@@ -389,6 +389,7 @@ class Surface {
   // Keep the backdrop copy registered with the real backdrop. Scrolling usually moves both together,
   // so most calls change nothing and write nothing.
   align() {
+    if (!this.source?.isConnected || !this.copy) return;
     const lr = this.layer.getBoundingClientRect();
     const sr = this.source.getBoundingClientRect();
     const key = `${sr.width}|${sr.height}|${sr.left - lr.left}|${sr.top - lr.top}`;
@@ -406,15 +407,23 @@ class Surface {
 
 class LgElement extends HTMLElement {
   connectedCallback() {
-    injectStyles();
-    if (!this._built) {
-      this._built = true;
-      this.build();
+    try {
+      injectStyles();
+      if (!this._built) {
+        this._built = true;
+        this.build();
+      }
+      this.attach();
+    } catch (err) {
+      console.warn('[LiquidGlass] Element mount skipped:', err);
     }
-    this.attach();
   }
   disconnectedCallback() {
-    this.detach();
+    try {
+      this.detach();
+    } catch (err) {
+      console.warn('[LiquidGlass] Element detach skipped:', err);
+    }
   }
   build() {}
   attach() {}
@@ -483,7 +492,7 @@ class LgSwitch extends LgElement {
   }
 
   attributeChangedCallback(name) {
-    if (!this.input) return;
+    if (!this.input || !this.xs) return;
     if (name === 'checked') {
       this.input.checked = this.hasAttribute('checked');
       this.xs.set(this.input.checked ? 1 : 0);
@@ -498,7 +507,7 @@ class LgSwitch extends LgElement {
   }
 
   render() {
-    if (!this.glass) return;
+    if (!this.glass || !this.firstChild?.lastChild) return;
     const stretch = Math.min(10, Math.abs(this.v) * 1.6);
     const w = lerp(36, 54, this.p) + stretch;
     const h = lerp(24, 36, this.p) - stretch * 0.2;
@@ -577,7 +586,7 @@ class LgSlider extends LgElement {
   }
 
   attributeChangedCallback(name) {
-    if (!this.input) return;
+    if (!this.input || !this.ts) return;
     if (name === 'value') {
       this.input.value = this.getAttribute('value');
       this.ts.set(this.fraction());
@@ -661,6 +670,7 @@ class LgSegmented extends LgElement {
   }
 
   fillCopy() {
+    if (!this.refract || !this.buttons) return;
     this.refract.replaceChildren(
       ...this.buttons.map((b) => {
         const c = el('span', 'lg-seg__option');
@@ -672,25 +682,26 @@ class LgSegmented extends LgElement {
 
   /** Call after changing option labels so the glass copy matches again. */
   refresh() {
+    if (!this.isConnected || !this.refract || !this.buttons?.length) return;
     this.fillCopy();
     this.select(this.index, { immediate: true });
   }
 
   get value() {
-    this.buttons = this.buttons || [...this.querySelectorAll(':scope > button')];
-    const b = this.buttons?.[this.index];
+    const buttons = this.buttons || [...this.querySelectorAll(':scope > button')];
+    const b = buttons?.[this.index];
     return b ? b.value || b.textContent.trim() : this.getAttribute('value');
   }
   set value(v) {
-    this.buttons = this.buttons || [...this.querySelectorAll(':scope > button')];
-    if (!this.buttons || !this.buttons.length) return;
+    this.setAttribute('value', String(v));
+    if (!this.xs || !this.buttons || !this.buttons.length) return;
     const i = this.buttons.findIndex((b) => (b.value || b.textContent.trim()) === String(v));
     if (i >= 0) this.select(i);
   }
 
   select(i, { emit = false, focus = false, immediate = false } = {}) {
+    if (!this.buttons || !this.buttons.length) return;
     const n = this.buttons.length;
-    if (!n) return;
     const next = (i + n) % n;
     const changed = next !== this.index;
     this.index = next;
@@ -699,11 +710,12 @@ class LgSegmented extends LgElement {
       b.tabIndex = j === next ? 0 : -1;
     });
     if (focus) this.buttons[next].focus();
-    this.xs.set(this.buttons[next].offsetLeft, { immediate });
+    this.xs?.set(this.buttons[next].offsetLeft, { immediate });
     if (emit && changed) this.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { value: this.value, index: next } }));
   }
 
   widthAt(pos) {
+    if (!this.buttons || !this.buttons.length) return 0;
     const lefts = this.buttons.map((b) => b.offsetLeft);
     if (lefts.length < 2) return this.buttons[0].offsetWidth;
     let i = 0;
@@ -713,7 +725,7 @@ class LgSegmented extends LgElement {
   }
 
   render() {
-    if (!this.glass) return;
+    if (!this.glass || !this.buttons || !this.buttons.length) return;
     const first = this.buttons[0];
     const stretch = Math.min(12, Math.abs(this.v) * 0.02);
     const w = this.widthAt(this.x) + stretch;
@@ -824,6 +836,7 @@ class LgNavbar extends LgElement {
   }
 
   fillCopy() {
+    if (!this.copy || !this.links) return;
     this.copy.replaceChildren(
       ...this.links.map((a) => {
         const c = el('span');
@@ -835,24 +848,27 @@ class LgNavbar extends LgElement {
 
   /** Call after changing link text (e.g. a language switch) so the glass copy matches again. */
   refresh() {
+    if (!this.isConnected || !this.copy || !this.links?.length) return;
     this.fillCopy();
     this.moveTo(this.target ?? this.current, true);
   }
 
   setCurrent(i) {
+    if (!this.links || i < 0 || i >= this.links.length) return;
     this.links.forEach((a, j) => (j === i ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
     this.current = i;
     this.moveTo(i);
   }
 
   moveTo(i, immediate = false) {
-    const a = this.links[i];
-    if (!a) return;
+    const a = this.links?.[i];
+    if (!a || !this.xs) return;
     this.target = i;
     this.xs.set(a.offsetLeft, { immediate });
   }
 
   widthAt(pos) {
+    if (!this.links || !this.links.length) return 0;
     const lefts = this.links.map((a) => a.offsetLeft);
     if (lefts.length < 2) return this.links[0].offsetWidth;
     let i = 0;

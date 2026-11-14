@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { LgSwitchElement } from '../../types/liquidglass';
+import { GlassControlBoundary } from '../ErrorBoundary';
 import { useLiquidGlassReady } from './loader';
 
 export interface GlassSwitchProps {
@@ -15,8 +16,8 @@ export interface GlassSwitchProps {
 
 /**
  * React 19-safe wrapper around <lg-switch>.
- * Renders <lg-switch> childless so language/text updates in React never
- * collide with LgSwitch's replaceChildren() DOM manipulation.
+ * Renders <lg-switch> childless, wraps it in GlassControlBoundary,
+ * and seamlessly falls back to a standard accessible HTML switch if needed.
  */
 export const GlassSwitch: React.FC<GlassSwitchProps> = ({
   checked,
@@ -51,25 +52,59 @@ export const GlassSwitch: React.FC<GlassSwitchProps> = ({
   useEffect(() => {
     const el = switchRef.current;
     if (!el || !ready || failed || cssOnly) return;
-    el.toggleAttribute('checked', checked);
+    try {
+      el.toggleAttribute('checked', checked);
+    } catch {
+      // Ignore
+    }
   }, [checked, ready, failed, cssOnly]);
 
   useEffect(() => {
     const el = switchRef.current;
     if (!el || !ready || failed || cssOnly) return;
-    el.toggleAttribute('disabled', disabled);
+    try {
+      el.toggleAttribute('disabled', disabled);
+    } catch {
+      // Ignore
+    }
   }, [disabled, ready, failed, cssOnly]);
 
   useEffect(() => {
     const el = switchRef.current;
     if (!el || !ready || failed || cssOnly || !label) return;
-    const input = el.querySelector('.lg-switch__input');
-    if (input) input.setAttribute('aria-label', label);
+    try {
+      const input = el.querySelector('.lg-switch__input');
+      if (input) input.setAttribute('aria-label', label);
+    } catch {
+      // Ignore
+    }
   }, [label, ready, failed, cssOnly]);
 
   const toggleFromLabel = () => {
     if (!disabled) onChange(!checked);
   };
+
+  const fallbackSwitch = (
+    <button
+      key="css-switch"
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={label ? labelId : undefined}
+      aria-label={!label ? 'Toggle' : undefined}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+        checked ? 'bg-[#34C759]' : 'bg-[#D6CAD0]'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`inline-block h-6 w-8 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
 
   return (
     <div className={`flex items-center justify-between gap-4 ${className}`}>
@@ -85,33 +120,19 @@ export const GlassSwitch: React.FC<GlassSwitchProps> = ({
       )}
 
       {cssOnly || !ready || failed ? (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-labelledby={label ? labelId : undefined}
-          aria-label={!label ? 'Toggle' : undefined}
-          disabled={disabled}
-          onClick={() => !disabled && onChange(!checked)}
-          className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
-            checked ? 'bg-[#34C759]' : 'bg-[#D6CAD0]'
-          } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <span
-            className={`inline-block h-6 w-8 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-              checked ? 'translate-x-5' : 'translate-x-0'
-            }`}
-          />
-        </button>
+        fallbackSwitch
       ) : (
-        <lg-switch
-          ref={switchRef}
-          name={name}
-          checked={checked ? true : undefined}
-          disabled={disabled ? true : undefined}
-          aria-label={label || 'Toggle'}
-          className="shrink-0"
-        />
+        <GlassControlBoundary fallback={fallbackSwitch}>
+          <lg-switch
+            key="lg-switch"
+            ref={switchRef}
+            name={name}
+            checked={checked ? true : undefined}
+            disabled={disabled ? true : undefined}
+            aria-label={label || 'Toggle'}
+            className="shrink-0"
+          />
+        </GlassControlBoundary>
       )}
     </div>
   );

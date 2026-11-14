@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { LgTone } from '../../types/liquidglass';
+import { GlassControlBoundary } from '../ErrorBoundary';
 import { useLiquidGlassReady } from './loader';
 
 export interface GlassButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
@@ -36,9 +37,8 @@ const FALLBACK_TONES: Record<LgTone, string> = {
 
 /**
  * React 19-safe hybrid wrapper around <lg-button>.
- * Uses a single permanent inner <span> slot so LgButton's replaceChildren()
- * never collides with React dynamic text/language/icon updates, and renders
- * an identical CSS glass fallback before lazy-load or if unsupported.
+ * Isolates React DOM keys between HTML fallback and <lg-button> and wraps the custom
+ * element inside GlassControlBoundary so any runtime error gracefully reverts to native HTML.
  */
 export const GlassButton: React.FC<GlassButtonProps> = ({
   tone = 'tinted',
@@ -66,13 +66,17 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
   React.useEffect(() => {
     if (cssOnly || !ready || failed || !lgRef.current) return;
-    const inner = lgRef.current.querySelector('.lg-button__el');
-    if (inner) {
-      if (ariaLabel) {
-        inner.setAttribute('aria-label', ariaLabel);
-      } else {
-        inner.removeAttribute('aria-label');
+    try {
+      const inner = lgRef.current.querySelector('.lg-button__el');
+      if (inner) {
+        if (ariaLabel) {
+          inner.setAttribute('aria-label', ariaLabel);
+        } else {
+          inner.removeAttribute('aria-label');
+        }
       }
+    } catch {
+      // Ignore DOM sync issues on detached custom element
     }
   }, [ariaLabel, cssOnly, ready, failed]);
 
@@ -84,72 +88,74 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     </span>
   );
 
+  const baseClasses = [
+    'inline-flex items-center justify-center rounded-full font-semibold transition-all duration-200 cursor-pointer select-none',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]',
+    'disabled:opacity-50 disabled:cursor-not-allowed',
+    SIZE_CLASSES[size],
+    FALLBACK_TONES[tone],
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const fallbackElement = href ? (
+    <a
+      key={`css-a-${href}`}
+      href={href}
+      target={target}
+      aria-label={ariaLabel}
+      onClick={onAnchorClick || (onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>)}
+      className={baseClasses}
+    >
+      {contentSlot}
+    </a>
+  ) : (
+    <button
+      key={`css-btn-${type}`}
+      type={type}
+      disabled={isDisabled}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={baseClasses}
+      {...rest}
+    >
+      {contentSlot}
+    </button>
+  );
+
   if (cssOnly || !ready || failed) {
-    const baseClasses = [
-      'inline-flex items-center justify-center rounded-full font-semibold transition-all duration-200 cursor-pointer select-none',
-      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]',
-      'disabled:opacity-50 disabled:cursor-not-allowed',
-      SIZE_CLASSES[size],
-      FALLBACK_TONES[tone],
-      className,
-    ]
-      .filter(Boolean)
-      .join(' ');
-
-    if (href) {
-      return (
-        <a
-          href={href}
-          target={target}
-          aria-label={ariaLabel}
-          onClick={onAnchorClick || (onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>)}
-          className={baseClasses}
-        >
-          {contentSlot}
-        </a>
-      );
-    }
-
-    return (
-      <button
-        type={type}
-        disabled={isDisabled}
-        aria-label={ariaLabel}
-        onClick={onClick}
-        className={baseClasses}
-        {...rest}
-      >
-        {contentSlot}
-      </button>
-    );
+    return fallbackElement;
   }
 
   return (
-    <lg-button
-      ref={lgRef as React.RefObject<never>}
-      key={`${href ?? 'btn'}-${type}`}
-      tone={tone}
-      href={href}
-      target={target}
-      type={href ? undefined : type}
-      disabled={isDisabled ? true : undefined}
-      radius={radius}
-      backdrop={backdrop}
-      aria-label={ariaLabel}
-      onClick={(e) => {
-        if (isDisabled) {
-          e.preventDefault();
-          return;
-        }
-        if (href && onAnchorClick) {
-          onAnchorClick(e);
-        } else if (onClick) {
-          onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
-        }
-      }}
-      className={`inline-flex ${className}`}
-    >
-      {contentSlot}
-    </lg-button>
+    <GlassControlBoundary fallback={fallbackElement}>
+      <lg-button
+        ref={lgRef as React.RefObject<never>}
+        key={`lg-${href ?? 'btn'}-${type}`}
+        tone={tone}
+        href={href}
+        target={target}
+        type={href ? undefined : type}
+        disabled={isDisabled ? true : undefined}
+        radius={radius}
+        backdrop={backdrop}
+        aria-label={ariaLabel}
+        onClick={(e) => {
+          if (isDisabled) {
+            e.preventDefault();
+            return;
+          }
+          if (href && onAnchorClick) {
+            onAnchorClick(e);
+          } else if (onClick) {
+            onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
+          }
+        }}
+        className={`inline-flex ${className}`}
+      >
+        {contentSlot}
+      </lg-button>
+    </GlassControlBoundary>
   );
 };

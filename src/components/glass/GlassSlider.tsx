@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { LgSliderElement } from '../../types/liquidglass';
+import { GlassControlBoundary } from '../ErrorBoundary';
 import { useLiquidGlassReady } from './loader';
 
 export interface GlassSliderProps {
@@ -17,8 +18,8 @@ export interface GlassSliderProps {
 }
 
 /**
- * React 19-safe wrapper around <lg-slider> with responsive width and
- * native <input type="range"> fallback.
+ * React 19-safe wrapper around <lg-slider> with responsive width,
+ * GlassControlBoundary protection, and native <input type="range"> fallback.
  */
 export const GlassSlider: React.FC<GlassSliderProps> = ({
   value,
@@ -63,17 +64,41 @@ export const GlassSlider: React.FC<GlassSliderProps> = ({
   useEffect(() => {
     const el = sliderRef.current;
     if (!el || !ready || failed || cssOnly) return;
-    if (String(el.getAttribute('value')) !== String(value)) {
-      el.setAttribute('value', String(value));
+    try {
+      if (String(el.getAttribute('value')) !== String(value)) {
+        el.setAttribute('value', String(value));
+      }
+    } catch {
+      // Ignore
     }
   }, [value, ready, failed, cssOnly]);
 
   useEffect(() => {
     const el = sliderRef.current;
     if (!el || !ready || failed || cssOnly || !label) return;
-    const input = el.querySelector('.lg-slider__input');
-    if (input) input.setAttribute('aria-label', label);
+    try {
+      const input = el.querySelector('.lg-slider__input');
+      if (input) input.setAttribute('aria-label', label);
+    } catch {
+      // Ignore
+    }
   }, [label, ready, failed, cssOnly]);
+
+  const fallbackSlider = (
+    <input
+      key="css-slider"
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      name={name}
+      disabled={disabled}
+      aria-label={label || 'Range slider'}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-[#D66389] bg-[#F5C9D8]/45"
+    />
+  );
 
   return (
     <div className={`w-full space-y-2 ${className}`}>
@@ -85,30 +110,22 @@ export const GlassSlider: React.FC<GlassSliderProps> = ({
       )}
 
       {cssOnly || !ready || failed ? (
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          name={name}
-          disabled={disabled}
-          aria-label={label || 'Range slider'}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer accent-[#D66389] bg-[#F5C9D8]/45"
-        />
+        fallbackSlider
       ) : (
-        <lg-slider
-          ref={sliderRef}
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          name={name}
-          disabled={disabled ? true : undefined}
-          label={label || 'Range slider'}
-          style={{ width: '100%', display: 'block' }}
-        />
+        <GlassControlBoundary fallback={fallbackSlider}>
+          <lg-slider
+            key="lg-slider"
+            ref={sliderRef}
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            name={name}
+            disabled={disabled ? true : undefined}
+            label={label || 'Range slider'}
+            style={{ width: '100%', display: 'block' }}
+          />
+        </GlassControlBoundary>
       )}
     </div>
   );

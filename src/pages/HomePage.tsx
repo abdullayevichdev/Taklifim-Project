@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, Link } from '../context/RouterContext';
-import { useLanguage, translateCategory } from '../locales';
+import { useLanguage } from '../locales';
 import { mockTemplates } from '../data/mockTemplates';
 import { api } from '../services/api';
 import { Template } from '../types';
 import { mockFaq, mockStats } from '../data/mockFaq';
-import { formatPriceUZS } from '../utils/logic';
 import { LuxuryEnvelope } from '../components/LuxuryEnvelope';
+import { TemplateCard } from '../components/TemplateCard';
 import { GlassSurface, GlassButton, GlassAccordion } from '../components/glass';
 import {
   ArrowRight,
@@ -37,7 +37,12 @@ export const HomePage: React.FC = () => {
   useEffect(() => {
     if (heroImgRef.current?.complete && heroImgRef.current.naturalWidth > 0) {
       setHeroImgLoaded(true);
+      return;
     }
+    const timer = window.setTimeout(() => {
+      setHeroImgLoaded(true);
+    }, 1800);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -407,70 +412,13 @@ export const HomePage: React.FC = () => {
           </Link>
         </div>
 
-        {/* Lightweight glass cards (.glass-card-lite): fast 8px blur desktop / 0px blur mobile, no nested blurs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredTemplates.map((template) => (
-            <div
-              key={template.id}
-              className="glass-card-lite glass-card-hover rounded-3xl overflow-hidden flex flex-col justify-between group"
-            >
-              <div>
-                <div className="relative h-64 overflow-hidden bg-[#ECE4D8]">
-                  <img
-                    src={template.previewImage}
-                    alt={template.name}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-95"
-                    loading="lazy"
-                  />
-                  <div className="absolute top-3 left-3 flex gap-1.5">
-                    {template.isPopular && (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#F5C9D8]/95 text-[#2E141E] shadow-xs border border-white/80">
-                        {t.templatesSection.popular}
-                      </span>
-                    )}
-                    {template.isNew && (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-[#B9DFFA]/95 text-[#142636] shadow-xs border border-white/80">
-                        {t.templatesSection.newBadge}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="absolute bottom-3 right-3 px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#1E1418]/85 text-white border border-white/30 tabular-nums">
-                    {formatPriceUZS(template.price, language)}
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-[#9E3E60] mb-1">
-                    {translateCategory(template.category, language)}
-                  </div>
-                  <h3 className="font-playfair text-lg font-bold text-[#1E1418] mb-1.5">{template.name}</h3>
-                  <p className="text-xs text-[#4A383F] line-clamp-2 leading-relaxed">
-                    {template.description[language] || template.description.uz}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-5 pt-0 grid grid-cols-2 gap-2 border-t border-black/5 mt-2">
-                <Link
-                  to={`/templates/${template.slug}`}
-                  className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold text-[#1E1418] bg-white/85 hover:bg-white border border-black/8 text-center transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#3B88C3] shrink-0" aria-hidden="true" />
-                  <span>{t.templatesSection.shortPreview}</span>
-                </Link>
-
-                <Link
-                  to={`/create/${template.slug}`}
-                  className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-extrabold text-[#1E1418] bg-gradient-to-r from-[#F5C9D8] to-[#B9DFFA] hover:brightness-105 text-center transition-all flex items-center justify-center gap-1 whitespace-nowrap"
-                >
-                  <span>{t.templatesSection.selectShort}</span>
-                  <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
-                </Link>
-              </div>
-            </div>
-          ))}
+        {/* Rich pastel gradient mesh behind cards */}
+        <div className="taklifim-section-mesh">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr gap-5 lg:gap-6 items-stretch relative z-10">
+            {featuredTemplates.map((template, idx) => (
+              <TemplateCard key={template.id} template={template} priority={idx < 4} />
+            ))}
+          </div>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { LgNavbarElement } from '../../types/liquidglass';
+import { GlassControlBoundary } from '../ErrorBoundary';
 import { useLiquidGlassReady } from './loader';
 
 export interface GlassNavbarItem {
@@ -43,12 +44,7 @@ function findActiveIndex(items: GlassNavbarItem[], currentPath: string): number 
 }
 
 /**
- * React 19-safe wrapper around <lg-navbar>.
- * - Routes clicks through RouterContext `onNavigate` (no full page reload).
- * - Syncs `aria-current="page"` and slides the lens via `.setCurrent(index)`
- *   on route and browser Back/Forward navigation.
- * - Calls `.refresh()` (plus rAF frame) whenever labels update (`UZ -> RU -> EN -> UZ`)
- *   so glass overlay text and lens width never clip or duplicate.
+ * React 19-safe wrapper around <lg-navbar> with GlassControlBoundary fallback.
  */
 export const GlassNavbar: React.FC<GlassNavbarProps> = ({
   items,
@@ -69,75 +65,55 @@ export const GlassNavbar: React.FC<GlassNavbarProps> = ({
     const el = navRef.current;
     if (!el || !ready || failed || cssOnly) return;
 
-    const links = Array.from(el.querySelectorAll(':scope > a, :scope > button'));
-    links.forEach((link, idx) => {
-      if (idx === activeIndex) {
-        link.setAttribute('aria-current', 'page');
-      } else {
-        link.removeAttribute('aria-current');
-      }
-    });
+    try {
+      const links = Array.from(el.querySelectorAll(':scope > a, :scope > button'));
+      links.forEach((link, idx) => {
+        if (idx === activeIndex) {
+          link.setAttribute('aria-current', 'page');
+        } else {
+          link.removeAttribute('aria-current');
+        }
+      });
 
-    if (activeIndex >= 0 && typeof el.setCurrent === 'function') {
-      el.setCurrent(activeIndex);
+      if (activeIndex >= 0 && typeof el.setCurrent === 'function') {
+        el.setCurrent(activeIndex);
+      }
+    } catch {
+      // Ignore
     }
   }, [activeIndex, structureKey, ready, failed, cssOnly]);
 
   useEffect(() => {
     const el = navRef.current;
     if (!el || !ready || failed || cssOnly) return;
-    if (typeof el.refresh === 'function') {
-      el.refresh();
-      const raf = window.requestAnimationFrame(() => {
+    let raf = 0;
+    try {
+      if (typeof el.refresh === 'function') {
         el.refresh();
-        if (activeIndex >= 0 && typeof el.setCurrent === 'function') {
-          el.setCurrent(activeIndex);
-        }
-      });
-      return () => window.cancelAnimationFrame(raf);
+        raf = window.requestAnimationFrame(() => {
+          try {
+            el.refresh();
+            if (activeIndex >= 0 && typeof el.setCurrent === 'function') {
+              el.setCurrent(activeIndex);
+            }
+          } catch {
+            // Ignore
+          }
+        });
+      }
+    } catch {
+      // Ignore
     }
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+    };
   }, [labelsKey, structureKey, activeIndex, ready, failed, cssOnly]);
 
-  if (cssOnly || !ready || failed) {
-    return (
-      <nav
-        aria-label={ariaLabel}
-        className={`taklifim-top-navbar inline-flex items-center gap-1 p-1 rounded-full glass-surface ${className}`}
-      >
-        {items.map((item, idx) => {
-          const isActive = idx === activeIndex;
-          return (
-            <a
-              key={item.to}
-              href={item.to}
-              aria-current={isActive ? 'page' : undefined}
-              onClick={(e) => {
-                e.preventDefault();
-                onNavigate(item.to);
-              }}
-              className={`inline-flex items-center gap-1.5 h-9 px-3 xl:px-3.5 rounded-full text-xs xl:text-[13px] font-medium whitespace-nowrap transition-all duration-200 ${
-                isActive
-                  ? 'bg-white text-[#1E1418] font-semibold shadow-sm'
-                  : 'text-[#5C4F48] hover:text-[#1E1418] hover:bg-white/60'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </a>
-          );
-        })}
-      </nav>
-    );
-  }
-
-  return (
-    <lg-navbar
-      key={structureKey}
-      ref={navRef}
-      tone="light"
-      radius="capsule"
+  const fallbackNav = (
+    <nav
+      key={`css-${structureKey}`}
       aria-label={ariaLabel}
-      className={`taklifim-top-navbar ${className}`}
+      className={`taklifim-top-navbar inline-flex items-center gap-1 p-1 rounded-full glass-surface ${className}`}
     >
       {items.map((item, idx) => {
         const isActive = idx === activeIndex;
@@ -150,14 +126,54 @@ export const GlassNavbar: React.FC<GlassNavbarProps> = ({
               e.preventDefault();
               onNavigate(item.to);
             }}
+            className={`inline-flex items-center gap-1.5 h-9 px-3 xl:px-3.5 rounded-full text-xs xl:text-[13px] font-medium whitespace-nowrap transition-all duration-200 ${
+              isActive
+                ? 'bg-white text-[#1E1418] font-semibold shadow-sm'
+                : 'text-[#5C4F48] hover:text-[#1E1418] hover:bg-white/60'
+            }`}
           >
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-              {item.icon}
-              <span>{item.label}</span>
-            </span>
+            {item.icon}
+            <span>{item.label}</span>
           </a>
         );
       })}
-    </lg-navbar>
+    </nav>
+  );
+
+  if (cssOnly || !ready || failed || items.length === 0) {
+    return fallbackNav;
+  }
+
+  return (
+    <GlassControlBoundary fallback={fallbackNav}>
+      <lg-navbar
+        key={`lg-${structureKey}`}
+        ref={navRef}
+        tone="light"
+        radius="capsule"
+        aria-label={ariaLabel}
+        className={`taklifim-top-navbar ${className}`}
+      >
+        {items.map((item, idx) => {
+          const isActive = idx === activeIndex;
+          return (
+            <a
+              key={item.to}
+              href={item.to}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate(item.to);
+              }}
+            >
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                {item.icon}
+                <span>{item.label}</span>
+              </span>
+            </a>
+          );
+        })}
+      </lg-navbar>
+    </GlassControlBoundary>
   );
 };

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { RouterProvider, useRouter } from './context/RouterContext';
 import { LanguageProvider, useLanguage } from './locales';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -12,21 +12,56 @@ import { Footer } from './components/Footer';
 import { ToastContainer } from './components/ToastContainer';
 import { GlassBackground } from './components/glass/GlassBackground';
 import { GlassBottomNav } from './components/glass/GlassBottomNav';
+import { ErrorBoundary, lazyWithRetry } from './components/ErrorBoundary';
 
-// Pages
+// Keep HomePage eager for instant landing page paint
 import { HomePage } from './pages/HomePage';
-import { TemplatesPage } from './pages/TemplatesPage';
-import { TemplateDetailPage } from './pages/TemplateDetailPage';
-import { BuilderPage } from './pages/BuilderPage';
-import { InvitationGuestPage } from './pages/InvitationGuestPage';
-import { PricingPage } from './pages/PricingPage';
-import { ContactPage } from './pages/ContactPage';
-import { FaqPage } from './pages/FaqPage';
-import { LegalPage } from './pages/LegalPage';
-import { AuthPages } from './pages/AuthPages';
-import { CustomerDashboard } from './pages/CustomerDashboard';
-import { MyInvitationsPage } from './pages/MyInvitationsPage';
-import { NotFoundPage } from './pages/NotFoundPage';
+
+// Lazy-load secondary routes with automatic chunk-error recovery
+const TemplatesPage = lazyWithRetry(() =>
+  import('./pages/TemplatesPage').then((m) => ({ default: m.TemplatesPage }))
+);
+const TemplateDetailPage = lazyWithRetry(() =>
+  import('./pages/TemplateDetailPage').then((m) => ({ default: m.TemplateDetailPage }))
+);
+const BuilderPage = lazyWithRetry(() =>
+  import('./pages/BuilderPage').then((m) => ({ default: m.BuilderPage }))
+);
+const InvitationGuestPage = lazyWithRetry(() =>
+  import('./pages/InvitationGuestPage').then((m) => ({ default: m.InvitationGuestPage }))
+);
+const PricingPage = lazyWithRetry(() =>
+  import('./pages/PricingPage').then((m) => ({ default: m.PricingPage }))
+);
+const ContactPage = lazyWithRetry(() =>
+  import('./pages/ContactPage').then((m) => ({ default: m.ContactPage }))
+);
+const FaqPage = lazyWithRetry(() =>
+  import('./pages/FaqPage').then((m) => ({ default: m.FaqPage }))
+);
+const LegalPage = lazyWithRetry(() =>
+  import('./pages/LegalPage').then((m) => ({ default: m.LegalPage }))
+);
+const AuthPages = lazyWithRetry(() =>
+  import('./pages/AuthPages').then((m) => ({ default: m.AuthPages }))
+);
+const CustomerDashboard = lazyWithRetry(() =>
+  import('./pages/CustomerDashboard').then((m) => ({ default: m.CustomerDashboard }))
+);
+const MyInvitationsPage = lazyWithRetry(() =>
+  import('./pages/MyInvitationsPage').then((m) => ({ default: m.MyInvitationsPage }))
+);
+const NotFoundPage = lazyWithRetry(() =>
+  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
+);
+
+const RouteLoadingFallback: React.FC = () => (
+  <div className="pt-28 pb-20 min-h-[70vh] flex items-center justify-center px-4">
+    <div className="glass-surface rounded-full p-4 shadow-sm">
+      <div className="w-7 h-7 border-[3px] border-[#E27B9B] border-t-transparent rounded-full animate-spin" />
+    </div>
+  </div>
+);
 
 // Protected Route — faqat login bo'lgan foydalanuvchilar uchun
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -55,7 +90,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const AppContent: React.FC = () => {
-  const { path } = useRouter();
+  const { path, navigate } = useRouter();
+  const { language } = useLanguage();
 
   // Determine if this is a dedicated guest-facing invitation page
   const isGuestInvitation = path.startsWith('/i/');
@@ -137,7 +173,16 @@ const AppContent: React.FC = () => {
       {!isGuestInvitation && <Header />}
 
       <main className="flex-1 relative z-10">
-        {renderCurrentPage()}
+        <ErrorBoundary
+          scope="route"
+          resetKey={path}
+          language={language}
+          onGoHome={() => navigate('/')}
+        >
+          <Suspense fallback={<RouteLoadingFallback />}>
+            {renderCurrentPage()}
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       {!isGuestInvitation && <Footer />}
@@ -150,12 +195,14 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <RouterProvider>
-          <AppContent />
-        </RouterProvider>
-      </AuthProvider>
-    </LanguageProvider>
+    <ErrorBoundary scope="app">
+      <LanguageProvider>
+        <AuthProvider>
+          <RouterProvider>
+            <AppContent />
+          </RouterProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }

@@ -122,6 +122,17 @@ export const en: typeof uz = {
     free: 'Demo Preview',
     popular: 'Popular',
     newBadge: 'New',
+    exampleBadge: 'Sample',
+    sampleDateShort: '25.10.2026 • 18:00',
+    sampleVenueShort: '«Versal» Palace',
+    sampleTypeByCat: {
+      weddings: 'Wedding Invitation',
+      engagements: 'Engagement Invitation',
+      traditional: 'Traditional Gala',
+      birthdays: 'Birthday Celebration',
+      baby_showers: 'Baby Celebration',
+      anniversaries: 'Anniversary Gala',
+    },
   },
 
   templatesPage: {

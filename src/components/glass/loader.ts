@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ToastHandle, ToastOptions } from '../../types/liquidglass';
+import { isChunkLoadError, attemptChunkErrorReloadOnce } from '../ErrorBoundary';
 
 type ComponentsModule = typeof import('../../vendor/liquidglass/components.js');
 
@@ -8,8 +9,8 @@ let loadedModule: ComponentsModule | null = null;
 
 /**
  * Dynamically loads the vendored liquidglass.dev Web Components (v1.0.0)
- * on demand so pages that do not render interactive glass web components
- * do not pay the bundle cost upfront.
+ * on demand. If loading fails (offline or stale chunk after deploy),
+ * falls back gracefully to pure CSS glass controls and reloads once on chunk errors.
  */
 export function loadLiquidGlass(): Promise<ComponentsModule | null> {
   if (typeof window === 'undefined') {
@@ -26,6 +27,9 @@ export function loadLiquidGlass(): Promise<ComponentsModule | null> {
       })
       .catch((err) => {
         console.warn('[Taklifim] Liquid Glass web components failed to load; using CSS fallback:', err);
+        if (isChunkLoadError(err)) {
+          attemptChunkErrorReloadOnce();
+        }
         return null;
       });
   }
