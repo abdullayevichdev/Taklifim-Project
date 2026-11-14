@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Sparkles } from 'lucide-react';
 
 export const Template13_RoseGoldLuxe: React.FC<TemplateRenderProps> = (props) => {
@@ -14,27 +15,26 @@ export const Template13_RoseGoldLuxe: React.FC<TemplateRenderProps> = (props) =>
   const bg = template.colorStyle.background; // #FAF5F6
 
   return (
-    <div className="w-full min-h-screen text-[#26171A] relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#26171A] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Rose Gold Foil Luxe Card */}
-        <div className="relative rounded-[36px] p-8 sm:p-12 text-center space-y-6 bg-gradient-to-b from-[#FFF5F7] to-white border-2 border-[#B76E79]/30 shadow-[0_20px_60px_rgba(183,110,121,0.2)]">
-          <div className="flex items-center justify-center gap-2 text-[#B76E79]">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-gradient-to-b from-[#FFF5F7] to-white border-2 border-[#B76E79]/30 shadow-[0_20px_60px_rgba(183,110,121,0.2)]">
+          <div className="flex items-center justify-center gap-2 text-[#B76E79] min-w-0">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span className="taklifim-tpl-eyebrow uppercase font-bold min-w-0">
               {invitation.eventType || 'ROSE GOLD LUXE'}
             </span>
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 shrink-0" />
           </div>
 
           <div className="space-y-2">
-            <h1
-              className="text-4xl sm:text-5xl font-black tracking-tight text-[#26171A]"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-[#26171A]"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="flex items-center justify-center gap-2 text-[#B76E79]">
               <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-[#B76E79] to-transparent" />
             </div>
@@ -52,7 +52,7 @@ export const Template13_RoseGoldLuxe: React.FC<TemplateRenderProps> = (props) =>
             </p>
           )}
 
-          <div className="inline-flex items-center gap-2 py-2 px-6 rounded-full bg-gradient-to-r from-[#B76E79]/15 via-[#B76E79]/25 to-[#B76E79]/15 border border-[#B76E79]/40 text-[#26171A] font-bold text-xs shadow-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#B76E79]/15 via-[#B76E79]/25 to-[#B76E79]/15 border border-[#B76E79]/40 text-[#26171A] font-bold shadow-xs">
             <span>{invitation.eventDate}</span>
             <span>•</span>
             <span>{invitation.startTime}</span>
@@ -61,8 +61,8 @@ export const Template13_RoseGoldLuxe: React.FC<TemplateRenderProps> = (props) =>
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-white/90 border border-rose-100 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-[#26171A] font-medium max-w-md mx-auto">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-rose-100 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#26171A] font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}

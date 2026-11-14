@@ -2380,7 +2380,7 @@ export const BuilderPage: React.FC = () => {
                     {/* Speaker Notch */}
                     <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-30" />
 
-                    <div className="w-full h-[620px] rounded-[36px] overflow-y-auto overflow-x-hidden pt-6 border border-black/10 select-none shadow-inner relative bg-white">
+                    <div className="w-full h-[620px] rounded-[36px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll pt-6 border border-black/10 select-none shadow-inner relative bg-white">
                       <TemplateRenderer
                         invitation={invitationState}
                         language={language}
@@ -2403,7 +2403,7 @@ export const BuilderPage: React.FC = () => {
                       <div className="w-8" />
                     </div>
 
-                    <div className="w-full h-[600px] overflow-y-auto overflow-x-hidden select-none shadow-inner relative bg-white">
+                    <div className="w-full h-[600px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll select-none shadow-inner relative bg-white">
                       <TemplateRenderer
                         invitation={invitationState}
                         language={language}
@@ -2441,7 +2441,7 @@ export const BuilderPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <GlassButton
               type="button"
-              tone="clear"
+              tone="light"
               size="sm"
               onClick={() => setShowResetModal(false)}
               className="w-full"
@@ -2451,7 +2451,7 @@ export const BuilderPage: React.FC = () => {
             <button
               type="button"
               onClick={handleStartOverConfirm}
-              className="min-h-[40px] py-2.5 px-4 rounded-full text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer"
+              className="min-h-[42px] py-2.5 px-4 rounded-full text-xs font-bold text-white bg-[#C81E4A] hover:bg-[#A6143A] shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C81E4A]"
             >
               {t.builder.startOver}
             </button>

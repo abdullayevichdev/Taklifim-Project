@@ -745,3 +745,134 @@ lg-segmented.taklifim-auth-seg .lg-seg__option {
     transition: none !important;
   }
 }
+
+/* ============================================================================
+ * Modal & Overlay Isolation + Preview Scrollbar Suppression
+ * ============================================================================ */
+html.taklifim-modal-open .taklifim-bottom-nav {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.taklifim-preview-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.taklifim-preview-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================================
+ * CSS Container Query Responsive System for All 20 Invitation Templates
+ * Ensures identical balanced framing inside 260-350px builder phone previews,
+ * real mobile phones (320-430px), tablets (768px), and desktops (1024px+).
+ * ============================================================================ */
+.taklifim-tpl-root {
+  container-type: inline-size;
+  container-name: tpl;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.taklifim-tpl-wrap {
+  width: 100%;
+  max-width: 36rem;
+  margin-inline: auto;
+  padding-block: clamp(1.5rem, 6cqw, 3rem);
+  padding-inline: clamp(0.625rem, 3.2cqw, 1rem);
+}
+
+.taklifim-tpl-hero-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: clamp(1.5rem, 6.5cqw, 3rem);
+  padding-inline: clamp(0.875rem, 5cqw, 2.5rem);
+}
+
+.taklifim-tpl-hero-card-spacious {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: clamp(1.5rem, 7cqw, 3.5rem);
+  padding-inline: clamp(0.875rem, 5.5cqw, 3rem);
+}
+
+.taklifim-tpl-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: clamp(1rem, 4.5cqw, 2rem);
+}
+
+.taklifim-tpl-eyebrow {
+  max-width: 100%;
+  text-align: center;
+  font-size: clamp(9px, 2.35cqw, 11px);
+  letter-spacing: clamp(0.11em, 0.55cqw, 0.3em);
+  line-height: 1.45;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.taklifim-tpl-fit-title {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  margin-inline: auto;
+}
+
+.taklifim-tpl-fit-title[data-force-inline="1"] > span {
+  flex-wrap: nowrap !important;
+  flex-direction: row !important;
+  width: max-content !important;
+}
+
+.taklifim-tpl-date-pill {
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  text-align: center;
+  padding-block: 0.45rem;
+  padding-inline: clamp(0.75rem, 3.5cqw, 1.5rem);
+  font-size: clamp(11px, 2.8cqw, 12px);
+}
+
+.taklifim-cq-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.125rem;
+}
+
+.taklifim-cq-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.taklifim-cq-countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.35rem, 1.6cqw, 0.75rem);
+}
+
+@container tpl (min-width: 440px) {
+  .taklifim-cq-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .taklifim-cq-row {
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+}
+

@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search, Check, AlertCircle } from 'lucide-react';
 import { useLanguage, translations } from '../locales';
 import { Language } from '../types';
+import { getPortalRoot } from '../utils/portalRoot';
 
 export interface CountryInfo {
   code: string;
@@ -90,13 +92,49 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const portalMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const numberInputRef = useRef<HTMLInputElement>(null);
 
+  const updateMenuPosition = useCallback(() => {
+    if (!dropdownRef.current) return;
+    const rect = dropdownRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 8;
+    const width = Math.min(288, vw - margin * 2);
+    const left = Math.max(margin, Math.min(rect.left, vw - width - margin));
+    const spaceBelow = vh - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUpward = spaceBelow < 200 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, Math.min(288, (openUpward ? spaceAbove : spaceBelow) - 4));
+    setMenuPos({
+      top: openUpward ? undefined : rect.bottom + 6,
+      bottom: openUpward ? vh - rect.top + 6 : undefined,
+      left,
+      width,
+      maxHeight,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (isDropdownOpen) {
+      updateMenuPosition();
+    } else {
+      setMenuPos(null);
+    }
+  }, [isDropdownOpen, updateMenuPosition]);
+
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target) &&
+        (!portalMenuRef.current || !portalMenuRef.current.contains(target))
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -109,14 +147,18 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       document.addEventListener('mousedown', handleOutsideClick);
       document.addEventListener('touchstart', handleOutsideClick);
       document.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('resize', updateMenuPosition);
+      window.addEventListener('scroll', updateMenuPosition, true);
       setTimeout(() => searchInputRef.current?.focus(), 50);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, updateMenuPosition]);
 
   const filteredCountries = useMemo(() => {
     if (!searchQuery.trim()) return COUNTRIES;
@@ -187,56 +229,71 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             <ChevronDown className={`w-3.5 h-3.5 text-[#4A383F] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#9E3E60]' : ''}`} aria-hidden="true" />
           </button>
 
-          {isDropdownOpen && (
-            <div className="absolute top-12 left-0 w-72 max-h-72 glass-surface-elevated rounded-[var(--lg-radius-lg)] shadow-2xl border border-white/95 z-[9999] overflow-hidden flex flex-col animate-fadeIn">
-              <div className="p-2.5 border-b border-black/5 bg-white/60 sticky top-0">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-[#4A383F] absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t.shared.phoneSearchPlaceholder}
-                    className="w-full pl-8 pr-3 py-1.5 bg-white/90 rounded-xl border border-black/10 text-xs text-[#1E1418] placeholder-[#7A6A63] outline-none focus:ring-2 focus:ring-[#D66389]/35 focus:border-[#D66389]/60"
-                  />
-                </div>
-              </div>
-
-              <div className="overflow-y-auto flex-1 divide-y divide-black/5">
-                {filteredCountries.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-[#4A383F]">
-                    {t.shared.phoneNotFound}
+          {isDropdownOpen &&
+            menuPos &&
+            getPortalRoot() &&
+            createPortal(
+              <div
+                ref={portalMenuRef}
+                style={{
+                  position: 'fixed',
+                  top: menuPos.top,
+                  bottom: menuPos.bottom,
+                  left: menuPos.left,
+                  width: menuPos.width,
+                  maxHeight: menuPos.maxHeight,
+                }}
+                className="glass-surface-elevated rounded-[var(--lg-radius-lg)] shadow-2xl border border-white/95 z-[9500] overflow-hidden flex flex-col animate-fadeIn"
+              >
+                <div className="p-2.5 border-b border-black/5 bg-white/60 sticky top-0">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-[#4A383F] absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={t.shared.phoneSearchPlaceholder}
+                      className="w-full pl-8 pr-3 py-1.5 bg-white/90 rounded-xl border border-black/10 text-xs text-[#1E1418] placeholder-[#7A6A63] outline-none focus:ring-2 focus:ring-[#D66389]/35 focus:border-[#D66389]/60"
+                    />
                   </div>
-                ) : (
-                  filteredCountries.map((c) => {
-                    const isSelected = c.code === selectedCountry.code && c.dialCode === selectedCountry.dialCode;
-                    return (
-                      <button
-                        key={`${c.code}-${c.dialCode}`}
-                        type="button"
-                        onClick={() => handleCountrySelect(c)}
-                        className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between hover:bg-white/80 transition-colors cursor-pointer ${
-                          isSelected ? 'bg-rose-50/90 text-[#9E3E60] font-bold' : 'text-[#1E1418]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="inline-flex items-center justify-center w-6 py-0.5 rounded bg-black/5 text-[9px] font-extrabold text-[#1E1418] shrink-0">
-                            {c.code}
-                          </span>
-                          <span className="truncate">{c.names[activeLang]}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                          <span className="font-mono tabular-nums text-xs text-[#4A383F] font-semibold">{c.dialCode}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#9E3E60]" aria-hidden="true" />}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
+                </div>
+
+                <div className="overflow-y-auto flex-1 divide-y divide-black/5">
+                  {filteredCountries.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-[#4A383F]">
+                      {t.shared.phoneNotFound}
+                    </div>
+                  ) : (
+                    filteredCountries.map((c) => {
+                      const isSelected = c.code === selectedCountry.code && c.dialCode === selectedCountry.dialCode;
+                      return (
+                        <button
+                          key={`${c.code}-${c.dialCode}`}
+                          type="button"
+                          onClick={() => handleCountrySelect(c)}
+                          className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between hover:bg-white/80 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-rose-50/90 text-[#9E3E60] font-bold' : 'text-[#1E1418]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="inline-flex items-center justify-center w-6 py-0.5 rounded bg-black/5 text-[9px] font-extrabold text-[#1E1418] shrink-0">
+                              {c.code}
+                            </span>
+                            <span className="truncate">{c.names[activeLang]}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                            <span className="font-mono tabular-nums text-xs text-[#4A383F] font-semibold">{c.dialCode}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#9E3E60]" aria-hidden="true" />}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>,
+              getPortalRoot()!
+            )}
         </div>
 
         <input

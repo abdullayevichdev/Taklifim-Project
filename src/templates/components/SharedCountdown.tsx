@@ -70,7 +70,7 @@ export const SharedCountdown: React.FC<SharedCountdownProps> = ({
         {labels.title}
       </div>
 
-      <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-sm mx-auto">
+      <div className="taklifim-cq-countdown-grid max-w-sm mx-auto">
         {[
           { val: timeLeft.days, label: labels.days },
           { val: timeLeft.hours, label: labels.hours },
@@ -79,16 +79,16 @@ export const SharedCountdown: React.FC<SharedCountdownProps> = ({
         ].map((item, idx) => (
           <div
             key={idx}
-            className={`p-2.5 sm:p-3 rounded-2xl flex flex-col items-center justify-center transition-all ${
+            className={`p-2 sm:p-3 rounded-2xl min-w-0 flex flex-col items-center justify-center transition-all ${
               isDarkTheme
                 ? 'bg-white/5 border border-white/10 shadow-lg text-white'
                 : 'bg-white/85 border border-black/5 shadow-xs text-[#231E1B]'
             }`}
           >
-            <span className="font-playfair text-xl sm:text-2xl font-black tabular-nums" style={{ color: primaryColor }}>
+            <span className="font-playfair text-lg sm:text-2xl font-black tabular-nums leading-none" style={{ color: primaryColor }}>
               {String(item.val).padStart(2, '0')}
             </span>
-            <span className={`text-[9px] sm:text-[10px] uppercase font-bold tracking-wider mt-0.5 ${isDarkTheme ? 'text-white/60' : 'text-[#7A6A63]'}`}>
+            <span className={`text-[8.5px] sm:text-[10px] uppercase font-bold tracking-wider mt-1 truncate max-w-full ${isDarkTheme ? 'text-white/60' : 'text-[#7A6A63]'}`}>
               {item.label}
             </span>
           </div>

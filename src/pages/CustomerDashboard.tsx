@@ -924,7 +924,7 @@ export const CustomerDashboard: React.FC = () => {
           closeLabel={t.common.close}
         >
           <div className="space-y-4 text-center pt-1">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 mx-auto flex items-center justify-center text-rose-600">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 mx-auto flex items-center justify-center text-[#C81E4A]">
               <Trash2 className="w-6 h-6" aria-hidden="true" />
             </div>
             <h3 className="font-playfair text-lg font-bold text-[#1E1418]">
@@ -936,7 +936,7 @@ export const CustomerDashboard: React.FC = () => {
             <div className="grid grid-cols-2 gap-2.5 pt-2">
               <GlassButton
                 type="button"
-                tone="clear"
+                tone="light"
                 size="sm"
                 onClick={() => setInvitationToDelete(null)}
                 className="w-full"
@@ -946,7 +946,7 @@ export const CustomerDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={handleDeleteConfirm}
-                className="min-h-[40px] py-2.5 px-4 rounded-full bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
+                className="min-h-[42px] py-2.5 px-4 rounded-full bg-[#C81E4A] hover:bg-[#A6143A] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C81E4A]"
               >
                 {t.dashboard.confirmDeleteBtn}
               </button>
@@ -963,7 +963,7 @@ export const CustomerDashboard: React.FC = () => {
           closeLabel={t.common.close}
         >
           <div className="space-y-4 text-center pt-1">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 mx-auto flex items-center justify-center text-rose-600">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 mx-auto flex items-center justify-center text-[#C81E4A]">
               <Trash2 className="w-6 h-6" aria-hidden="true" />
             </div>
             <h3 className="font-playfair text-lg font-bold text-[#1E1418]">
@@ -975,7 +975,7 @@ export const CustomerDashboard: React.FC = () => {
             <div className="grid grid-cols-2 gap-2.5 pt-2">
               <GlassButton
                 type="button"
-                tone="clear"
+                tone="light"
                 size="sm"
                 onClick={() => setGuestToDelete(null)}
                 className="w-full"
@@ -985,7 +985,7 @@ export const CustomerDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={handleDeleteGuestConfirm}
-                className="min-h-[40px] py-2.5 px-4 rounded-full bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer"
+                className="min-h-[42px] py-2.5 px-4 rounded-full bg-[#C81E4A] hover:bg-[#A6143A] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C81E4A]"
               >
                 {t.dashboard.confirmDeleteBtn}
               </button>

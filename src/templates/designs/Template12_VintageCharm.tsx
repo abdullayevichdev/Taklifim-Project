@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Mail, Stamp } from 'lucide-react';
 
 export const Template12_VintageCharm: React.FC<TemplateRenderProps> = (props) => {
@@ -14,30 +15,29 @@ export const Template12_VintageCharm: React.FC<TemplateRenderProps> = (props) =>
   const bg = template.colorStyle.background; // #FAF6F2
 
   return (
-    <div className="w-full min-h-screen text-[#3D291E] relative overflow-hidden font-serif" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#3D291E] relative overflow-hidden font-serif" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Vintage Parchment Telegram Card */}
-        <div className="relative rounded-2xl p-8 sm:p-12 text-center space-y-6 bg-[#F5EFE6] border-2 border-[#8A5D45]/30 shadow-lg relative">
+        <div className="taklifim-tpl-hero-card relative rounded-2xl text-center space-y-6 bg-[#F5EFE6] border-2 border-[#8A5D45]/30 shadow-lg">
           {/* Post Stamp Header */}
-          <div className="flex items-center justify-between border-b border-[#8A5D45]/20 pb-3">
-            <span className="text-[10px] tracking-widest uppercase font-mono text-[#8A5D45]">
+          <div className="flex items-center justify-between gap-2 border-b border-[#8A5D45]/20 pb-3">
+            <span className="text-[clamp(9px,2.4cqw,10px)] tracking-widest uppercase font-mono text-[#8A5D45] text-left">
               PAR AVION • TELEGRAMME
             </span>
-            <div className="w-9 h-11 border-2 border-dashed border-[#8A5D45]/50 rounded flex items-center justify-center text-[10px] text-[#8A5D45]">
+            <div className="w-9 h-11 shrink-0 border-2 border-dashed border-[#8A5D45]/50 rounded flex items-center justify-center text-[10px] text-[#8A5D45]">
               💌
             </div>
           </div>
 
           <div className="space-y-2 pt-2">
-            <h1
-              className="text-3xl sm:text-5xl font-black tracking-tight text-[#3D291E]"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-[#3D291E]"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
-            <div className="text-[11px] font-mono tracking-widest text-[#8A5D45] uppercase">
+            />
+            <div className="taklifim-tpl-eyebrow font-mono text-[#8A5D45] uppercase">
               {invitation.eventType || 'NOHUDIY AN’ANAVIY TO‘Y'}
             </div>
           </div>
@@ -54,15 +54,15 @@ export const Template12_VintageCharm: React.FC<TemplateRenderProps> = (props) =>
             </p>
           )}
 
-          <div className="inline-block py-1.5 px-6 rounded border border-[#8A5D45] font-mono font-bold text-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-1.5 rounded border border-[#8A5D45] font-mono font-bold">
             DATE: {invitation.eventDate} • TIME: {invitation.startTime}
           </div>
         </div>
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
-          <div className="rounded-2xl p-6 sm:p-8 text-center space-y-3 bg-[#F5EFE6] border border-[#8A5D45]/20 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-[#3D291E] font-medium max-w-md mx-auto font-sans">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-2xl text-center space-y-3 bg-[#F5EFE6] border border-[#8A5D45]/20 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#3D291E] font-medium max-w-md mx-auto font-sans break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}

@@ -58,7 +58,7 @@ export const SharedRSVP: React.FC<SharedRSVPProps> = ({
 
   return (
     <div
-      className={`rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl backdrop-blur-md border ${
+      className={`rounded-3xl taklifim-tpl-card space-y-6 shadow-xl backdrop-blur-md border ${
         isDarkTheme
           ? 'bg-white/5 border-white/10 text-white'
           : 'bg-white/90 border-black/5 text-[#231E1B]'
@@ -93,7 +93,7 @@ export const SharedRSVP: React.FC<SharedRSVPProps> = ({
             <button
               type="button"
               onClick={() => setAttending(true)}
-              className={`p-3 rounded-2xl font-bold flex items-center justify-center gap-2 border transition-all ${
+              className={`p-2.5 sm:p-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 text-center leading-tight min-h-[44px] border transition-all ${
                 attending
                   ? 'bg-emerald-600 text-white shadow-sm border-emerald-600'
                   : isDarkTheme
@@ -101,13 +101,13 @@ export const SharedRSVP: React.FC<SharedRSVPProps> = ({
                   : 'bg-white border-black/10 text-[#5C4F48]'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{rsvpT.yesAttending}</span>
             </button>
             <button
               type="button"
               onClick={() => setAttending(false)}
-              className={`p-3 rounded-2xl font-bold flex items-center justify-center gap-2 border transition-all ${
+              className={`p-2.5 sm:p-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 text-center leading-tight min-h-[44px] border transition-all ${
                 !attending
                   ? 'bg-rose-600 text-white shadow-sm border-rose-600'
                   : isDarkTheme
@@ -147,7 +147,7 @@ export const SharedRSVP: React.FC<SharedRSVPProps> = ({
           </div>
 
           {attending && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="taklifim-cq-grid-2 pt-1">
               <div>
                 <label className="font-bold block mb-1">{rsvpT.guestCountLabel}</label>
                 <select

@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Flower2, Heart } from 'lucide-react';
 
 export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) => {
@@ -14,7 +15,7 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
   const bg = template.colorStyle.background; // #FAF6F0
 
   return (
-    <div className="w-full min-h-screen text-[#231E1B] relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#231E1B] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
       {/* Floating Floral Petal Glow Accents */}
@@ -22,30 +23,29 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
       <div className="absolute bottom-20 right-1/4 w-80 h-80 rounded-full bg-gradient-to-tl from-[#FFF5F8] via-[#F5C9D8]/30 to-transparent blur-3xl pointer-events-none" />
 
       {/* Main Container */}
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Romantic White & Blush Floral Card */}
-        <div className="relative rounded-[36px] p-8 sm:p-12 text-center space-y-6 bg-white/90 backdrop-blur-xl border border-white shadow-[0_20px_60px_rgba(217,101,139,0.15)]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-white/90 backdrop-blur-xl border border-white shadow-[0_20px_60px_rgba(217,101,139,0.15)]">
           {/* Top Delicate Floral Blossom Wreath */}
           <div className="flex items-center justify-center gap-2 text-[#D9658B]">
-            <Flower2 className="w-5 h-5 animate-pulse" />
-            <span className="font-script text-2xl sm:text-3xl font-bold tracking-wide text-[#D9658B]">
+            <Flower2 className="w-5 h-5 shrink-0 animate-pulse" />
+            <span className="font-script text-[clamp(1.25rem,6cqw,1.875rem)] leading-tight font-bold tracking-wide text-[#D9658B]">
               Oq gullar jilosi
             </span>
-            <Flower2 className="w-5 h-5 animate-pulse" />
+            <Flower2 className="w-5 h-5 shrink-0 animate-pulse" />
           </div>
 
-          <div className="text-[10px] tracking-[0.25em] uppercase font-bold text-[#8A7C74]">
+          <div className="taklifim-tpl-eyebrow uppercase font-bold text-[#8A7C74]">
             {invitation.eventType || 'VISOL OQSHOMI'}
           </div>
 
           {/* Couple Names */}
           <div className="space-y-2">
-            <h1
-              className="text-4xl sm:text-5xl font-black tracking-tight text-[#1E1418]"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-[#1E1418]"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="flex items-center justify-center gap-2 text-rose-300">
               <span>🌸</span>
               <div className="w-20 h-px bg-rose-200" />
@@ -68,7 +68,7 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
           )}
 
           {/* Date Badge */}
-          <div className="inline-flex items-center gap-2 py-2 px-5 rounded-full bg-gradient-to-r from-[#FFF5F8] to-[#F5C9D8]/30 border border-[#F5C9D8] text-[#1E1418] font-bold text-xs shadow-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#FFF5F8] to-[#F5C9D8]/30 border border-[#F5C9D8] text-[#1E1418] font-bold shadow-xs">
             <span>{invitation.eventDate}</span>
             <span>•</span>
             <span>{invitation.startTime}</span>
@@ -86,9 +86,9 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
 
         {/* 2. INVITATION MESSAGE */}
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-white/90 border border-white shadow-sm">
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-white shadow-sm">
             <Heart className="w-5 h-5 text-[#D9658B] fill-current mx-auto opacity-70" />
-            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto break-words">
               "{invitation.invitationMessage}"
             </p>
           </div>

@@ -1,18 +1,23 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { GlassSurface } from './glass';
+import { getPortalRoot } from '../utils/portalRoot';
 
 export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useAuth();
 
   if (toasts.length === 0) return null;
 
-  return (
+  const portalRoot = getPortalRoot();
+  if (!portalRoot) return null;
+
+  return createPortal(
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-24 lg:bottom-6 right-4 sm:right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+      className="fixed bottom-24 lg:bottom-6 right-4 sm:right-6 left-4 sm:left-auto z-[10500] flex flex-col gap-2 sm:max-w-sm sm:w-full pointer-events-none"
     >
       {toasts.map((toast) => (
         <GlassSurface
@@ -45,6 +50,7 @@ export const ToastContainer: React.FC = () => {
           </button>
         </GlassSurface>
       ))}
-    </div>
+    </div>,
+    portalRoot
   );
 };

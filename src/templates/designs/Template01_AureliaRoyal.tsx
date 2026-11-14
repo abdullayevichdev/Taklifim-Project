@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 
 export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) => {
   const { invitation, template, language, isPreview, onRSVPSubmit, onWishSubmit, wishesList, interactiveMap, musicPlayer, headingFont } = props;
@@ -13,7 +14,7 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
   const bg = template.colorStyle.background; // #FAF6F0
 
   return (
-    <div className="w-full min-h-screen text-[#2A2420] relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#2A2420] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {/* Floating music player if provided */}
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
@@ -23,10 +24,10 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
       <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-gradient-to-tl from-[#B48B47]/20 to-transparent blur-3xl pointer-events-none" />
 
       {/* Main Container */}
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Royal Double-Border Golden Crest Card */}
         <div className="relative rounded-[32px] p-2 bg-gradient-to-b from-[#E6D2B5] via-[#B48B47] to-[#E6D2B5] shadow-2xl">
-          <div className="rounded-[28px] p-6 sm:p-10 text-center space-y-6 bg-[#FAF6F0] relative overflow-hidden border border-white">
+          <div className="rounded-[28px] taklifim-tpl-hero-card text-center space-y-6 bg-[#FAF6F0] relative overflow-hidden border border-white">
             {/* Top Royal Crest */}
             <div className="flex flex-col items-center justify-center space-y-2">
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#B48B47] to-[#F3E7D3] p-0.5 shadow-md">
@@ -34,19 +35,18 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
                   ⚜️
                 </div>
               </div>
-              <div className="text-[10px] tracking-[0.3em] uppercase font-black text-[#B48B47]">
+              <div className="taklifim-tpl-eyebrow uppercase font-black text-[#B48B47]">
                 {invitation.eventType || 'QIROLLIK TO‘YI'}
               </div>
             </div>
 
             {/* Couple Names in Golden Royal Serif */}
             <div className="space-y-2">
-              <h1
-                className="text-3xl sm:text-5xl font-black tracking-tight text-[#2A2420] drop-shadow-xs"
+              <TemplateFitTitle
+                text={invitation.hostNames}
+                className="font-black tracking-tight text-[#2A2420] drop-shadow-xs"
                 style={{ fontFamily: headingFont || 'Playfair Display' }}
-              >
-                {invitation.hostNames}
-              </h1>
+              />
               <div className="flex items-center justify-center gap-3">
                 <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#B48B47]" />
                 <span className="text-[#B48B47] text-xs">✦</span>
@@ -69,7 +69,7 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
             )}
 
             {/* Date Badge */}
-            <div className="inline-flex items-center gap-2 py-2 px-6 rounded-full bg-gradient-to-r from-[#B48B47]/15 via-[#B48B47]/25 to-[#B48B47]/15 border border-[#B48B47]/40 text-[#2A2420] font-bold text-xs shadow-xs">
+            <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#B48B47]/15 via-[#B48B47]/25 to-[#B48B47]/15 border border-[#B48B47]/40 text-[#2A2420] font-bold shadow-xs">
               <span>{invitation.eventDate}</span>
               <span>•</span>
               <span>{invitation.startTime}</span>
@@ -88,9 +88,9 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
 
         {/* 2. INVITATION MESSAGE */}
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-white/90 border border-[#B48B47]/20 shadow-md">
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-[#B48B47]/20 shadow-md">
             <span className="text-xl">💌</span>
-            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto break-words">
               "{invitation.invitationMessage}"
             </p>
           </div>

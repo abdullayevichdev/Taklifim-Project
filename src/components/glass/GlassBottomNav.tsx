@@ -62,7 +62,7 @@ export const GlassBottomNav: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-0 inset-x-0 z-50 px-2 sm:px-4 pointer-events-none lg:hidden"
+      className="taklifim-bottom-nav fixed bottom-0 inset-x-0 z-50 px-2 sm:px-4 pointer-events-none lg:hidden transition-opacity duration-200"
       style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
     >
       <nav

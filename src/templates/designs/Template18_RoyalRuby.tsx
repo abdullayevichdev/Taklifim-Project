@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Crown, Sparkles } from 'lucide-react';
 
 export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
@@ -14,27 +15,26 @@ export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
   const bg = template.colorStyle.background; // #23060E
 
   return (
-    <div className="w-full min-h-screen text-white relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-white relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Deep Velvet Ruby Baroque Card */}
-        <div className="relative rounded-[36px] p-8 sm:p-12 text-center space-y-6 bg-[#360B18]/90 backdrop-blur-xl border-2 border-amber-400/40 shadow-[0_25px_80px_rgba(0,0,0,0.8)]">
-          <div className="flex items-center justify-center gap-2 text-amber-300">
-            <Crown className="w-5 h-5" />
-            <span className="text-[10px] tracking-[0.35em] uppercase font-bold text-amber-300">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-[#360B18]/90 backdrop-blur-xl border-2 border-amber-400/40 shadow-[0_25px_80px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center justify-center gap-2 text-amber-300 min-w-0">
+            <Crown className="w-5 h-5 shrink-0" />
+            <span className="taklifim-tpl-eyebrow uppercase font-bold text-amber-300 min-w-0">
               {invitation.eventType || 'ROYAL RUBY GALA'}
             </span>
-            <Crown className="w-5 h-5" />
+            <Crown className="w-5 h-5 shrink-0" />
           </div>
 
           <div className="space-y-2">
-            <h1
-              className="text-4xl sm:text-5xl font-black tracking-tight text-white drop-shadow-md"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-white drop-shadow-md"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="flex items-center justify-center gap-2 text-amber-400">
               <span>⚜️</span>
               <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
@@ -54,7 +54,7 @@ export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
             </p>
           )}
 
-          <div className="inline-flex items-center gap-2 py-2 px-6 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 font-bold text-xs shadow-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 font-bold shadow-xs">
             <span>{invitation.eventDate}</span>
             <span>•</span>
             <span>{invitation.startTime}</span>
@@ -63,8 +63,8 @@ export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor="#D4AF37" isDarkTheme={true} variant="ruby" />
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-[#360B18]/85 border border-white/10 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-white font-medium max-w-md mx-auto">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-[#360B18]/85 border border-white/10 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-white font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor="#D4AF37" isDarkTheme={true} />}

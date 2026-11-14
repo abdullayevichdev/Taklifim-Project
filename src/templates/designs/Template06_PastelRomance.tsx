@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Heart } from 'lucide-react';
 
 export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) => {
@@ -14,25 +15,24 @@ export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) =
   const bg = template.colorStyle.background; // #FCF8FA
 
   return (
-    <div className="w-full min-h-screen text-[#2D1B22] relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#2D1B22] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Pastel Watercolor Dream Card */}
-        <div className="relative rounded-[36px] p-8 sm:p-12 text-center space-y-6 bg-gradient-to-b from-[#FFF0F5] to-white/90 border border-pink-100 shadow-[0_20px_50px_rgba(226,123,155,0.18)]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-gradient-to-b from-[#FFF0F5] to-white/90 border border-pink-100 shadow-[0_20px_50px_rgba(226,123,155,0.18)]">
           <div className="flex items-center justify-center gap-2 text-[#E27B9B]">
-            <Heart className="w-4 h-4 fill-current opacity-80" />
-            <span className="font-script text-2xl text-[#E27B9B]">Pastel sevgi qissasi</span>
-            <Heart className="w-4 h-4 fill-current opacity-80" />
+            <Heart className="w-4 h-4 shrink-0 fill-current opacity-80" />
+            <span className="font-script text-[clamp(1.25rem,5.5cqw,1.65rem)] leading-tight text-[#E27B9B]">Pastel sevgi qissasi</span>
+            <Heart className="w-4 h-4 shrink-0 fill-current opacity-80" />
           </div>
 
           <div className="space-y-2">
-            <h1
-              className="text-4xl sm:text-5xl font-black tracking-tight text-[#2D1B22]"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-[#2D1B22]"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-[#E27B9B] to-transparent mx-auto" />
           </div>
 
@@ -48,7 +48,7 @@ export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) =
             </p>
           )}
 
-          <div className="inline-flex items-center gap-2 py-2 px-6 rounded-full bg-pink-50 border border-pink-200 text-[#2D1B22] font-bold text-xs shadow-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-pink-50 border border-pink-200 text-[#2D1B22] font-bold shadow-xs">
             <span>{invitation.eventDate}</span>
             <span>•</span>
             <span>{invitation.startTime}</span>
@@ -57,8 +57,8 @@ export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) =
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-white/90 border border-pink-100 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-pink-100 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}

@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 
 export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) => {
   const { invitation, template, language, onRSVPSubmit, onWishSubmit, wishesList, interactiveMap, musicPlayer, headingFont } = props;
@@ -13,23 +14,23 @@ export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) =>
   const bg = template.colorStyle.background; // #F8FAFC
 
   return (
-    <div className="w-full min-h-screen text-[#0F172A] relative overflow-hidden font-sans" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#0F172A] relative overflow-hidden font-sans" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-16 relative z-10 space-y-14">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-14">
         {/* HERO: Editorial Minimalist Oyster Pearl Card */}
-        <div className="relative rounded-3xl p-8 sm:p-14 text-center space-y-8 bg-white border border-slate-200 shadow-sm">
-          <div className="text-[10px] tracking-[0.4em] uppercase font-bold text-slate-400">
+        <div className="taklifim-tpl-hero-card-spacious relative rounded-3xl text-center space-y-8 bg-white border border-slate-200 shadow-sm">
+          <div className="taklifim-tpl-eyebrow uppercase font-bold text-slate-400">
             {invitation.eventType || 'SAVE THE DATE'}
           </div>
 
           <div className="space-y-4">
-            <h1
-              className="text-4xl sm:text-6xl font-light tracking-tight text-slate-900 uppercase"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              maxFontSize={56}
+              className="font-light tracking-tight text-slate-900 uppercase"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="w-8 h-px bg-slate-300 mx-auto" />
           </div>
 
@@ -45,15 +46,15 @@ export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) =>
             </p>
           )}
 
-          <div className="text-xs uppercase tracking-widest font-semibold text-slate-600">
+          <div className="text-[clamp(11px,2.8cqw,12px)] uppercase tracking-widest font-semibold text-slate-600 text-center break-words">
             {invitation.eventDate} — {invitation.startTime}
           </div>
         </div>
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
-          <div className="rounded-2xl p-8 text-center space-y-3 bg-white border border-slate-100 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-slate-600 font-light max-w-md mx-auto">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-2xl text-center space-y-3 bg-white border border-slate-100 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-600 font-light max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}

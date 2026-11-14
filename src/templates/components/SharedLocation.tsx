@@ -111,13 +111,13 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
 
   return (
     <div
-      className={`rounded-3xl p-6 sm:p-8 space-y-6 shadow-lg backdrop-blur-md border ${
+      className={`rounded-3xl taklifim-tpl-card space-y-6 shadow-lg backdrop-blur-md border ${
         isDarkTheme
           ? 'bg-white/5 border-white/10 text-white'
           : 'bg-white/85 border-black/5 text-[#231E1B]'
       }`}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-left">
+      <div className="taklifim-cq-grid-2 text-left">
         {/* Date & Time */}
         <div className="flex items-start gap-3.5">
           <div
@@ -178,27 +178,27 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
       {interactiveMap && <div className="pt-2">{interactiveMap}</div>}
 
       {/* Action Buttons */}
-      <div className="pt-2 flex flex-col sm:flex-row gap-3">
+      <div className="pt-2 taklifim-cq-row">
         <a
           href={resolvedMapUrl}
           target="_blank"
           rel="noreferrer"
-          className="flex-1 py-3 px-4 rounded-2xl text-xs font-bold text-white flex items-center justify-center gap-2 shadow-xs hover:opacity-95 transition-opacity"
+          className="flex-1 py-3 px-4 rounded-2xl text-xs font-bold text-white flex items-center justify-center gap-2 text-center shadow-xs hover:opacity-95 transition-opacity"
           style={{ backgroundColor: primaryColor }}
         >
-          <MapPin className="w-4 h-4" />
+          <MapPin className="w-4 h-4 shrink-0" />
           <span>{labels.openMap}</span>
-          <ExternalLink className="w-3.5 h-3.5 ml-1" />
+          <ExternalLink className="w-3.5 h-3.5 ml-1 shrink-0" />
         </a>
         <button
           onClick={handleSaveToCalendar}
-          className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold border flex items-center justify-center gap-2 shadow-xs transition-all ${
+          className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold border flex items-center justify-center gap-2 text-center shadow-xs transition-all ${
             isDarkTheme
               ? 'bg-white/10 hover:bg-white/20 text-white border-white/15'
               : 'bg-white hover:bg-black/5 text-[#231E1B] border-black/10'
           }`}
         >
-          <Calendar className="w-4 h-4" style={{ color: primaryColor }} />
+          <Calendar className="w-4 h-4 shrink-0" style={{ color: primaryColor }} />
           <span>{labels.calendar}</span>
         </button>
       </div>

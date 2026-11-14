@@ -6,6 +6,7 @@ import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
 import { SharedRSVP } from '../components/SharedRSVP';
 import { SharedWishes } from '../components/SharedWishes';
+import { TemplateFitTitle } from '../components/TemplateFitTitle';
 import { Moon, Sparkles } from 'lucide-react';
 
 export const Template15_CelestialDream: React.FC<TemplateRenderProps> = (props) => {
@@ -14,27 +15,26 @@ export const Template15_CelestialDream: React.FC<TemplateRenderProps> = (props) 
   const bg = template.colorStyle.background; // #FBF9FD
 
   return (
-    <div className="w-full min-h-screen text-[#261E38] relative overflow-hidden" style={{ backgroundColor: bg }}>
+    <div className="taklifim-tpl-root w-full min-h-screen text-[#261E38] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      <div className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-12">
+      <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Celestial Lavender Starlight Card */}
-        <div className="relative rounded-[36px] p-8 sm:p-12 text-center space-y-6 bg-gradient-to-b from-[#F5F0FF] to-white border-2 border-[#6B5B95]/20 shadow-[0_20px_60px_rgba(107,91,149,0.18)]">
-          <div className="flex items-center justify-center gap-2 text-[#6B5B95]">
-            <Moon className="w-4 h-4 text-purple-600" />
-            <span className="text-[10px] tracking-[0.3em] uppercase font-bold text-[#6B5B95]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-gradient-to-b from-[#F5F0FF] to-white border-2 border-[#6B5B95]/20 shadow-[0_20px_60px_rgba(107,91,149,0.18)]">
+          <div className="flex items-center justify-center gap-2 text-[#6B5B95] min-w-0">
+            <Moon className="w-4 h-4 shrink-0 text-purple-600" />
+            <span className="taklifim-tpl-eyebrow uppercase font-bold text-[#6B5B95] min-w-0">
               {invitation.eventType || 'CELESTIAL DREAM'}
             </span>
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
           </div>
 
           <div className="space-y-2">
-            <h1
-              className="text-4xl sm:text-5xl font-black tracking-tight text-[#261E38]"
+            <TemplateFitTitle
+              text={invitation.hostNames}
+              className="font-black tracking-tight text-[#261E38]"
               style={{ fontFamily: headingFont || 'Playfair Display' }}
-            >
-              {invitation.hostNames}
-            </h1>
+            />
             <div className="flex items-center justify-center gap-2 text-[#6B5B95]">
               <span>✨</span>
               <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-[#6B5B95] to-transparent" />
@@ -54,7 +54,7 @@ export const Template15_CelestialDream: React.FC<TemplateRenderProps> = (props) 
             </p>
           )}
 
-          <div className="inline-flex items-center gap-2 py-2 px-6 rounded-full bg-[#EFE9FA] border border-[#6B5B95]/30 text-[#261E38] font-bold text-xs shadow-xs">
+          <div className="taklifim-tpl-date-pill inline-flex items-center gap-2 rounded-full bg-[#EFE9FA] border border-[#6B5B95]/30 text-[#261E38] font-bold shadow-xs">
             <span>{invitation.eventDate}</span>
             <span>•</span>
             <span>{invitation.startTime}</span>
@@ -63,8 +63,8 @@ export const Template15_CelestialDream: React.FC<TemplateRenderProps> = (props) 
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
-          <div className="rounded-3xl p-6 sm:p-8 text-center space-y-3 bg-white/90 border border-purple-100 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-[#261E38] font-medium max-w-md mx-auto">"{invitation.invitationMessage}"</p>
+          <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-purple-100 shadow-xs">
+            <p className="text-xs sm:text-sm leading-relaxed text-[#261E38] font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}
