@@ -37,6 +37,12 @@
   --lg-focus: #C64873;
   --lg-toast-top: 20px;
 
+  /* Dynamic Fixed Chrome Spacing Tokens (updated live via ResizeObserver) */
+  --header-h: 64px;
+  --header-visible-h: 64px;
+  --header-sticky-top: calc(var(--header-visible-h, 64px) + 8px);
+  --bottom-nav-h: 76px;
+
   /* Taklifim Custom Glass Tokens */
   --glass-blur-subtle: 12px;
   --glass-blur-base: 18px;
@@ -434,7 +440,6 @@ lg-button,
 lg-navbar,
 lg-switch,
 lg-slider,
-lg-segmented,
 lg-toast {
   transform: none;
   font-family: var(--font-primary);
@@ -442,28 +447,13 @@ lg-toast {
 }
 
 lg-button,
-lg-switch,
-lg-segmented {
+lg-switch {
   touch-action: manipulation;
 }
 
 lg-slider,
 .lg-slider__input {
   touch-action: pan-y;
-}
-
-@media (max-width: 639px) {
-  lg-segmented {
-    max-width: 100%;
-  }
-
-  lg-segmented .lg-seg__option {
-    min-width: 0;
-    padding: 0 10px;
-    font-size: 12.5px;
-    min-height: 34px;
-    gap: 5px;
-  }
 }
 
 lg-button .lg-button__el {
@@ -567,18 +557,29 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   }
 }
 
-/* Compact segmented controls inside Auth / Legal cards for clean fit down to 320px */
-lg-segmented.taklifim-auth-seg .lg-seg__option {
-  padding: 0 9px;
-  font-size: 12px;
-  gap: 5px;
-  min-width: 0;
+/* Pure-CSS GlassSegmented track & indicator */
+.taklifim-seg-track {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
-@media (min-width: 480px) {
-  lg-segmented.taklifim-auth-seg .lg-seg__option {
-    padding: 0 12px;
-    font-size: 12.5px;
+.taklifim-seg-track::-webkit-scrollbar {
+  display: none;
+}
+
+.taklifim-seg-indicator {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taklifim-seg-indicator {
+    transition: none !important;
   }
 }
 
@@ -747,19 +748,35 @@ lg-segmented.taklifim-auth-seg .lg-seg__option {
 }
 
 /* ============================================================================
- * Modal & Overlay Isolation + Preview Scrollbar Suppression
+ * Page Viewport Offsets, Modal Isolation & Horizontal Scrollbar Suppression
  * ============================================================================ */
+.taklifim-page-top {
+  padding-top: calc(var(--header-h, 64px) + 12px);
+}
+
+.taklifim-page-bottom {
+  padding-bottom: calc(var(--bottom-nav-h, 76px) + env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+@media (min-width: 1024px) {
+  .taklifim-page-bottom {
+    padding-bottom: 5rem;
+  }
+}
+
 html.taklifim-modal-open .taklifim-bottom-nav {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
 
+.no-scrollbar,
 .taklifim-preview-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
+.no-scrollbar::-webkit-scrollbar,
 .taklifim-preview-scroll::-webkit-scrollbar {
   display: none;
 }

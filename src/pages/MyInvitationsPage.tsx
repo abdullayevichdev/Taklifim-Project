@@ -147,7 +147,7 @@ export const MyInvitationsPage: React.FC = () => {
   };
 
   return (
-    <div className="pt-28 pb-28 lg:pb-20 min-h-screen max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
       {/* 1. Header & Quick Actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -422,7 +422,7 @@ export const MyInvitationsPage: React.FC = () => {
 
         {/* Filter & Search Bar */}
         <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-          <div className="overflow-x-auto no-scrollbar pb-0.5">
+          <div className="w-full lg:w-auto min-w-0">
             <GlassSegmented
               ariaLabel={t.myInvitations.rsvpTableTitle}
               value={guestStatusFilter}

@@ -9,7 +9,7 @@ export const NotFoundPage: React.FC = () => {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen pt-32 pb-20 flex items-center justify-center px-4 text-center">
+    <div className="min-h-screen taklifim-page-top taklifim-page-bottom flex items-center justify-center px-4 text-center">
       <GlassSurface variant="elevated" rounded="3xl" className="max-w-md w-full p-8 sm:p-10 space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] mx-auto flex items-center justify-center text-[#1E1418] shadow-sm border border-white">
           <Compass className="w-8 h-8" aria-hidden="true" />

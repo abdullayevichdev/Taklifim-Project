@@ -46,7 +46,7 @@ export const FaqPage: React.FC = () => {
   }, [category, search, language]);
 
   return (
-    <div className="pt-28 pb-20 min-h-screen">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
         <div className="text-center space-y-3">
           <GlassSurface
@@ -74,13 +74,12 @@ export const FaqPage: React.FC = () => {
             leftIcon={<Search className="w-4 h-4" aria-hidden="true" />}
           />
 
-          <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+          <div className="w-full min-w-0">
             <GlassSegmented<FaqCategory>
               options={categoryOptions}
               value={category}
               onChange={(val) => setCategory(val)}
               ariaLabel={t.faq.cats.all}
-              className="w-max"
             />
           </div>
         </GlassSurface>

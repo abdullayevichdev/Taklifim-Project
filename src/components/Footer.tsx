@@ -13,7 +13,7 @@ export const Footer: React.FC = () => {
   return (
     <footer
       className={`relative z-10 glass-surface-subtle border-t border-white/85 text-[#4A3E39] pt-14 ${
-        hasBottomNav ? 'pb-[calc(96px+env(safe-area-inset-bottom))] lg:pb-12' : 'pb-12'
+        hasBottomNav ? 'pb-[calc(var(--bottom-nav-h,76px)+env(safe-area-inset-bottom,0px)+20px)] lg:pb-12' : 'pb-12'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

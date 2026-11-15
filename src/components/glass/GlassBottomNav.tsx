@@ -22,8 +22,34 @@ export const GlassBottomNav: React.FC = () => {
   const { path, navigate } = useRouter();
   const { t } = useLanguage();
   const { isLoggedIn } = useAuth();
+  const wrapRef = React.useRef<HTMLDivElement | null>(null);
+  const isVisible = shouldShowBottomNav(path);
 
-  if (!shouldShowBottomNav(path)) {
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!isVisible) {
+      document.documentElement.style.setProperty('--bottom-nav-h', '0px');
+      return;
+    }
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const updateVar = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height || 76);
+      document.documentElement.style.setProperty('--bottom-nav-h', `${h}px`);
+    };
+
+    updateVar();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateVar) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', updateVar, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updateVar);
+    };
+  }, [isVisible]);
+
+  if (!isVisible) {
     return null;
   }
 
@@ -62,12 +88,23 @@ export const GlassBottomNav: React.FC = () => {
 
   return (
     <div
-      className="taklifim-bottom-nav fixed bottom-0 inset-x-0 z-50 px-2 sm:px-4 pointer-events-none lg:hidden transition-opacity duration-200"
+      ref={wrapRef}
+      className="taklifim-bottom-nav fixed bottom-0 inset-x-0 z-50 px-2.5 sm:px-4 pt-3 pointer-events-none lg:hidden transition-opacity duration-200"
       style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
     >
+      {/* Soft top-fading scrim so page copy behind/below the floating bar isn't readable */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -top-4 pointer-events-none -z-10"
+        style={{
+          background:
+            'linear-gradient(to top, rgba(252, 238, 244, 0.96) 0%, rgba(252, 238, 244, 0.86) 56%, rgba(252, 238, 244, 0) 100%)',
+        }}
+      />
+
       <nav
         aria-label={t.nav.mobileNavigation}
-        className="pointer-events-auto mx-auto w-full max-w-[460px] glass-surface-elevated rounded-[26px] p-1.5 flex items-center justify-between gap-1"
+        className="pointer-events-auto mx-auto w-full max-w-[460px] bg-white/94 backdrop-blur-[12px] border border-white rounded-[26px] p-1.5 flex items-center justify-between gap-1 shadow-[0_14px_34px_-8px_rgba(30,20,24,0.22),inset_0_1.5px_0_rgba(255,255,255,1)]"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -83,8 +120,8 @@ export const GlassBottomNav: React.FC = () => {
               }}
               className={`flex-1 min-w-[44px] min-h-[48px] px-1 py-1.5 rounded-[20px] flex flex-col items-center justify-center gap-0.5 transition-all duration-200 select-none ${
                 tab.isActive
-                  ? 'bg-white/95 text-[#C94F79] shadow-[0_6px_16px_-4px_rgba(214,99,137,0.28),inset_0_1px_0_rgba(255,255,255,1)] border border-white'
-                  : 'text-[#5C4F48] hover:text-[#1E1418] hover:bg-white/50'
+                  ? 'bg-gradient-to-b from-[#FFF5F8] to-white text-[#9E3E60] shadow-[0_6px_16px_-4px_rgba(214,99,137,0.28),inset_0_1px_0_rgba(255,255,255,1)] border border-[#F5C9D8]/80'
+                  : 'text-[#4A383F] hover:text-[#1E1418] hover:bg-white/70'
               }`}
             >
               <Icon className={`w-[18px] h-[18px] shrink-0 ${tab.isActive ? 'stroke-[2.25]' : 'stroke-[1.9]'}`} aria-hidden="true" />

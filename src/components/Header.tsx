@@ -21,12 +21,66 @@ export const Header: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const { isLoggedIn, user, logout } = useAuth();
 
+  const headerRef = React.useRef<HTMLElement | null>(null);
+  const lastScrollYRef = React.useRef<number>(0);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isHiddenMobile, setIsHiddenMobile] = useState(false);
+
+  // Sync --header-h and --header-visible-h dynamically via ResizeObserver
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof document === 'undefined') return;
+
+    const updateVars = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height || 64);
+      const isMobile = window.innerWidth < 1024;
+      document.documentElement.style.setProperty('--header-h', `${h}px`);
+      document.documentElement.style.setProperty(
+        '--header-visible-h',
+        isMobile && isHiddenMobile ? '0px' : `${h}px`
+      );
+    };
+
+    updateVars();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateVars) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', updateVars, { passive: true });
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updateVars);
+    };
+  }, [isHiddenMobile, language, isLoggedIn]);
+
+  // Reset mobile header visibility on route navigation
+  useEffect(() => {
+    setIsHiddenMobile(false);
+  }, [path]);
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const currentY = Math.max(0, window.scrollY || 0);
+      setIsScrolled(currentY > 20);
+
+      const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const isMobile = window.innerWidth < 1024;
+
+      if (!isMobile || prefersReduced) {
+        setIsHiddenMobile(false);
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      const delta = currentY - lastScrollYRef.current;
+      if (currentY <= 56) {
+        setIsHiddenMobile(false);
+      } else if (delta > 10 && currentY > 88) {
+        setIsHiddenMobile(true);
+      } else if (delta < -8) {
+        setIsHiddenMobile(false);
+      }
+      lastScrollYRef.current = currentY;
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -106,7 +160,29 @@ export const Header: React.FC = () => {
   const userFirstName = user?.name?.split(' ')[0] || user?.name || t.nav.profile;
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 pt-2.5 sm:pt-3.5 px-3 sm:px-5 lg:px-6 pointer-events-none">
+    <header
+      ref={headerRef}
+      style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}
+      className={`fixed top-0 inset-x-0 z-50 pb-2 px-3 sm:px-5 lg:px-6 pointer-events-none transition-[transform,opacity] duration-250 ease-out motion-reduce:transition-none lg:translate-y-0 lg:opacity-100 ${
+        isHiddenMobile
+          ? '-translate-y-full opacity-0'
+          : 'translate-y-0 opacity-100'
+      }`}
+    >
+      {/* Full-width translucent gradient & blur backdrop scrim so scrolled text never bleeds between capsules */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 -bottom-4 pointer-events-none -z-10"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(252, 238, 244, 0.96) 0%, rgba(252, 238, 244, 0.86) 62%, rgba(252, 238, 244, 0) 100%)',
+          backdropFilter: 'blur(12px) saturate(1.35)',
+          WebkitBackdropFilter: 'blur(12px) saturate(1.35)',
+          maskImage: 'linear-gradient(to bottom, black 64%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 64%, transparent 100%)',
+        }}
+      />
+
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 xl:gap-3">
         {/* Brand Logo Pill — always visible, never clipped */}
         <Link

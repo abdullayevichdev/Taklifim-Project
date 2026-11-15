@@ -95,11 +95,11 @@ export const HomePage: React.FC = () => {
   );
 
   return (
-    <div className="pb-20 space-y-20 sm:space-y-28 overflow-x-hidden relative">
+    <div className="taklifim-page-bottom space-y-20 sm:space-y-28 overflow-x-clip relative">
       {/* 6.1 HERO SECTION — Full-bleed pastel wedding glass photo backdrop with real refraction on desktop */}
       <section
         data-lg-backdrop={!isMobileViewport && !heroImgFailed ? '#hero-backdrop-img' : undefined}
-        className="relative w-full overflow-hidden pt-24 sm:pt-28 lg:pt-32 pb-14 sm:pb-20 rounded-b-[32px] sm:rounded-b-[48px]"
+        className="relative w-full overflow-hidden pt-[calc(var(--header-h,64px)+20px)] sm:pt-[calc(var(--header-h,68px)+28px)] pb-14 sm:pb-20 rounded-b-[32px] sm:rounded-b-[48px]"
       >
         {/* Hero Background Photo + Soft Readability & Edge Blend Gradients (graceful fallback to CSS gradient mesh) */}
         {!heroImgFailed && (

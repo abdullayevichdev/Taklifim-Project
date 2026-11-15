@@ -59,7 +59,7 @@ export const TemplateDetailPage: React.FC = () => {
 
   if (!template) {
     return (
-      <div className="pt-32 pb-24 max-w-lg mx-auto px-4 text-center">
+      <div className="taklifim-page-top taklifim-page-bottom max-w-lg mx-auto px-4 text-center">
         <GlassSurface variant="elevated" rounded="3xl" className="p-8 space-y-4">
           <div className="w-16 h-16 rounded-3xl bg-[#F5EBDD] mx-auto flex items-center justify-center text-[#5C4F48]">
             <Eye className="w-8 h-8" aria-hidden="true" />
@@ -91,7 +91,7 @@ export const TemplateDetailPage: React.FC = () => {
   const categoryLabel = translateCategory(template.category, language);
 
   return (
-    <div className="pt-24 sm:pt-28 pb-20 min-h-screen">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Top Breadcrumb & Device Preview Switcher */}
         <div className="flex flex-wrap items-center justify-between gap-3">

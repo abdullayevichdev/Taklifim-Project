@@ -293,7 +293,7 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   // If already logged in, show instant confirmation glass card and navigate
   if (isLoggedIn && user) {
     return (
-      <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center px-3.5 sm:px-4 relative">
         <GlassSurface
           variant="elevated"
           rounded="3xl"
@@ -328,11 +328,11 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   }
 
   return (
-    <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center px-3.5 sm:px-4 relative">
       <GlassSurface
         variant="elevated"
         rounded="3xl"
-        className="w-full max-w-md p-6 sm:p-9 space-y-5 relative"
+        className="w-full max-w-md min-w-0 p-5 sm:p-9 space-y-5 relative"
       >
         {/* Header with Logo */}
         <div className="text-center space-y-2">
@@ -398,11 +398,11 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
 
         {/* Auth Method Tabs (GlassSegmented) */}
         {mode !== 'forgot' && (
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#5C4F48] text-center">
               {t.auth.chooseMethodLabel}
             </div>
-            <div className="w-full overflow-x-auto pb-1 no-scrollbar flex justify-center">
+            <div className="w-full min-w-0 flex justify-center">
               <GlassSegmented<AuthTab>
                 options={methodOptions}
                 value={activeTab}
@@ -411,7 +411,6 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
                   setActiveTab(val);
                 }}
                 ariaLabel={t.auth.chooseMethodLabel}
-                className="taklifim-auth-seg w-max sm:w-full"
                 fullWidth
               />
             </div>

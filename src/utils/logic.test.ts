@@ -6,6 +6,13 @@ import {
   formatPriceUZS,
   filterTemplates,
   calculateRSVPStats,
+  normalizeTime24h,
+  get24hTimeSlots,
+  formatLocalizedFullDate,
+  deriveEventTitleFromHosts,
+  healStaleBuilderDraft,
+  truncateFilenameMiddle,
+  formatFileSize,
 } from './logic';
 import { Template, GuestRSVP } from '../types';
 
@@ -101,3 +108,77 @@ test('calculateRSVPStats calculates counts and attendance percentage correctly',
   assert.equal(stats.totalGuests, 3);
   assert.equal(stats.acceptanceRate, 67);
 });
+
+test('normalizeTime24h converts 12h AM/PM and unpadded times cleanly to 24h HH:MM', () => {
+  assert.equal(normalizeTime24h('6:00PM'), '18:00');
+  assert.equal(normalizeTime24h('6:00 PM'), '18:00');
+  assert.equal(normalizeTime24h('5:30 PM'), '17:30');
+  assert.equal(normalizeTime24h('12:00 AM'), '00:00');
+  assert.equal(normalizeTime24h('12:00 PM'), '12:00');
+  assert.equal(normalizeTime24h('9:05'), '09:05');
+  assert.equal(normalizeTime24h('19:00'), '19:00');
+  assert.equal(normalizeTime24h('invalid', '18:00'), '18:00');
+
+  const slots = get24hTimeSlots('18:10');
+  assert.ok(slots.includes('18:00'));
+  assert.ok(slots.includes('18:10'));
+  assert.ok(slots.includes('23:45'));
+});
+
+test('formatLocalizedFullDate renders readable Uzbek, Russian, and English dates', () => {
+  assert.equal(formatLocalizedFullDate('2026-09-24', 'uz'), '24 sentabr 2026, payshanba');
+  const ru = formatLocalizedFullDate('2026-09-24', 'ru');
+  assert.ok(ru.includes('24') && ru.includes('2026') && ru.includes('четверг'));
+  const en = formatLocalizedFullDate('2026-09-24', 'en');
+  assert.equal(en, '24 September 2026, Thursday');
+});
+
+test('deriveEventTitleFromHosts keeps default title synced while respecting custom titles', () => {
+  const synced = deriveEventTitleFromHosts(
+    'Abdulhay & Madina',
+    'Asrorbek & Madina',
+    'Asrorbek & Madina Nikoh To‘yi'
+  );
+  assert.equal(synced.wasAutoDerived, true);
+  assert.equal(synced.nextTitle, 'Abdulhay & Madina Nikoh To‘yi');
+
+  const custom = deriveEventTitleFromHosts(
+    'Abdulhay & Madina',
+    'Asrorbek & Madina',
+    'Maxsus tantana kechasi'
+  );
+  assert.equal(custom.wasAutoDerived, false);
+  assert.equal(custom.nextTitle, 'Maxsus tantana kechasi');
+
+  const cleared = deriveEventTitleFromHosts('', 'Asrorbek & Madina', 'Asrorbek & Madina Nikoh To‘yi');
+  assert.equal(cleared.nextTitle, 'Nikoh To‘yi');
+  const retyped = deriveEventTitleFromHosts('Abdulhay & Madina', '', cleared.nextTitle);
+  assert.equal(retyped.wasAutoDerived, true);
+  assert.equal(retyped.nextTitle, 'Abdulhay & Madina Nikoh To‘yi');
+});
+
+test('healStaleBuilderDraft migrates legacy Asrorbek defaults when hostNames already changed', () => {
+  const healed = healStaleBuilderDraft({
+    status: 'draft',
+    slug: 'asrorbek-madina-4135',
+    hostNames: 'Abdulhay & Madina',
+    eventTitle: 'Asrorbek & Madina Nikoh To‘yi',
+    partner1Name: 'Asrorbek',
+    partner2Name: 'Madina',
+  });
+  assert.equal(healed.eventTitle, 'Abdulhay & Madina Nikoh To‘yi');
+  assert.equal(healed.partner1Name, 'Abdulhay');
+  assert.equal(healed.partner2Name, 'Madina');
+  assert.equal(healed.slug, 'abdulhay-madina-4135');
+});
+
+test('truncateFilenameMiddle preserves extension and fits within maxLength', () => {
+  const longName = 'file_000000008a9882109d0d73368c0a7c3a.jpg';
+  const truncated = truncateFilenameMiddle(longName, 20);
+  assert.equal(truncated.endsWith('.jpg'), true);
+  assert.ok(truncated.includes('…'));
+  assert.ok(truncated.length <= 20);
+  assert.equal(truncateFilenameMiddle('chek.pdf', 20), 'chek.pdf');
+  assert.equal(formatFileSize(1536, 'uz'), '2 KB');
+});
+

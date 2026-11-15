@@ -12,8 +12,8 @@ import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
-import { formatPriceUZS } from '../utils/logic';
-import { generateInvitationSlug, cleanNameForSlug } from '../utils/slug';
+import { formatPriceUZS, normalizeTime24h, get24hTimeSlots, formatLocalizedFullDate, deriveEventTitleFromHosts, healStaleBuilderDraft, truncateFilenameMiddle, formatFileSize } from '../utils/logic';
+import { generateInvitationSlug, cleanNameForSlug, parseHostNames, generate4DigitCode } from '../utils/slug';
 import {
   compressImageForUpload,
   validatePdfFile,
@@ -157,6 +157,11 @@ export const BuilderPage: React.FC = () => {
   const [isUploadingReceipt, setIsUploadingReceipt] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const receiptInputRef = useRef<HTMLInputElement | null>(null);
+  const existingSlugsRef = useRef<Set<string>>(new Set());
+  const isSlugManualRef = useRef<boolean>(false);
+  const isTitleManualRef = useRef<boolean>(false);
+  const sessionSlugCodeRef = useRef<string>(generate4DigitCode());
 
   // Main Builder State (Live reactive)
   const [invitationState, setInvitationState] = useState<InvitationData>(() => {
@@ -165,29 +170,45 @@ export const BuilderPage: React.FC = () => {
       const draft = localStorage.getItem('taklifim_builder_draft');
       if (draft) {
         const parsed = JSON.parse(draft);
-        if (params.templateSlug && parsed.templateSlug !== params.templateSlug) {
+        const healed = healStaleBuilderDraft(parsed);
+        if (healed.startTime) {
+          healed.startTime = normalizeTime24h(healed.startTime, '18:00');
+        }
+        if (Array.isArray(healed.schedule)) {
+          healed.schedule = healed.schedule.map((item: ScheduleItem) => ({
+            ...item,
+            time: normalizeTime24h(item.time, '18:00'),
+          }));
+        }
+        const tailMatch = typeof healed.slug === 'string' ? healed.slug.match(/-(\d{4})$/) : null;
+        if (tailMatch) {
+          sessionSlugCodeRef.current = tailMatch[1];
+        }
+        if (params.templateSlug && healed.templateSlug !== params.templateSlug) {
           const matchTpl = mockTemplates.find((t) => t.slug === params.templateSlug);
           if (matchTpl) {
-            parsed.templateId = matchTpl.id;
-            parsed.templateSlug = matchTpl.slug;
-            parsed.coverImage = matchTpl.previewImage;
-            parsed.galleryImages = [matchTpl.previewImage, ...(parsed.galleryImages?.slice(1) || [])];
-            parsed.customColors = { ...matchTpl.colorStyle };
-            parsed.customFonts = {
+            healed.templateId = matchTpl.id;
+            healed.templateSlug = matchTpl.slug;
+            healed.coverImage = matchTpl.previewImage;
+            healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
+            healed.customColors = { ...matchTpl.colorStyle };
+            healed.customFonts = {
               heading: matchTpl.typography.headingFont,
               body: matchTpl.typography.bodyFont,
             };
           }
         }
-        return parsed;
+        return healed;
       }
     } catch {
       // ignore
     }
 
+    const initialCode = sessionSlugCodeRef.current;
+
     return {
       id: `inv-${Date.now()}`,
-      slug: generateInvitationSlug('Asrorbek', 'Madina'),
+      slug: generateInvitationSlug('Asrorbek', 'Madina', initialCode),
       templateId: initialTemplate.id,
       templateSlug: initialTemplate.slug,
       language: 'uz',
@@ -263,6 +284,54 @@ export const BuilderPage: React.FC = () => {
 
   // Track last synced route slug to avoid reverting user template selection
   const lastSyncedSlugRef = useRef<string>(params.templateSlug || '');
+  const isSlugLocked =
+    invitationState.status !== 'draft' || Boolean(activeOrderId) || isOrderComplete;
+
+  // Load known slugs once for uniqueness checks during auto-slug updates
+  useEffect(() => {
+    let active = true;
+    api
+      .getInvitations()
+      .then((list) => {
+        if (!active || !Array.isArray(list)) return;
+        const slugs = new Set<string>();
+        list.forEach((inv) => {
+          if (inv?.slug && inv.id !== invitationState.id) {
+            slugs.add(inv.slug.toLowerCase());
+          }
+        });
+        existingSlugsRef.current = slugs;
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [invitationState.id]);
+
+  // Debounced automatic slug regeneration from hostNames while draft & not manually edited
+  useEffect(() => {
+    if (isSlugLocked || isSlugManualRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      const { groom, bride } = parseHostNames(invitationState.hostNames);
+      let code = sessionSlugCodeRef.current || generate4DigitCode();
+      let candidate = generateInvitationSlug(groom, bride, code);
+      let attempts = 0;
+      while (existingSlugsRef.current.has(candidate.toLowerCase()) && attempts < 8) {
+        code = generate4DigitCode();
+        candidate = generateInvitationSlug(groom, bride, code);
+        attempts++;
+      }
+      sessionSlugCodeRef.current = code;
+
+      setInvitationState((prev) => {
+        if (prev.slug === candidate) return prev;
+        return { ...prev, slug: candidate };
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [invitationState.hostNames, isSlugLocked]);
 
   // Keep template sync if changed
   const handleSelectTemplate = (tpl: Template) => {
@@ -771,8 +840,8 @@ export const BuilderPage: React.FC = () => {
     const fullLiveUrl = typeof window !== 'undefined' ? `${window.location.origin}${liveUrl}` : liveUrl;
 
     return (
-      <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4">
-        <GlassSurface variant="elevated" rounded="3xl" className="w-full max-w-lg p-8 sm:p-10 text-center space-y-6 animate-fadeIn">
+      <div className="taklifim-page-top pb-16 min-h-screen flex items-center justify-center px-4">
+        <GlassSurface variant="elevated" rounded="3xl" className="w-full max-w-lg p-6 sm:p-10 text-center space-y-6 animate-fadeIn">
           <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 mx-auto flex items-center justify-center text-emerald-700 shadow-xs">
             <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
           </div>
@@ -791,19 +860,21 @@ export const BuilderPage: React.FC = () => {
 
           <GlassSurface variant="subtle" rounded="2xl" className="p-4 text-xs text-left space-y-2.5">
             <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-              <span className="text-[#4A383F]">{t.guestGate.eventLabel}:</span>
-              <strong className="text-[#1E1418] text-right">{invitationState.eventTitle}</strong>
+              <span className="text-[#4A383F] shrink-0">{t.guestGate.eventLabel}:</span>
+              <strong className="text-[#1E1418] text-right min-w-0 break-words">{invitationState.eventTitle}</strong>
             </div>
             <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-              <span className="text-[#4A383F]">{t.builder.reviewCouple}</span>
-              <strong className="text-[#1E1418] text-right">{invitationState.hostNames}</strong>
+              <span className="text-[#4A383F] shrink-0">{t.builder.reviewCouple}</span>
+              <strong className="text-[#1E1418] text-right min-w-0 break-words">{invitationState.hostNames}</strong>
             </div>
             <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-              <span className="text-[#4A383F]">{t.guestGate.dateLabel}:</span>
-              <strong className="text-[#1E1418] tabular-nums text-right">{invitationState.eventDate} ({invitationState.startTime})</strong>
+              <span className="text-[#4A383F] shrink-0">{t.guestGate.dateLabel}:</span>
+              <strong className="text-[#1E1418] tabular-nums text-right min-w-0 break-words">
+                {formatLocalizedFullDate(invitationState.eventDate, language)} ({normalizeTime24h(invitationState.startTime)})
+              </strong>
             </div>
             <div className="flex justify-between items-center gap-3 pt-0.5">
-              <span className="text-[#4A383F]">{t.builder.linkLabel}</span>
+              <span className="text-[#4A383F] shrink-0">{t.builder.linkLabel}</span>
               <span className="font-mono text-[#9E3E60] font-bold truncate max-w-[200px]">
                 {liveUrl}
               </span>
@@ -857,10 +928,10 @@ export const BuilderPage: React.FC = () => {
   }
 
   return (
-    <div className="pt-24 pb-16 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="taklifim-page-top pb-16 min-h-screen">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 space-y-5 sm:space-y-6">
         {/* Top Builder Bar */}
-        <GlassSurface variant="elevated" rounded="3xl" className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+        <GlassSurface variant="elevated" rounded="3xl" className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
             <Link
               to="/templates"
@@ -1015,36 +1086,89 @@ export const BuilderPage: React.FC = () => {
                     type="text"
                     label={t.builder.hostNamesLabel}
                     value={invitationState.hostNames}
-                    onChange={(e) =>
-                      setInvitationState((p) => ({ ...p, hostNames: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      const nextHosts = e.target.value;
+                      setInvitationState((p) => {
+                        const parsed = parseHostNames(nextHosts);
+                        const derivedTitle = !isTitleManualRef.current
+                          ? deriveEventTitleFromHosts(nextHosts, p.hostNames, p.eventTitle)
+                          : { nextTitle: p.eventTitle, wasAutoDerived: false };
+                        return {
+                          ...p,
+                          hostNames: nextHosts,
+                          partner1Name: parsed.groom,
+                          partner2Name: parsed.bride,
+                          eventTitle: derivedTitle.nextTitle,
+                        };
+                      });
+                    }}
                     placeholder={t.builder.hostNamesPlaceholder}
                   />
 
-                  <div>
-                    <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">
+                  <div className="space-y-1.5 min-w-0">
+                    <label className="font-bold text-[11px] text-[#3A2D28] block">
                       {t.builder.slugLabel}
                     </label>
-                    <div className="flex items-center gap-1 glass-surface-subtle bg-white/80 min-h-[44px] px-3.5 py-2 rounded-[var(--lg-radius)] text-xs focus-within:bg-white/95 focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
-                      <span className="text-[#4A383F] shrink-0 font-mono text-[11px]">{typeof window !== 'undefined' ? window.location.origin : ''}/i/</span>
-                      <input
-                        type="text"
-                        value={invitationState.slug}
-                        onChange={(e) => {
-                          const cleaned = cleanNameForSlug(e.target.value);
-                          setInvitationState((p) => ({ ...p, slug: cleaned }));
-                        }}
-                        placeholder="asrorbek-madina-4135"
-                        className="w-full bg-transparent font-mono text-[#1E1418] font-bold outline-none"
-                      />
+                    <div className="rounded-[var(--lg-radius)] overflow-hidden border border-black/10 bg-white/85 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
+                      <div className="px-3.5 py-1.5 bg-white/70 border-b border-black/8 font-mono text-[11px] text-[#4A383F] break-all">
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://taklifim.uz')}/i/
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 min-w-0">
+                        <input
+                          type="text"
+                          value={invitationState.slug}
+                          disabled={isSlugLocked}
+                          onChange={(e) => {
+                            if (isSlugLocked) return;
+                            isSlugManualRef.current = true;
+                            const raw = e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9-]+/g, '-')
+                              .replace(/-+/g, '-')
+                              .replace(/^-+/, '');
+                            setInvitationState((p) => ({ ...p, slug: raw }));
+                          }}
+                          onBlur={() => {
+                            if (isSlugLocked) return;
+                            setInvitationState((p) => ({
+                              ...p,
+                              slug: cleanNameForSlug(p.slug) || generateInvitationSlug(p.partner1Name, p.partner2Name, sessionSlugCodeRef.current),
+                            }));
+                          }}
+                          placeholder="asrorbek-madina-4135"
+                          className="flex-1 min-w-0 min-h-[40px] px-1.5 bg-transparent font-mono text-xs sm:text-[13px] text-[#1E1418] font-bold outline-none disabled:opacity-65"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://taklifim.uz';
+                            const url = `${origin}/i/${invitationState.slug}`;
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText(url);
+                              showToast(t.builder.slugCopiedToast, 'success');
+                            }
+                          }}
+                          aria-label={t.builder.copyLinkBtn}
+                          className="min-h-[40px] px-3 rounded-xl glass-surface-subtle hover:bg-white text-[11px] font-bold text-[#9E3E60] inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                        >
+                          <Copy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          <span>{t.builder.copyLinkBtn}</span>
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-[#4A383F] block mt-1">
-                      {t.builder.slugHint}
+                    <div className="text-[11px] text-[#4A383F] bg-white/55 px-3 py-1.5 rounded-xl border border-black/6">
+                      <span className="font-semibold text-[#3A2D28]">{t.builder.fullLinkPreviewLabel} </span>
+                      <span className="font-mono text-[#9E3E60] font-bold break-all">
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://taklifim.uz')}/i/{invitationState.slug}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#4A383F] block">
+                      {isSlugLocked ? t.builder.slugLockedNotice : t.builder.slugHint}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
+                    <div className="min-w-0">
                       <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">{t.builder.weddingDateLabel}</label>
                       <input
                         type="date"
@@ -1052,19 +1176,33 @@ export const BuilderPage: React.FC = () => {
                         onChange={(e) =>
                           setInvitationState((p) => ({ ...p, eventDate: e.target.value }))
                         }
-                        className={GLASS_FIELD_CLS}
+                        className={`${GLASS_FIELD_CLS} min-h-[44px]`}
                       />
+                      {invitationState.eventDate && (
+                        <span className="text-[11px] font-medium text-[#4A383F] block mt-1.5 capitalize">
+                          {formatLocalizedFullDate(invitationState.eventDate, language)}
+                        </span>
+                      )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="font-bold text-[11px] text-[#3A2D28] block mb-1.5">{t.builder.startTimeLabel}</label>
-                      <input
-                        type="time"
-                        value={invitationState.startTime}
-                        onChange={(e) =>
-                          setInvitationState((p) => ({ ...p, startTime: e.target.value }))
-                        }
-                        className={GLASS_FIELD_CLS}
-                      />
+                      <div className="relative">
+                        <Clock className="w-3.5 h-3.5 text-[#9E3E60] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                        <select
+                          aria-label={t.builder.startTimeLabel}
+                          value={normalizeTime24h(invitationState.startTime, '18:00')}
+                          onChange={(e) =>
+                            setInvitationState((p) => ({ ...p, startTime: normalizeTime24h(e.target.value, '18:00') }))
+                          }
+                          className={`${GLASS_FIELD_CLS} min-h-[44px] pl-9 font-bold tabular-nums cursor-pointer`}
+                        >
+                          {get24hTimeSlots(invitationState.startTime).map((slot) => (
+                            <option key={slot} value={slot}>
+                              {slot}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1566,8 +1704,8 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 6: Schedule */}
             {currentStep === 6 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
+                <div className="flex flex-col min-[380px]:flex-row min-[380px]:items-center justify-between gap-2.5">
+                  <h3 className="font-playfair text-xl font-bold text-[#1E1418] min-w-0">
                     {t.builder.step6Heading}
                   </h3>
                   <GlassButton
@@ -1576,49 +1714,70 @@ export const BuilderPage: React.FC = () => {
                     size="sm"
                     onClick={handleAddScheduleItem}
                     leftIcon={<Plus className="w-3.5 h-3.5" aria-hidden="true" />}
+                    className="w-full min-[380px]:w-auto shrink-0"
                   >
                     {t.builder.addScheduleItem}
                   </GlassButton>
                 </div>
 
                 <div className="space-y-3">
-                  {invitationState.schedule.map((item) => (
-                    <GlassSurface key={item.id} variant="subtle" rounded="2xl" className="p-3 flex items-center gap-2">
-                      <input
-                        type="time"
-                        value={item.time}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setInvitationState((p) => ({
-                            ...p,
-                            schedule: p.schedule.map((s) => (s.id === item.id ? { ...s, time: val } : s)),
-                          }));
-                        }}
-                        className="w-24 min-h-[38px] px-2 py-1.5 rounded-xl text-xs font-bold border border-black/10 bg-white/90 text-[#1E1418] tabular-nums outline-none focus:ring-2 focus:ring-[#D66389]/35"
-                      />
-                      <input
-                        type="text"
-                        value={typeof item.title === 'string' ? item.title : item.title.uz}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setInvitationState((p) => ({
-                            ...p,
-                            schedule: p.schedule.map((s) => (s.id === item.id ? { ...s, title: val } : s)),
-                          }));
-                        }}
-                        placeholder={t.builder.stepNamePlaceholder}
-                        className="flex-1 min-h-[38px] px-3 py-1.5 rounded-xl text-xs border border-black/10 bg-white/90 text-[#1E1418] outline-none focus:ring-2 focus:ring-[#D66389]/35"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveScheduleItem(item.id)}
-                        aria-label={t.dashboard.deleteActionTitle}
-                        className="min-h-[38px] min-w-[38px] rounded-xl text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
+                  {invitationState.schedule.map((item) => {
+                    const normalizedSlot = normalizeTime24h(item.time, '18:00');
+                    const titleValue = typeof item.title === 'string' ? item.title : item.title.uz;
+                    return (
+                      <GlassSurface
+                        key={item.id}
+                        variant="subtle"
+                        rounded="2xl"
+                        className="p-3 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] min-[420px]:grid-cols-[108px_minmax(0,1fr)_auto] items-center gap-2"
                       >
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                    </GlassSurface>
-                  ))}
+                        <div className="relative min-w-0">
+                          <Clock className="w-3.5 h-3.5 text-[#9E3E60] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                          <select
+                            aria-label={t.builder.startTimeLabel}
+                            value={normalizedSlot}
+                            onChange={(e) => {
+                              const val = normalizeTime24h(e.target.value, '18:00');
+                              setInvitationState((p) => ({
+                                ...p,
+                                schedule: p.schedule.map((s) => (s.id === item.id ? { ...s, time: val } : s)),
+                              }));
+                            }}
+                            className="w-full min-h-[44px] pl-8 pr-2 py-1.5 rounded-xl text-xs font-bold border border-black/10 bg-white/95 text-[#1E1418] tabular-nums outline-none focus:ring-2 focus:ring-[#D66389]/35 cursor-pointer"
+                          >
+                            {get24hTimeSlots(normalizedSlot).map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveScheduleItem(item.id)}
+                          aria-label={t.dashboard.deleteActionTitle}
+                          className="min-h-[44px] min-w-[44px] min-[420px]:col-start-3 min-[420px]:row-start-1 rounded-xl text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        </button>
+
+                        <input
+                          type="text"
+                          value={titleValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInvitationState((p) => ({
+                              ...p,
+                              schedule: p.schedule.map((s) => (s.id === item.id ? { ...s, title: val } : s)),
+                            }));
+                          }}
+                          placeholder={t.builder.stepNamePlaceholder}
+                          className="col-span-2 min-[420px]:col-span-1 min-[420px]:col-start-2 min-[420px]:row-start-1 w-full min-w-0 min-h-[44px] px-3 py-2 rounded-xl text-xs border border-black/10 bg-white/95 text-[#1E1418] outline-none focus:ring-2 focus:ring-[#D66389]/35"
+                        />
+                      </GlassSurface>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2076,25 +2235,27 @@ export const BuilderPage: React.FC = () => {
                 </h3>
                 <GlassSurface variant="subtle" rounded="2xl" className="p-4 text-xs space-y-2.5">
                   <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-                    <span className="text-[#4A383F]">{t.guestGate.eventLabel}:</span>
-                    <strong className="text-[#1E1418] text-right">{invitationState.eventTitle}</strong>
+                    <span className="text-[#4A383F] shrink-0">{t.guestGate.eventLabel}:</span>
+                    <strong className="text-[#1E1418] text-right min-w-0 break-words">{invitationState.eventTitle}</strong>
                   </div>
                   <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-                    <span className="text-[#4A383F]">{t.builder.reviewCouple}</span>
-                    <strong className="text-[#1E1418] text-right">{invitationState.hostNames}</strong>
+                    <span className="text-[#4A383F] shrink-0">{t.builder.reviewCouple}</span>
+                    <strong className="text-[#1E1418] text-right min-w-0 break-words">{invitationState.hostNames}</strong>
                   </div>
                   <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-                    <span className="text-[#4A383F]">{t.builder.reviewDate}</span>
-                    <strong className="text-[#1E1418] tabular-nums text-right">
-                      {invitationState.eventDate} ({invitationState.startTime})
+                    <span className="text-[#4A383F] shrink-0">{t.builder.reviewDate}</span>
+                    <strong className="text-[#1E1418] tabular-nums text-right min-w-0 break-words capitalize">
+                      {formatLocalizedFullDate(invitationState.eventDate, language)} ({normalizeTime24h(invitationState.startTime, '18:00')})
                     </strong>
                   </div>
                   <div className="flex justify-between gap-3 border-b border-black/8 pb-2">
-                    <span className="text-[#4A383F]">{t.builder.reviewVenue}</span>
-                    <strong className="text-[#1E1418] text-right">{invitationState.venueName}</strong>
+                    <span className="text-[#4A383F] shrink-0">{t.builder.reviewVenue}</span>
+                    <strong className="text-[#1E1418] text-right min-w-0 break-words">
+                      {invitationState.venueName || (invitationState.venueLocationType === 'home' ? 'Xonadonda' : '—')}
+                    </strong>
                   </div>
                   <div className="flex justify-between gap-3 pt-0.5">
-                    <span className="text-[#4A383F]">{t.builder.reviewPhotos}</span>
+                    <span className="text-[#4A383F] shrink-0">{t.builder.reviewPhotos}</span>
                     <strong className="text-[#1E1418] tabular-nums">{formatItemCount(invitationState.galleryImages.length, language)}</strong>
                   </div>
                 </GlassSurface>
@@ -2212,24 +2373,35 @@ export const BuilderPage: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="space-y-2">
+                        <div className="space-y-2 min-w-0">
                           <label className="text-xs font-bold text-[#1E1418] block">
                             {t.builder.receiptUploadLabel}
                           </label>
 
-                          <div className="relative glass-surface-subtle border-2 border-dashed border-[#C64873]/40 hover:border-[#C64873] rounded-2xl p-5 text-center hover:bg-white/80 transition-colors cursor-pointer">
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp,application/pdf"
-                              onChange={handleReceiptFileChange}
-                              disabled={isPreparingFile || isUploadingReceipt}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            <div className="space-y-2 flex flex-col items-center justify-center">
-                              <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
-                                <Upload className="w-5 h-5" aria-hidden="true" />
-                              </div>
-                              {isPreparingFile ? (
+                          <input
+                            ref={receiptInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            onChange={handleReceiptFileChange}
+                            disabled={isPreparingFile || isUploadingReceipt}
+                            className="sr-only"
+                          />
+
+                          <div
+                            onClick={() => {
+                              if (!isPreparingFile && !isUploadingReceipt && !selectedFile) {
+                                receiptInputRef.current?.click();
+                              }
+                            }}
+                            className={`glass-surface-subtle border-2 border-dashed border-[#C64873]/40 rounded-2xl p-4 sm:p-5 transition-colors overflow-hidden ${
+                              !selectedFile && !isPreparingFile ? 'hover:border-[#C64873] hover:bg-white/80 cursor-pointer' : ''
+                            }`}
+                          >
+                            {isPreparingFile ? (
+                              <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
+                                <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
+                                  <Upload className="w-5 h-5 animate-pulse" aria-hidden="true" />
+                                </div>
                                 <div>
                                   <span className="text-xs font-bold text-[#1E1418] block">
                                     {t.builder.compressingImage}
@@ -2238,16 +2410,47 @@ export const BuilderPage: React.FC = () => {
                                     {t.builder.compressingSub}
                                   </span>
                                 </div>
-                              ) : selectedFile ? (
-                                <div>
-                                  <span className="text-xs font-bold text-[#1E1418] block truncate max-w-xs">
-                                    📄 {preparedFileName || selectedFile.name}
-                                  </span>
-                                  <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">
-                                    {t.builder.fileReadyText}
-                                  </span>
+                              </div>
+                            ) : selectedFile ? (
+                              <div className="flex flex-col gap-3 w-full min-w-0">
+                                <div className="flex items-center gap-3 w-full min-w-0 max-w-full p-2.5 sm:p-3 rounded-xl bg-white/92 border border-emerald-200/90 shadow-xs">
+                                  <div className="flex-none w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+                                    <FileText className="w-5 h-5" aria-hidden="true" />
+                                  </div>
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <span
+                                      title={preparedFileName || selectedFile.name}
+                                      className="font-mono text-xs font-bold text-[#1E1418] block truncate"
+                                    >
+                                      {truncateFilenameMiddle(preparedFileName || selectedFile.name, 22)}
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] mt-0.5">
+                                      {selectedFile.size > 0 && (
+                                        <span className="text-[#4A383F] tabular-nums">
+                                          {formatFileSize(selectedFile.size, language)}
+                                        </span>
+                                      )}
+                                      <span className="text-emerald-700 font-semibold">
+                                        {t.builder.fileReadyText}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                              ) : (
+
+                                <button
+                                  type="button"
+                                  disabled={isUploadingReceipt}
+                                  onClick={() => receiptInputRef.current?.click()}
+                                  className="min-h-[40px] w-full sm:w-auto sm:self-center px-4 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-black/10 text-xs font-bold text-[#9E3E60] transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {t.builder.replaceReceiptFileBtn}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
+                                <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
+                                  <Upload className="w-5 h-5" aria-hidden="true" />
+                                </div>
                                 <div>
                                   <span className="text-xs font-bold text-[#1E1418] block">
                                     {t.builder.clickToChooseFile}
@@ -2256,8 +2459,8 @@ export const BuilderPage: React.FC = () => {
                                     {t.builder.fileSizeRules}
                                   </span>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -2268,20 +2471,26 @@ export const BuilderPage: React.FC = () => {
                           </div>
                         )}
 
-                        <GlassButton
-                          type="button"
-                          tone="tinted"
-                          size="lg"
-                          loading={isUploadingReceipt}
-                          disabled={!canSubmitReceipt}
-                          onClick={handleSubmitReceiptUpload}
-                          leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
-                          className="w-full"
-                        >
-                          {isUploadingReceipt
-                            ? t.builder.submittingReceiptAdminBtn
-                            : t.builder.submitReceiptAdminBtn}
-                        </GlassButton>
+                        <div className="space-y-1.5">
+                          <GlassButton
+                            type="button"
+                            tone="tinted"
+                            size="lg"
+                            multiline
+                            loading={isUploadingReceipt}
+                            disabled={!canSubmitReceipt}
+                            onClick={handleSubmitReceiptUpload}
+                            leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
+                            className="w-full min-h-[52px]"
+                          >
+                            {isUploadingReceipt
+                              ? t.builder.submittingReceiptAdminBtn
+                              : t.builder.submitReceiptPrimaryBtn}
+                          </GlassButton>
+                          <p className="text-[11px] font-medium text-[#4A383F] text-center">
+                            {t.builder.submitReceiptHelperCaption}
+                          </p>
+                        </div>
                       </GlassSurface>
                     )}
                   </div>
@@ -2350,7 +2559,7 @@ export const BuilderPage: React.FC = () => {
 
             return (
               <div
-                className={`lg:col-span-6 flex flex-col items-center sticky top-28 ${
+                className={`lg:col-span-6 flex flex-col items-center lg:sticky lg:top-[var(--header-sticky-top,76px)] ${
                   activeTabMobile === 'settings' ? 'hidden lg:flex' : 'flex'
                 }`}
               >

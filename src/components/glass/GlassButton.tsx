@@ -15,6 +15,8 @@ export interface GlassButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLBu
   rightIcon?: React.ReactNode;
   backdrop?: string;
   radius?: number | 'capsule';
+  /** Allows multi-line wrapped labels cleanly (bypasses <lg-button> single-line clipping) */
+  multiline?: boolean;
   /** Forces pure CSS fallback rendering instead of <lg-button> */
   cssOnly?: boolean;
   onAnchorClick?: (e: React.MouseEvent<HTMLElement>) => void;
@@ -23,7 +25,7 @@ export interface GlassButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLBu
 const SIZE_CLASSES: Record<NonNullable<GlassButtonProps['size']>, string> = {
   sm: 'min-h-[40px] px-4 text-sm',
   md: 'min-h-[44px] px-5 text-sm sm:text-base',
-  lg: 'min-h-[48px] px-7 text-base',
+  lg: 'min-h-[48px] px-6 py-2.5 text-base',
 };
 
 const FALLBACK_TONES: Record<LgTone, string> = {
@@ -52,6 +54,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   rightIcon,
   backdrop,
   radius = 'capsule',
+  multiline = false,
   cssOnly = false,
   className = '',
   onClick,
@@ -60,12 +63,13 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   'aria-label': ariaLabel,
   ...rest
 }) => {
-  const { ready, failed } = useLiquidGlassReady(!cssOnly);
+  const usePureCss = cssOnly || multiline;
+  const { ready, failed } = useLiquidGlassReady(!usePureCss);
   const lgRef = React.useRef<HTMLElement | null>(null);
   const isDisabled = disabled || loading;
 
   React.useEffect(() => {
-    if (cssOnly || !ready || failed || !lgRef.current) return;
+    if (usePureCss || !ready || failed || !lgRef.current) return;
     try {
       const inner = lgRef.current.querySelector('.lg-button__el');
       if (inner) {
@@ -78,13 +82,13 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     } catch {
       // Ignore DOM sync issues on detached custom element
     }
-  }, [ariaLabel, cssOnly, ready, failed]);
+  }, [ariaLabel, usePureCss, ready, failed]);
 
   const contentSlot = (
-    <span className="inline-flex items-center justify-center gap-2 leading-none">
-      {loading ? <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" /> : leftIcon}
-      <span>{children}</span>
-      {!loading && rightIcon}
+    <span className="inline-flex items-center justify-center gap-2 leading-snug text-center [text-wrap:balance] max-w-full">
+      {loading ? <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" /> : leftIcon ? <span className="inline-flex shrink-0">{leftIcon}</span> : null}
+      <span className="min-w-0">{children}</span>
+      {!loading && rightIcon ? <span className="inline-flex shrink-0">{rightIcon}</span> : null}
     </span>
   );
 
@@ -124,7 +128,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     </button>
   );
 
-  if (cssOnly || !ready || failed) {
+  if (usePureCss || !ready || failed) {
     return fallbackElement;
   }
 

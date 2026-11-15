@@ -29,7 +29,7 @@ export const LegalPage: React.FC = () => {
   const sections = tab === 'privacy' ? t.legal.privacySections : t.legal.termsSections;
 
   return (
-    <div className="pt-28 pb-20 min-h-screen">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
         <div className="text-center space-y-2">
           <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#1E1418]">
@@ -39,7 +39,7 @@ export const LegalPage: React.FC = () => {
         </div>
 
         {/* Tab switch via GlassSegmented */}
-        <div className="w-full overflow-x-auto pb-1 no-scrollbar flex justify-center">
+        <div className="w-full min-w-0 flex justify-center">
           <GlassSegmented<LegalTab>
             options={tabOptions}
             value={tab}
@@ -48,7 +48,6 @@ export const LegalPage: React.FC = () => {
               navigate(val === 'terms' ? '/terms' : '/privacy');
             }}
             ariaLabel={`${t.legal.privacyTab} / ${t.legal.termsTab}`}
-            className="taklifim-auth-seg w-max"
           />
         </div>
 

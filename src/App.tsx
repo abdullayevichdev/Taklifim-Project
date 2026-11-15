@@ -56,7 +56,7 @@ const NotFoundPage = lazyWithRetry(() =>
 );
 
 const RouteLoadingFallback: React.FC = () => (
-  <div className="pt-28 pb-20 min-h-[70vh] flex items-center justify-center px-4">
+  <div className="taklifim-page-top taklifim-page-bottom min-h-[70vh] flex items-center justify-center px-4">
     <div className="glass-surface rounded-full p-4 shadow-sm">
       <div className="w-7 h-7 border-[3px] border-[#E27B9B] border-t-transparent rounded-full animate-spin" />
     </div>
@@ -77,7 +77,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!isLoggedIn) {
     return (
-      <div className="pt-28 pb-20 min-h-screen flex items-center justify-center">
+      <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin w-8 h-8 border-4 border-[#E27B9B] border-t-transparent rounded-full mx-auto" />
           <p className="text-sm text-[#5C4F48]">{t.auth.googleConnecting}</p>

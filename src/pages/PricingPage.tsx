@@ -33,7 +33,7 @@ export const PricingPage: React.FC = () => {
   };
 
   return (
-    <div className="pt-28 pb-20 min-h-screen space-y-20">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen space-y-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto space-y-3">

@@ -76,7 +76,7 @@ export const TemplatesPage: React.FC = () => {
   };
 
   return (
-    <div className="pt-28 pb-20 min-h-screen">
+    <div className="taklifim-page-top taklifim-page-bottom min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Header Title */}
         <div className="text-center max-w-2xl mx-auto space-y-3">
@@ -154,13 +154,12 @@ export const TemplatesPage: React.FC = () => {
           </div>
 
           {/* Category Filter via GlassSegmented (horizontally scrollable cleanly down to 320px) */}
-          <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+          <div className="w-full min-w-0">
             <GlassSegmented<EventCategory>
               options={categories}
               value={category as EventCategory}
               onChange={(val) => setCategory(val)}
               ariaLabel={t.templatesSection.allCategories}
-              className="w-max"
             />
           </div>
 

@@ -1,5 +1,6 @@
 import { Template, GuestRSVP, Language } from '../types';
 import { translations, uz } from '../locales';
+import { parseHostNames, generateInvitationSlug } from './slug';
 
 export interface CountdownResult {
   days: number;
@@ -181,3 +182,252 @@ export function calculateRSVPStats(rsvps: GuestRSVP[]) {
     acceptanceRate,
   };
 }
+
+/**
+ * Normalizes 12h or 24h time strings (e.g. "6:00 PM", "6:00PM", "9:5", "18:00")
+ * into canonical 24-hour "HH:MM" format.
+ */
+export function normalizeTime24h(rawTime?: string, fallback = '18:00'): string {
+  if (!rawTime || typeof rawTime !== 'string') return fallback;
+  const trimmed = rawTime.trim();
+  if (!trimmed) return fallback;
+
+  const amPmMatch = trimmed.match(/^(\d{1,2}):(\d{1,2})\s*(am|pm)$/i);
+  if (amPmMatch) {
+    let hours = parseInt(amPmMatch[1], 10);
+    const minutes = parseInt(amPmMatch[2], 10);
+    const period = amPmMatch[3].toLowerCase();
+    if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return fallback;
+    if (period === 'pm' && hours !== 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+
+  const hhmmMatch = trimmed.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?$/);
+  if (hhmmMatch) {
+    const hours = parseInt(hhmmMatch[1], 10);
+    const minutes = parseInt(hhmmMatch[2], 10);
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return fallback;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+
+  return fallback;
+}
+
+/**
+ * Returns sorted 24-hour "HH:MM" time options in 15-minute increments,
+ * ensuring any existing normalized time value is also present in the list.
+ */
+export function get24hTimeSlots(currentValue?: string): string[] {
+  const slots = new Set<string>();
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      slots.add(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  const normalized = currentValue ? normalizeTime24h(currentValue, '') : '';
+  if (normalized) {
+    slots.add(normalized);
+  }
+  return Array.from(slots).sort();
+}
+
+const UZ_MONTHS_LOWER = [
+  'yanvar',
+  'fevral',
+  'mart',
+  'aprel',
+  'may',
+  'iyun',
+  'iyul',
+  'avgust',
+  'sentabr',
+  'oktabr',
+  'noyabr',
+  'dekabr',
+];
+
+const UZ_WEEKDAYS_LOWER = [
+  'yakshanba',
+  'dushanba',
+  'seshanba',
+  'chorshanba',
+  'payshanba',
+  'juma',
+  'shanba',
+];
+
+/**
+ * Formats an ISO date ("YYYY-MM-DD") into a human-readable localized date with weekday.
+ * Examples:
+ * - uz: "24 sentabr 2026, payshanba"
+ * - ru: "24 сентября 2026, четверг"
+ * - en: "24 September 2026, Thursday"
+ */
+export function formatLocalizedFullDate(isoDate?: string, language: Language = 'uz'): string {
+  if (!isoDate || typeof isoDate !== 'string') return '';
+  const match = isoDate.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return isoDate;
+
+  const year = parseInt(match[1], 10);
+  const monthIdx = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  const dateObj = new Date(year, monthIdx, day, 12, 0, 0);
+
+  if (isNaN(dateObj.getTime()) || monthIdx < 0 || monthIdx > 11 || day < 1 || day > 31) {
+    return isoDate;
+  }
+
+  if (language === 'uz') {
+    const monthName = UZ_MONTHS_LOWER[monthIdx] || '';
+    const weekdayName = UZ_WEEKDAYS_LOWER[dateObj.getDay()] || '';
+    return `${day} ${monthName} ${year}, ${weekdayName}`;
+  }
+
+  const localeTag = language === 'ru' ? 'ru-RU' : 'en-GB';
+  try {
+    if (language === 'ru') {
+      const datePart = new Intl.DateTimeFormat(localeTag, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+        .format(dateObj)
+        .replace(/\s*г\.?$/i, '')
+        .trim();
+      const weekdayPart = new Intl.DateTimeFormat(localeTag, { weekday: 'long' })
+        .format(dateObj)
+        .toLowerCase();
+      return `${datePart}, ${weekdayPart}`;
+    }
+
+    const datePart = new Intl.DateTimeFormat(localeTag, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(dateObj);
+    const weekdayPart = new Intl.DateTimeFormat(localeTag, { weekday: 'long' }).format(dateObj);
+    return `${datePart}, ${weekdayPart}`;
+  } catch {
+    return isoDate;
+  }
+}
+
+/**
+ * Derives an updated eventTitle from hostNames when the user hasn't customized eventTitle.
+ */
+export function deriveEventTitleFromHosts(
+  newHostNames: string,
+  prevHostNames: string,
+  currentTitle: string
+): { nextTitle: string; wasAutoDerived: boolean } {
+  const trimmedHosts = newHostNames.trim();
+  const prevTrimmed = prevHostNames.trim();
+  const defaultSuffix = 'Nikoh To‘yi';
+  const defaultFullTitle = `${prevTrimmed} ${defaultSuffix}`.trim();
+
+  const isDefaultOrSynced =
+    !currentTitle.trim() ||
+    currentTitle.trim() === defaultSuffix ||
+    currentTitle.trim() === 'Asrorbek & Madina Nikoh To‘yi' ||
+    (prevTrimmed.length > 0 &&
+      (currentTitle.trim() === prevTrimmed || currentTitle.trim() === defaultFullTitle));
+
+  if (!isDefaultOrSynced) {
+    return { nextTitle: currentTitle, wasAutoDerived: false };
+  }
+
+  if (!trimmedHosts) {
+    return { nextTitle: defaultSuffix, wasAutoDerived: true };
+  }
+
+  return {
+    nextTitle: `${trimmedHosts} ${defaultSuffix}`,
+    wasAutoDerived: true,
+  };
+}
+
+export interface BuilderDraftFields {
+  status?: string;
+  slug?: string;
+  hostNames?: string;
+  eventTitle?: string;
+  partner1Name?: string;
+  partner2Name?: string;
+}
+
+/**
+ * Repairs stale saved drafts where hostNames was edited away from the demo default
+ * ("Asrorbek & Madina") in an older build while eventTitle/partner/slug remained stuck.
+ */
+export function healStaleBuilderDraft<T extends BuilderDraftFields>(draft: T): T {
+  const hosts = typeof draft.hostNames === 'string' ? draft.hostNames.trim() : '';
+  if (!hosts || hosts === 'Asrorbek & Madina') {
+    return draft;
+  }
+
+  const next = { ...draft };
+  const { groom, bride } = parseHostNames(hosts);
+
+  if (!next.eventTitle?.trim() || next.eventTitle.trim() === 'Asrorbek & Madina Nikoh To‘yi') {
+    next.eventTitle = `${hosts} Nikoh To‘yi`;
+  }
+
+  if (!next.partner1Name?.trim() || next.partner1Name.trim() === 'Asrorbek') {
+    next.partner1Name = groom;
+    next.partner2Name = bride;
+  }
+
+  if (
+    (!next.status || next.status === 'draft') &&
+    typeof next.slug === 'string' &&
+    next.slug.toLowerCase().startsWith('asrorbek-')
+  ) {
+    const tailMatch = next.slug.match(/-(\d{4})$/);
+    next.slug = generateInvitationSlug(groom, bride, tailMatch?.[1]);
+  }
+
+  return next;
+}
+
+/**
+ * Middle-truncates long filenames while preserving the extension,
+ * e.g. "file_000000008a9882109d0d73368c0a7c3a.jpg" -> "file_0000…c3a.jpg"
+ */
+export function truncateFilenameMiddle(filename: string, maxLength = 24): string {
+  if (!filename) return '';
+  if (filename.length <= maxLength) return filename;
+
+  const lastDot = filename.lastIndexOf('.');
+  const hasExt = lastDot > 0 && filename.length - lastDot <= 6;
+  const ext = hasExt ? filename.slice(lastDot) : '';
+  const base = hasExt ? filename.slice(0, lastDot) : filename;
+
+  const available = maxLength - ext.length - 1; // 1 for ellipsis "…"
+  if (available <= 4) {
+    return `${base.slice(0, Math.max(2, maxLength - ext.length - 1))}…${ext}`;
+  }
+
+  const startChars = Math.max(4, Math.ceil(available * 0.65));
+  const endChars = Math.max(2, available - startChars);
+  return `${base.slice(0, startChars)}…${base.slice(-endChars)}${ext}`;
+}
+
+/**
+ * Formats byte size cleanly in localized B / KB / MB units.
+ */
+export function formatFileSize(bytes?: number, language: Language = 'uz'): string {
+  if (!bytes || bytes <= 0 || !Number.isFinite(bytes)) return '';
+  const unitMB = language === 'ru' ? 'МБ' : 'MB';
+  const unitKB = language === 'ru' ? 'КБ' : 'KB';
+  const unitB = language === 'ru' ? 'Б' : 'B';
+
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} ${unitMB}`;
+  }
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)} ${unitKB}`;
+  }
+  return `${bytes} ${unitB}`;
+}
+

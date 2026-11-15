@@ -215,7 +215,7 @@ export const CustomerDashboard: React.FC = () => {
   };
 
   return (
-    <div className="pt-28 pb-28 lg:pb-20 min-h-screen">
+    <div className="taklifim-page-top pb-16 lg:pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Dashboard Top Header */}
         <GlassSurface
@@ -669,7 +669,7 @@ export const CustomerDashboard: React.FC = () => {
 
             {/* Filter & Search Bar */}
             <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-              <div className="overflow-x-auto no-scrollbar pb-0.5">
+              <div className="w-full lg:w-auto min-w-0">
                 <GlassSegmented
                   ariaLabel={t.dashboard.rsvpSectionTitle}
                   value={guestFilterStatus}
