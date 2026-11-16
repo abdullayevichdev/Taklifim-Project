@@ -3,34 +3,71 @@
     ".read": false,
     ".write": false,
 
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "templates": {
       ".read": true,
       "$id": {
-        ".write": true
+        ".write": "auth != null"
+      }
+    },
+
+    "slugs": {
+      ".read": true,
+      "$slug": {
+        ".write": "auth != null && (!data.exists() || root.child('invitations').child(data.val()).child('ownerId').val() === auth.uid || root.child('invitations').child(data.val()).child('ownerUid').val() === auth.uid)"
       }
     },
 
     "invitations": {
-      ".read": true,
+      ".indexOn": ["ownerId", "ownerUid", "slug"],
+      ".read": "auth != null && ((query.orderByChild === 'ownerId' && query.equalTo === auth.uid) || (query.orderByChild === 'ownerUid' && query.equalTo === auth.uid))",
       "$id": {
-        ".write": true,
+        ".read": "data.child('status').val() === 'paid' || data.child('status').val() === 'published' || (auth != null && (data.child('ownerId').val() === auth.uid || data.child('ownerUid').val() === auth.uid))",
+        ".write": "auth != null && (!data.exists() || data.child('ownerId').val() === auth.uid || data.child('ownerUid').val() === auth.uid) && (!newData.exists() || newData.child('ownerId').val() === auth.uid || newData.child('ownerUid').val() === auth.uid)",
         "status": {
-          ".validate": "!data.exists() || newData.val() === data.val() || (newData.val() !== 'paid' && newData.val() !== 'rejected')"
+          ".validate": "!newData.exists() || (!data.exists() && (newData.val() === 'draft' || newData.val() === 'pending_payment')) || (data.exists() && (newData.val() === data.val() || ((data.val() === 'draft' || data.val() === 'pending_payment') && (newData.val() === 'draft' || newData.val() === 'pending_payment'))))"
+        },
+        "paymentStatus": {
+          ".validate": "!newData.exists() || (!data.exists() && (newData.val() === 'draft' || newData.val() === 'pending_payment')) || (data.exists() && newData.val() === data.val())"
+        },
+        "orderId": {
+          ".validate": "!newData.exists() || !data.exists() || newData.val() === data.val()"
+        },
+        "receiptUrl": {
+          ".validate": false
+        },
+        "customerPhone": {
+          ".validate": false
         }
       }
     },
 
     "orders": {
-      ".read": true,
-      "$id": {
-        ".write": true,
-        "status": {
-          ".validate": "!data.exists() || newData.val() === data.val() || (newData.val() !== 'paid' && newData.val() !== 'rejected')"
-        }
+      ".read": false,
+      ".write": false,
+      "$orderId": {
+        ".read": "auth != null && data.child('ownerUid').val() === auth.uid",
+        ".write": false
+      }
+    },
+
+    "userOrders": {
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
       }
     },
 
     "guests": {
+      ".indexOn": ["invitationSlug", "invitationOwnerId"],
       ".read": true,
       "$id": {
         ".write": true

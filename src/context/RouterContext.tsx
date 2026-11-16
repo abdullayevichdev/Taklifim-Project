@@ -83,6 +83,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     '/templates/:slug',
     '/create/:templateSlug',
     '/i/:slug',
+    '/order/:orderId',
   ];
 
   for (const pattern of parametricPatterns) {

@@ -1,10 +1,7 @@
 import { getTelegramConfig } from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
 import {
-  getOrder,
-  updateInvitationStatus,
-  upsertOrder,
-  type OrderStatus,
+  decideOrderPayment,
 } from './firebaseAdmin.js';
 
 async function tgApi(method: string, body: Record<string, unknown> | FormData) {
@@ -69,10 +66,19 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
   }
 
   try {
-    let order = await getOrder(orderId);
+    const newStatus = action === 'confirm' ? 'paid' : 'rejected';
+    const adminName =
+      `${callback.from?.first_name || ''} ${callback.from?.last_name || ''}`.trim() || 'Admin';
 
-    if (order && (order.status === 'paid' || order.status === 'rejected')) {
-      const statusText = order.status === 'paid' ? 'TASDIQLANGAN ✅' : 'RAD ETILGAN ❌';
+    const decisionResult = await decideOrderPayment({
+      orderId,
+      decision: newStatus,
+      adminName,
+    });
+
+    if (decisionResult.alreadyDecided) {
+      const statusText =
+        decisionResult.existingStatus === 'paid' ? 'TASDIQLANGAN ✅' : 'RAD ETILGAN ❌';
       await tgApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: `⚠️ Ushbu buyurtma allaqachon ${statusText}!`,
@@ -80,31 +86,6 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
       });
       return;
     }
-
-    const newStatus: OrderStatus = action === 'confirm' ? 'paid' : 'rejected';
-    const nowIso = new Date().toISOString();
-
-    await upsertOrder(orderId, {
-      id: orderId,
-      status: newStatus,
-      updatedAt: nowIso,
-      customerName: order?.customerName || 'Mijoz',
-      customerPhone: order?.customerPhone || '',
-      price: order?.price || 0,
-      createdAt: order?.createdAt || nowIso,
-    });
-
-    const invitationId = order?.invitationId;
-    if (invitationId) {
-      try {
-        await updateInvitationStatus(invitationId, newStatus, nowIso);
-      } catch (err) {
-        console.warn('Invitation status sync warning:', err);
-      }
-    }
-
-    const adminName =
-      `${callback.from?.first_name || ''} ${callback.from?.last_name || ''}`.trim() || 'Admin';
     const originalCaption = message?.caption || message?.text || '';
     const statusBadge =
       action === 'confirm'

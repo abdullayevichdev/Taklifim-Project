@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,7 +10,12 @@ import {
 } from '../locales';
 import { api } from '../services/api';
 import { InvitationData, GuestRSVP, OrderItem, Language } from '../types';
-import { calculateRSVPStats, formatPriceUZS } from '../utils/logic';
+import {
+  calculateRSVPStats,
+  formatPriceUZS,
+  CanonicalPaymentStatus,
+  resolveInvitationPaymentStatus,
+} from '../utils/logic';
 import { generateInvitationSlug } from '../utils/slug';
 import { ShareModal } from '../components/ShareModal';
 import { PhoneInput } from '../components/PhoneInput';
@@ -41,6 +46,8 @@ import {
   LayoutGrid,
   List as ListIcon,
   Globe,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 export const CustomerDashboard: React.FC = () => {
@@ -57,11 +64,15 @@ export const CustomerDashboard: React.FC = () => {
     return 'overview';
   }, [path]);
 
-  // Data states
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   const [guests, setGuests] = useState<GuestRSVP[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState(false);
+
+  const prevStatusesRef = useRef<Map<string, CanonicalPaymentStatus>>(new Map());
+  const statusBaselineReadyRef = useRef<boolean>(false);
+  const backfilledOrdersRef = useRef<Set<string>>(new Set());
 
   // Invitations view mode: grid or list
   const [invitationViewMode, setInvitationViewMode] = useState<'grid' | 'list'>('grid');
@@ -91,29 +102,62 @@ export const CustomerDashboard: React.FC = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
+  const loadData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setSyncError(false);
+    try {
       const [invList, guestList, orderList] = await Promise.all([
-        api.getInvitations(),
-        api.getGuests(),
-        api.getOrders(),
+        api.getInvitations(user.id),
+        api.getGuests(undefined, user.id),
+        api.getOrders(user.id),
       ]);
       setInvitations(invList);
       setGuests(guestList);
       setOrders(orderList);
+    } catch {
+      setSyncError(true);
+    } finally {
       setLoading(false);
     }
+  }, [user?.id]);
+
+  useEffect(() => {
+    statusBaselineReadyRef.current = false;
+    prevStatusesRef.current.clear();
     loadData();
 
-    const unsubInv = api.subscribe<InvitationData[]>('invitations', (data) => {
-      setInvitations(data);
-    });
+    if (!user?.id) return;
+
+    const unsubInv = api.subscribeUserInvitations(
+      user.id,
+      (data) => {
+        setInvitations(data);
+        setSyncError(false);
+        setLoading(false);
+      },
+      () => {
+        setSyncError(true);
+        setLoading(false);
+      }
+    );
+
+    const unsubOrders = api.subscribeUserOrders(
+      user.id,
+      (data) => {
+        setOrders(data);
+        setSyncError(false);
+      },
+      () => {
+        setSyncError(true);
+      }
+    );
+
     const unsubGuests = api.subscribe<GuestRSVP[]>('guests', (data) => {
-      setGuests(data);
-    });
-    const unsubOrders = api.subscribe<OrderItem[]>('orders', (data) => {
-      setOrders(data);
+      setGuests((data || []).filter((g) => g.invitationOwnerId === user.id));
     });
 
     return () => {
@@ -121,7 +165,78 @@ export const CustomerDashboard: React.FC = () => {
       unsubGuests();
       unsubOrders();
     };
-  }, []);
+  }, [user?.id, loadData]);
+
+  // Backfill legacy orders that have inv.orderId but are not yet indexed under userOrders/{uid}
+  useEffect(() => {
+    if (!user?.id || invitations.length === 0) return;
+
+    invitations.forEach((inv) => {
+      if (!inv.orderId) return;
+      const alreadyIndexed = orders.some((o) => o.id === inv.orderId);
+      if (alreadyIndexed || backfilledOrdersRef.current.has(inv.orderId)) return;
+
+      backfilledOrdersRef.current.add(inv.orderId);
+      api
+        .getOrderStatus(inv.orderId)
+        .then((res) => {
+          if (res.success && res.status) {
+            setOrders((prev) => {
+              if (prev.some((o) => o.id === inv.orderId)) return prev;
+              return [
+                {
+                  id: inv.orderId!,
+                  orderNumber: inv.orderId!,
+                  serviceType: 'website_invitation',
+                  serviceName: inv.eventTitle,
+                  planName: res.templateName || inv.templateSlug,
+                  customerName: res.customerName || inv.hostNames,
+                  customerPhone: '',
+                  ownerUid: user.id,
+                  date: (res.receiptSentAt || inv.createdAt || '').slice(0, 10),
+                  price: res.price || 0,
+                  status: res.status!,
+                  invitationId: res.invitationId || inv.id,
+                  invitationSlug: res.invitationSlug || inv.slug,
+                  receiptSentAt: res.receiptSentAt,
+                  decidedAt: res.decidedAt,
+                  rejectReason: res.rejectReason,
+                  updatedAt: res.updatedAt,
+                },
+                ...prev,
+              ];
+            });
+          }
+        })
+        .catch(() => {});
+    });
+  }, [invitations, orders, user?.id]);
+
+  // Notify on live payment status transitions
+  useEffect(() => {
+    if (loading || invitations.length === 0) return;
+    const nextMap = new Map<string, CanonicalPaymentStatus>();
+
+    invitations.forEach((inv) => {
+      const linkedOrder = orders.find(
+        (o) => (inv.orderId && o.id === inv.orderId) || o.invitationId === inv.id
+      );
+      const canonical = resolveInvitationPaymentStatus(inv, linkedOrder);
+      nextMap.set(inv.id, canonical);
+
+      if (statusBaselineReadyRef.current) {
+        const prev = prevStatusesRef.current.get(inv.id);
+        if (prev === 'pending_review' && canonical === 'paid') {
+          showToast(t.myInvitations.toastApproved, 'success');
+        } else if (prev === 'pending_review' && canonical === 'rejected') {
+          showToast(t.myInvitations.toastRejected, 'error');
+        }
+      }
+    });
+
+    prevStatusesRef.current = nextMap;
+    statusBaselineReadyRef.current = true;
+  }, [invitations, orders, loading]);
 
   const handleExportCSV = () => {
     if (filteredGuests.length === 0) {
@@ -167,6 +282,13 @@ export const CustomerDashboard: React.FC = () => {
       slug: generateInvitationSlug(inv.partner1Name || inv.hostNames, inv.partner2Name),
       eventTitle: `${inv.eventTitle} ${t.dashboard.duplicateTitleSuffix}`,
       status: 'draft',
+      paymentStatus: 'draft',
+      orderId: undefined,
+      receiptSentAt: undefined,
+      decidedAt: undefined,
+      rejectReason: undefined,
+      ownerId: user?.id || inv.ownerId,
+      ownerUid: user?.id || inv.ownerUid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -277,6 +399,28 @@ export const CustomerDashboard: React.FC = () => {
           })}
         </nav>
 
+        {/* Sync Error Retry Banner */}
+        {syncError && (
+          <div
+            role="alert"
+            className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-900"
+          >
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true" />
+              <span>{t.myInvitations.syncErrorBanner}</span>
+            </div>
+            <GlassButton
+              type="button"
+              tone="light"
+              size="sm"
+              onClick={loadData}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
+            >
+              {t.myInvitations.retryBtn}
+            </GlassButton>
+          </div>
+        )}
+
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8 animate-fadeIn">
@@ -353,56 +497,100 @@ export const CustomerDashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {invitations.slice(0, 3).map((inv) => (
-                        <div
-                          key={inv.id}
-                          className="p-4 rounded-2xl glass-card-lite glass-card-hover space-y-3 flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 text-[10px] font-bold">
-                              <span className="uppercase text-[#4A383F] truncate">{translateCategory(inv.eventType, language)}</span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full shrink-0 ${
-                                  inv.status === 'published' || inv.status === 'paid'
-                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70'
-                                    : 'bg-amber-50 text-amber-800 border border-amber-200/70'
-                                }`}
-                              >
-                                {inv.status === 'published' || inv.status === 'paid' ? t.dashboard.statusActive : t.dashboard.statusDraft}
-                              </span>
-                            </div>
-                            <h4 className="font-playfair text-base font-bold text-[#1E1418] mt-1.5 truncate">
-                              {inv.hostNames}
-                            </h4>
-                            <p className="text-[11px] text-[#4A383F] mt-0.5 tabular-nums truncate">
-                              {inv.eventDate} · {inv.venueName}
-                            </p>
-                          </div>
+                      {invitations.slice(0, 3).map((inv) => {
+                        const linkedOrder = orders.find(
+                          (o) => (inv.orderId && o.id === inv.orderId) || o.invitationId === inv.id
+                        );
+                        const canonical = resolveInvitationPaymentStatus(inv, linkedOrder);
+                        const effectiveOrderId = linkedOrder?.id || inv.orderId;
+                        const primaryTarget =
+                          canonical === 'paid'
+                            ? `/i/${inv.slug}`
+                            : canonical === 'pending_review' || canonical === 'rejected'
+                            ? effectiveOrderId
+                              ? `/order/${encodeURIComponent(effectiveOrderId)}`
+                              : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                            : canonical === 'pending_payment'
+                            ? `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                            : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}`;
+                        const primaryLabel =
+                          canonical === 'paid'
+                            ? t.dashboard.openBtn
+                            : canonical === 'pending_review'
+                            ? t.myInvitations.orderStatusLink
+                            : canonical === 'rejected'
+                            ? t.myInvitations.reuploadReceiptBtn
+                            : canonical === 'pending_payment'
+                            ? t.myInvitations.goToPaymentBtn
+                            : t.myInvitations.continueDraftBtn;
+                        const badgeClass =
+                          canonical === 'paid'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70'
+                            : canonical === 'rejected'
+                            ? 'bg-rose-50 text-rose-800 border border-rose-200/70'
+                            : canonical === 'pending_review'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200/70'
+                            : canonical === 'pending_payment'
+                            ? 'bg-sky-50 text-sky-800 border border-sky-200/70'
+                            : 'bg-slate-100 text-slate-800 border border-slate-200/70';
+                        const badgeText =
+                          canonical === 'paid'
+                            ? t.myInvitations.statusPaidBadge
+                            : canonical === 'rejected'
+                            ? t.myInvitations.statusRejectedBadge
+                            : canonical === 'pending_review'
+                            ? t.myInvitations.statusPendingReviewBadge
+                            : canonical === 'pending_payment'
+                            ? t.myInvitations.statusPendingPaymentBadge
+                            : t.myInvitations.statusDraftBadge;
 
-                          <div className="flex items-center gap-2 pt-2 border-t border-black/5 text-xs">
-                            <Link
-                              to={`/i/${inv.slug}`}
-                              className="flex-1 min-h-[36px] inline-flex items-center justify-center px-3 rounded-xl bg-[#1E1418] text-white font-semibold hover:bg-black transition-colors"
-                            >
-                              {t.dashboard.openBtn}
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShareData({
-                                  url: `/i/${inv.slug}`,
-                                  title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
-                                })
-                              }
-                              className="min-h-[36px] min-w-[36px] rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] flex items-center justify-center cursor-pointer transition-colors"
-                              title={t.common.share}
-                              aria-label={t.common.share}
-                            >
-                              <Share2 className="w-3.5 h-3.5" aria-hidden="true" />
-                            </button>
+                        return (
+                          <div
+                            key={inv.id}
+                            className="p-4 rounded-2xl glass-card-lite glass-card-hover space-y-3 flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 text-[10px] font-bold">
+                                <span className="uppercase text-[#4A383F] truncate">{translateCategory(inv.eventType, language)}</span>
+                                <span className={`px-2 py-0.5 rounded-full shrink-0 ${badgeClass}`}>
+                                  {badgeText}
+                                </span>
+                              </div>
+                              <h4 className="font-playfair text-base font-bold text-[#1E1418] mt-1.5 truncate">
+                                {inv.hostNames}
+                              </h4>
+                              <p className="text-[11px] text-[#4A383F] mt-0.5 tabular-nums truncate">
+                                {inv.eventDate} · {inv.venueName || '—'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-black/5 text-xs">
+                              <Link
+                                to={primaryTarget}
+                                className="flex-1 min-h-[36px] inline-flex items-center justify-center px-3 rounded-xl bg-[#1E1418] text-white font-semibold hover:bg-black transition-colors"
+                              >
+                                {primaryLabel}
+                              </Link>
+                              {canonical === 'paid' && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setShareData({
+                                      url: `/i/${inv.slug}`,
+                                      title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
+                                    })
+                                  }
+                                  className="min-h-[36px] min-w-[36px] rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] flex items-center justify-center cursor-pointer transition-colors"
+                                  title={t.common.share}
+                                  aria-label={t.common.share}
+                                >
+                                  <Share2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </GlassSurface>
@@ -470,99 +658,154 @@ export const CustomerDashboard: React.FC = () => {
             ) : invitationViewMode === 'grid' ? (
               /* Grid View */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {invitations.map((inv) => (
-                  <div
-                    key={inv.id}
-                    className="glass-card-lite glass-card-hover rounded-3xl overflow-hidden flex flex-col justify-between"
-                  >
-                    <div>
-                      {inv.coverImage && (
-                        <div className="h-44 overflow-hidden relative bg-gradient-to-br from-[#F5C9D8]/50 to-[#B9DFFA]/50">
-                          <img
-                            src={inv.coverImage}
-                            alt={inv.hostNames}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-                          <span
-                            className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md border border-white/50 ${
-                              inv.status === 'published' || inv.status === 'paid'
-                                ? 'bg-emerald-600/90 text-white'
-                                : 'bg-amber-500/90 text-white'
+                {invitations.map((inv) => {
+                  const linkedOrder = orders.find(
+                    (o) => (inv.orderId && o.id === inv.orderId) || o.invitationId === inv.id
+                  );
+                  const canonical = resolveInvitationPaymentStatus(inv, linkedOrder);
+                  const effectiveOrderId = linkedOrder?.id || inv.orderId;
+                  const primaryTarget =
+                    canonical === 'paid'
+                      ? `/i/${inv.slug}`
+                      : canonical === 'pending_review' || canonical === 'rejected'
+                      ? effectiveOrderId
+                        ? `/order/${encodeURIComponent(effectiveOrderId)}`
+                        : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                      : canonical === 'pending_payment'
+                      ? `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                      : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}`;
+                  const primaryLabel =
+                    canonical === 'paid'
+                      ? t.dashboard.viewActionTitle
+                      : canonical === 'pending_review'
+                      ? t.myInvitations.orderStatusLink
+                      : canonical === 'rejected'
+                      ? t.myInvitations.reuploadReceiptBtn
+                      : canonical === 'pending_payment'
+                      ? t.myInvitations.goToPaymentBtn
+                      : t.myInvitations.continueDraftBtn;
+                  const badgeClass =
+                    canonical === 'paid'
+                      ? 'bg-emerald-600/95 text-white'
+                      : canonical === 'rejected'
+                      ? 'bg-rose-600/95 text-white'
+                      : canonical === 'pending_review'
+                      ? 'bg-amber-500/95 text-white'
+                      : canonical === 'pending_payment'
+                      ? 'bg-sky-600/95 text-white'
+                      : 'bg-slate-700/90 text-white';
+                  const badgeText =
+                    canonical === 'paid'
+                      ? t.myInvitations.statusPaidBadge
+                      : canonical === 'rejected'
+                      ? t.myInvitations.statusRejectedBadge
+                      : canonical === 'pending_review'
+                      ? t.myInvitations.statusPendingReviewBadge
+                      : canonical === 'pending_payment'
+                      ? t.myInvitations.statusPendingPaymentBadge
+                      : t.myInvitations.statusDraftBadge;
+
+                  return (
+                    <div
+                      key={inv.id}
+                      className="glass-card-lite glass-card-hover rounded-3xl overflow-hidden flex flex-col justify-between"
+                    >
+                      <div>
+                        {inv.coverImage && (
+                          <div className="h-44 overflow-hidden relative bg-gradient-to-br from-[#F5C9D8]/50 to-[#B9DFFA]/50">
+                            <img
+                              src={inv.coverImage}
+                              alt={inv.hostNames}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                            <span
+                              className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md border border-white/50 ${badgeClass}`}
+                            >
+                              {badgeText}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="p-5 space-y-1.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-[#9E3E60]">
+                            {translateCategory(inv.eventType, language)}
+                          </span>
+                          <h3 className="font-playfair text-lg font-bold text-[#1E1418] truncate">
+                            {inv.hostNames}
+                          </h3>
+                          <p className="text-xs text-[#4A383F] tabular-nums truncate">
+                            {inv.eventDate} ({inv.startTime}) · {inv.venueName || '—'}
+                          </p>
+                          {canonical === 'rejected' && (linkedOrder?.rejectReason || inv.rejectReason) && (
+                            <p className="text-[11px] text-rose-700 font-medium truncate">
+                              {t.myInvitations.rejectionReasonLabel} {linkedOrder?.rejectReason || inv.rejectReason}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-5 pt-3 border-t border-black/5 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Link
+                            to={primaryTarget}
+                            className={`min-h-[38px] inline-flex items-center px-3.5 rounded-xl font-semibold transition-colors ${
+                              canonical === 'rejected'
+                                ? 'bg-rose-600 text-white hover:bg-rose-700'
+                                : 'bg-[#1E1418] text-white hover:bg-black'
                             }`}
                           >
-                            {inv.status === 'published' || inv.status === 'paid' ? t.dashboard.statusActive : t.dashboard.statusDraft}
-                          </span>
+                            {primaryLabel}
+                          </Link>
+                          <Link
+                            to={`/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}`}
+                            className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors"
+                            title={t.dashboard.editActionTitle}
+                            aria-label={t.dashboard.editActionTitle}
+                          >
+                            <Edit className="w-3.5 h-3.5" aria-hidden="true" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicate(inv)}
+                            className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors cursor-pointer"
+                            title={t.dashboard.duplicateActionTitle}
+                            aria-label={t.dashboard.duplicateActionTitle}
+                          >
+                            <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                          {canonical === 'paid' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShareData({
+                                  url: `/i/${inv.slug}`,
+                                  title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
+                                })
+                              }
+                              className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors cursor-pointer"
+                              title={t.myInvitations.shareCardTitle}
+                              aria-label={t.myInvitations.shareCardTitle}
+                            >
+                              <Share2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            </button>
+                          )}
                         </div>
-                      )}
 
-                      <div className="p-5 space-y-1.5">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-[#9E3E60]">
-                          {translateCategory(inv.eventType, language)}
-                        </span>
-                        <h3 className="font-playfair text-lg font-bold text-[#1E1418] truncate">
-                          {inv.hostNames}
-                        </h3>
-                        <p className="text-xs text-[#4A383F] tabular-nums truncate">
-                          {inv.eventDate} ({inv.startTime}) · {inv.venueName}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-3 border-t border-black/5 flex items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Link
-                          to={`/i/${inv.slug}`}
-                          className="min-h-[38px] inline-flex items-center px-3.5 rounded-xl bg-[#1E1418] text-white font-semibold hover:bg-black transition-colors"
-                        >
-                          {t.dashboard.viewActionTitle}
-                        </Link>
-                        <Link
-                          to={`/create/${inv.templateSlug}`}
-                          className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors"
-                          title={t.dashboard.editActionTitle}
-                          aria-label={t.dashboard.editActionTitle}
-                        >
-                          <Edit className="w-3.5 h-3.5" aria-hidden="true" />
-                        </Link>
                         <button
                           type="button"
-                          onClick={() => handleDuplicate(inv)}
-                          className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors cursor-pointer"
-                          title={t.dashboard.duplicateActionTitle}
-                          aria-label={t.dashboard.duplicateActionTitle}
+                          onClick={() => setInvitationToDelete(inv)}
+                          className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={t.dashboard.deleteActionTitle}
+                          aria-label={t.dashboard.deleteActionTitle}
                         >
-                          <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShareData({
-                              url: `/i/${inv.slug}`,
-                              title: `${inv.hostNames} — ${inv.eventTitle || translateCategory(inv.eventType, language)}`,
-                            })
-                          }
-                          className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl glass-surface-subtle hover:bg-white text-[#1E1418] transition-colors cursor-pointer"
-                          title={t.myInvitations.shareCardTitle}
-                          aria-label={t.myInvitations.shareCardTitle}
-                        >
-                          <Share2 className="w-3.5 h-3.5" aria-hidden="true" />
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setInvitationToDelete(inv)}
-                        className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title={t.dashboard.deleteActionTitle}
-                        aria-label={t.dashboard.deleteActionTitle}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               /* List View */
@@ -578,62 +821,104 @@ export const CustomerDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/5">
-                      {invitations.map((inv) => (
-                        <tr key={inv.id} className="hover:bg-white/55 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <strong className="text-[#1E1418] block">{inv.hostNames}</strong>
-                            <span className="text-[11px] text-[#4A383F]">{translateCategory(inv.eventType, language)}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-[#4A383F] tabular-nums">{inv.eventDate}</td>
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                inv.status === 'published' || inv.status === 'paid'
-                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-                              }`}
-                            >
-                              {inv.status === 'published' || inv.status === 'paid' ? t.dashboard.statusActive : t.dashboard.statusDraft}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <Link
-                                to={`/i/${inv.slug}`}
-                                className="min-h-[34px] inline-flex items-center px-3 rounded-lg bg-[#1E1418] text-white font-semibold"
-                              >
-                                {t.dashboard.viewActionTitle}
-                              </Link>
-                              <Link
-                                to={`/create/${inv.templateSlug}`}
-                                className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg glass-surface-subtle hover:bg-white text-[#1E1418]"
-                                title={t.dashboard.editActionTitle}
-                                aria-label={t.dashboard.editActionTitle}
-                              >
-                                <Edit className="w-3.5 h-3.5" aria-hidden="true" />
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => handleDuplicate(inv)}
-                                className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg glass-surface-subtle hover:bg-white text-[#1E1418] cursor-pointer"
-                                title={t.dashboard.duplicateActionTitle}
-                                aria-label={t.dashboard.duplicateActionTitle}
-                              >
-                                <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setInvitationToDelete(inv)}
-                                className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                title={t.dashboard.deleteActionTitle}
-                                aria-label={t.dashboard.deleteActionTitle}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {invitations.map((inv) => {
+                        const linkedOrder = orders.find(
+                          (o) => (inv.orderId && o.id === inv.orderId) || o.invitationId === inv.id
+                        );
+                        const canonical = resolveInvitationPaymentStatus(inv, linkedOrder);
+                        const effectiveOrderId = linkedOrder?.id || inv.orderId;
+                        const primaryTarget =
+                          canonical === 'paid'
+                            ? `/i/${inv.slug}`
+                            : canonical === 'pending_review' || canonical === 'rejected'
+                            ? effectiveOrderId
+                              ? `/order/${encodeURIComponent(effectiveOrderId)}`
+                              : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                            : canonical === 'pending_payment'
+                            ? `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}&step=11`
+                            : `/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}`;
+                        const primaryLabel =
+                          canonical === 'paid'
+                            ? t.dashboard.viewActionTitle
+                            : canonical === 'pending_review'
+                            ? t.myInvitations.orderStatusLink
+                            : canonical === 'rejected'
+                            ? t.myInvitations.reuploadReceiptBtn
+                            : canonical === 'pending_payment'
+                            ? t.myInvitations.goToPaymentBtn
+                            : t.myInvitations.continueDraftBtn;
+                        const listBadgeClass =
+                          canonical === 'paid'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : canonical === 'rejected'
+                            ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                            : canonical === 'pending_review'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : canonical === 'pending_payment'
+                            ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                            : 'bg-slate-100 text-slate-800 border border-slate-200';
+                        const badgeText =
+                          canonical === 'paid'
+                            ? t.myInvitations.statusPaidBadge
+                            : canonical === 'rejected'
+                            ? t.myInvitations.statusRejectedBadge
+                            : canonical === 'pending_review'
+                            ? t.myInvitations.statusPendingReviewBadge
+                            : canonical === 'pending_payment'
+                            ? t.myInvitations.statusPendingPaymentBadge
+                            : t.myInvitations.statusDraftBadge;
+
+                        return (
+                          <tr key={inv.id} className="hover:bg-white/55 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <strong className="text-[#1E1418] block">{inv.hostNames}</strong>
+                              <span className="text-[11px] text-[#4A383F]">{translateCategory(inv.eventType, language)}</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-[#4A383F] tabular-nums">{inv.eventDate}</td>
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${listBadgeClass}`}>
+                                {badgeText}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Link
+                                  to={primaryTarget}
+                                  className="min-h-[34px] inline-flex items-center px-3 rounded-lg bg-[#1E1418] text-white font-semibold"
+                                >
+                                  {primaryLabel}
+                                </Link>
+                                <Link
+                                  to={`/create/${inv.templateSlug}?invitationId=${encodeURIComponent(inv.id)}`}
+                                  className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg glass-surface-subtle hover:bg-white text-[#1E1418]"
+                                  title={t.dashboard.editActionTitle}
+                                  aria-label={t.dashboard.editActionTitle}
+                                >
+                                  <Edit className="w-3.5 h-3.5" aria-hidden="true" />
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicate(inv)}
+                                  className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg glass-surface-subtle hover:bg-white text-[#1E1418] cursor-pointer"
+                                  title={t.dashboard.duplicateActionTitle}
+                                  aria-label={t.dashboard.duplicateActionTitle}
+                                >
+                                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setInvitationToDelete(inv)}
+                                  className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  title={t.dashboard.deleteActionTitle}
+                                  aria-label={t.dashboard.deleteActionTitle}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -816,7 +1101,12 @@ export const CustomerDashboard: React.FC = () => {
                         orders.map((ord) => (
                           <tr key={ord.id} className="hover:bg-white/55 transition-colors">
                             <td className="py-3.5 px-4 font-mono tabular-nums font-bold text-[#1E1418]">
-                              {ord.orderNumber}
+                              <Link
+                                to={`/order/${encodeURIComponent(ord.id)}`}
+                                className="text-[#9E3E60] hover:underline"
+                              >
+                                {ord.orderNumber || ord.id}
+                              </Link>
                             </td>
                             <td className="py-3.5 px-4 font-semibold text-[#1E1418]">
                               {ord.serviceName}
@@ -827,8 +1117,9 @@ export const CustomerDashboard: React.FC = () => {
                               {formatPriceUZS(ord.price, language)}
                             </td>
                             <td className="py-3.5 px-4">
-                              <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              <Link
+                                to={`/order/${encodeURIComponent(ord.id)}`}
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                   ord.status === 'confirmed' || ord.status === 'paid'
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                     : ord.status === 'rejected'
@@ -839,7 +1130,7 @@ export const CustomerDashboard: React.FC = () => {
                                 }`}
                               >
                                 {translateOrderStatus(ord.status, language)}
-                              </span>
+                              </Link>
                             </td>
                           </tr>
                         ))

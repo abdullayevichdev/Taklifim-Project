@@ -379,11 +379,12 @@ export const InvitationGuestPage: React.FC = () => {
   const [guestList, setGuestList] = useState<GuestRSVP[]>([]);
 
   useEffect(() => {
+    let unsubscribeGuests: (() => void) | undefined;
+
     async function load() {
       setLoading(true);
       let data = await api.getInvitationBySlug(slug);
 
-      // Agar slug bo'yicha topilmasa, mockInvitations orasida qidirish
       if (!data) {
         const mockMatch = mockInvitations.find((m) => m.slug === slug || m.id === slug);
         if (mockMatch) {
@@ -394,29 +395,26 @@ export const InvitationGuestPage: React.FC = () => {
       if (data) {
         setInvitation(data);
         setInvLang(data.language || 'uz');
-      } else {
-        // Agar umuman topilmasa, qoralamalardan yoki birinchi mavjud taklifnomadan tekshirish
-        const allLocal = await api.getInvitations();
-        const fallback = allLocal.find((i) => i.slug === slug) || allLocal[0] || mockInvitations[0];
-        setInvitation(fallback);
-        if (fallback) setInvLang(fallback.language || 'uz');
-      }
-      const guests = await api.getGuests(slug);
-      setGuestList(guests);
-      setLoading(false);
 
-      // Increment view count in real time
-      api.incrementViews(slug);
+        if (data.status === 'paid' || data.status === 'published') {
+          const guests = await api.getGuests(slug);
+          setGuestList(guests);
+          api.incrementViews(slug);
+
+          unsubscribeGuests = api.subscribe<GuestRSVP[]>('guests', (allGuests) => {
+            setGuestList(allGuests.filter((g) => g.invitationSlug === slug));
+          });
+        }
+      } else {
+        setInvitation(null);
+      }
+
+      setLoading(false);
     }
     load();
 
-    // Live subscription for real-time guest RSVP and wishes
-    const unsubscribeGuests = api.subscribe<GuestRSVP[]>('guests', (allGuests) => {
-      setGuestList(allGuests.filter((g) => g.invitationSlug === slug));
-    });
-
     return () => {
-      unsubscribeGuests();
+      if (unsubscribeGuests) unsubscribeGuests();
     };
   }, [slug]);
 
@@ -602,7 +600,7 @@ export const InvitationGuestPage: React.FC = () => {
 
   const activeLocaleT = translations[invLang] || translations.uz;
 
-  if (loading || !invitation) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 taklifim-glass-backdrop">
         <GlassSurface variant="elevated" rounded="3xl" className="p-8 text-center space-y-3 max-w-xs w-full">
@@ -610,6 +608,33 @@ export const InvitationGuestPage: React.FC = () => {
           <p className="font-playfair text-sm font-semibold text-[#1E1418]">
             {activeLocaleT.guestGate.loading}
           </p>
+        </GlassSurface>
+      </div>
+    );
+  }
+
+  if (!invitation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 taklifim-glass-backdrop">
+        <GlassSurface variant="elevated" rounded="3xl" className="max-w-md w-full p-8 text-center space-y-4">
+          <h2 className="font-playfair text-xl font-bold text-[#1E1418]">
+            {activeLocaleT.guestGate.notFoundTitle}
+          </h2>
+          <p className="text-xs sm:text-sm text-[#4A383F] leading-relaxed">
+            {activeLocaleT.guestGate.notFoundDesc}
+          </p>
+          <GlassButton
+            href="/"
+            tone="tinted"
+            size="md"
+            className="w-full"
+            onAnchorClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+          >
+            {activeLocaleT.guestGate.backHomeBtn}
+          </GlassButton>
         </GlassSurface>
       </div>
     );

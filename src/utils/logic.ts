@@ -1,4 +1,4 @@
-import { Template, GuestRSVP, Language } from '../types';
+import { Template, GuestRSVP, Language, InvitationData, OrderItem } from '../types';
 import { translations, uz } from '../locales';
 import { parseHostNames, generateInvitationSlug } from './slug';
 
@@ -431,3 +431,113 @@ export function formatFileSize(bytes?: number, language: Language = 'uz'): strin
   return `${bytes} ${unitB}`;
 }
 
+export type CanonicalPaymentStatus =
+  | 'draft'
+  | 'pending_payment'
+  | 'pending_review'
+  | 'paid'
+  | 'rejected';
+
+/**
+ * Resolves the canonical lifecycle status of an invitation by merging
+ * invitation fields with its linked order record (single source of truth).
+ */
+export function resolveInvitationPaymentStatus(
+  invitation?: Partial<Pick<InvitationData, 'status' | 'paymentStatus'>> | null,
+  order?: Partial<Pick<OrderItem, 'status'>> | null
+): CanonicalPaymentStatus {
+  const invStatus = invitation?.status;
+  const invPayStatus = invitation?.paymentStatus;
+  const orderStatus = order?.status;
+
+  if (
+    invStatus === 'paid' ||
+    invStatus === 'published' ||
+    invPayStatus === 'paid' ||
+    orderStatus === 'paid' ||
+    orderStatus === 'confirmed' ||
+    orderStatus === 'completed'
+  ) {
+    return 'paid';
+  }
+
+  if (orderStatus === 'rejected') {
+    return 'rejected';
+  }
+
+  if (orderStatus === 'pending_review') {
+    return 'pending_review';
+  }
+
+  if (invPayStatus === 'rejected' || invStatus === 'rejected') {
+    return 'rejected';
+  }
+
+  if (invPayStatus === 'pending_review' || invStatus === 'pending_review') {
+    return 'pending_review';
+  }
+
+  if (
+    orderStatus === 'pending_payment' ||
+    orderStatus === 'pending' ||
+    invPayStatus === 'pending_payment' ||
+    invStatus === 'pending_payment'
+  ) {
+    return 'pending_payment';
+  }
+
+  return 'draft';
+}
+
+/**
+ * Formats an ISO timestamp as a short localized relative time (e.g. "35 daqiqa oldin").
+ */
+export function formatRelativeTimeLocalized(
+  isoDate?: string,
+  language: Language = 'uz',
+  nowMs: number = Date.now()
+): string {
+  if (!isoDate || typeof isoDate !== 'string') return '';
+  const parsed = Date.parse(isoDate);
+  if (!Number.isFinite(parsed)) return '';
+
+  const diffSec = Math.max(0, Math.floor((nowMs - parsed) / 1000));
+  if (diffSec < 60) {
+    if (language === 'ru') return 'Только что';
+    if (language === 'en') return 'Just now';
+    return 'Hozirgina';
+  }
+
+  if (diffSec < 3600) {
+    const mins = Math.floor(diffSec / 60);
+    if (language === 'ru') return `${mins} мин. назад`;
+    if (language === 'en') return `${mins}m ago`;
+    return `${mins} daqiqa oldin`;
+  }
+
+  if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    if (language === 'ru') return `${hours} ч. назад`;
+    if (language === 'en') return `${hours}h ago`;
+    return `${hours} soat oldin`;
+  }
+
+  const days = Math.floor(diffSec / 86400);
+  if (language === 'ru') return `${days} дн. назад`;
+  if (language === 'en') return `${days}d ago`;
+  return `${days} kun oldin`;
+}
+
+/**
+ * Returns true when receiptSentAt is at least thresholdHours (default 2h) old.
+ */
+export function isReviewOverdue(
+  receiptSentAt?: string,
+  thresholdHours = 2,
+  nowMs: number = Date.now()
+): boolean {
+  if (!receiptSentAt || typeof receiptSentAt !== 'string') return false;
+  const parsed = Date.parse(receiptSentAt);
+  if (!Number.isFinite(parsed)) return false;
+  return nowMs - parsed >= thresholdHours * 60 * 60 * 1000;
+}

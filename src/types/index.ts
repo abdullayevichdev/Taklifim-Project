@@ -56,7 +56,11 @@ export interface InvitationData {
   templateSlug: string;
   language: Language; // Guest facing language
   status: 'draft' | 'pending_payment' | 'pending_review' | 'published' | 'paid' | 'rejected';
+  paymentStatus?: 'draft' | 'pending_payment' | 'pending_review' | 'paid' | 'rejected';
   orderId?: string;
+  receiptSentAt?: string;
+  decidedAt?: string;
+  rejectReason?: string;
   createdAt: string;
   updatedAt: string;
   
@@ -137,6 +141,7 @@ export interface InvitationData {
   
   viewsCount?: number;
   ownerId?: string; // Firebase UID yoki local user ID
+  ownerUid?: string;
 }
 
 export interface GuestRSVP {
@@ -175,8 +180,15 @@ export interface OrderItem {
   venueName?: string;
   receiptUrl?: string;
   receiptType?: 'photo' | 'document';
+  ownerUid?: string;
   submittedAt?: string;
+  receiptSentAt?: string;
   reviewedAt?: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  rejectReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PricingPlan {

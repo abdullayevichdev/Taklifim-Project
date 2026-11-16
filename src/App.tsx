@@ -51,6 +51,9 @@ const CustomerDashboard = lazyWithRetry(() =>
 const MyInvitationsPage = lazyWithRetry(() =>
   import('./pages/MyInvitationsPage').then((m) => ({ default: m.MyInvitationsPage }))
 );
+const OrderStatusPage = lazyWithRetry(() =>
+  import('./pages/OrderStatusPage').then((m) => ({ default: m.OrderStatusPage }))
+);
 const NotFoundPage = lazyWithRetry(() =>
   import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 );
@@ -93,72 +96,79 @@ const AppContent: React.FC = () => {
   const { path, navigate } = useRouter();
   const { language } = useLanguage();
 
+  const routePath = path.split('?')[0];
+
   // Determine if this is a dedicated guest-facing invitation page
-  const isGuestInvitation = path.startsWith('/i/');
+  const isGuestInvitation = routePath.startsWith('/i/');
 
   // Route dispatcher
   const renderCurrentPage = () => {
     // Guest Invitation
-    if (path.startsWith('/i/')) {
+    if (routePath.startsWith('/i/')) {
       return <InvitationGuestPage />;
     }
 
     // Home
-    if (path === '/' || path === '') {
+    if (routePath === '/' || routePath === '') {
       return <HomePage />;
     }
 
     // Templates
-    if (path === '/templates') {
+    if (routePath === '/templates') {
       return <TemplatesPage />;
     }
-    if (path.startsWith('/templates/')) {
+    if (routePath.startsWith('/templates/')) {
       return <TemplateDetailPage />;
     }
 
     // How It Works / Qanday ishlaydi
-    if (path === '/how-it-works' || path === '/#how-it-works') {
+    if (routePath === '/how-it-works' || path === '/#how-it-works') {
       return <HomePage />;
     }
 
     // Builder
-    if (path.startsWith('/create/')) {
+    if (routePath.startsWith('/create/')) {
       return <ProtectedRoute><BuilderPage /></ProtectedRoute>;
     }
 
     // Pricing
-    if (path === '/pricing') {
+    if (routePath === '/pricing') {
       return <PricingPage />;
     }
 
     // Contact
-    if (path === '/contact') {
+    if (routePath === '/contact') {
       return <ContactPage />;
     }
 
     // FAQ
-    if (path === '/faq') {
+    if (routePath === '/faq') {
       return <FaqPage />;
     }
 
     // Legal
-    if (path === '/privacy' || path === '/terms') {
+    if (routePath === '/privacy' || routePath === '/terms') {
       return <LegalPage />;
     }
 
     // Auth
-    if (path === '/login' || path === '/register' || path === '/forgot-password') {
+    if (routePath === '/login' || routePath === '/register' || routePath === '/forgot-password') {
       return <AuthPages />;
     }
 
     // Customer Dashboard
-    if (path.startsWith('/dashboard')) {
+    if (routePath.startsWith('/dashboard')) {
       return <ProtectedRoute><CustomerDashboard /></ProtectedRoute>;
     }
 
     // My Invitations / Taklifnomalarim
-    if (path === '/my-invitations' || path === '/taklifnomalarim') {
+    if (routePath === '/my-invitations' || routePath === '/taklifnomalarim') {
       return <ProtectedRoute><MyInvitationsPage /></ProtectedRoute>;
+    }
+
+    // Order Status Tracking
+    if (routePath.startsWith('/order/')) {
+      return <ProtectedRoute><OrderStatusPage /></ProtectedRoute>;
     }
 
     return <NotFoundPage />;

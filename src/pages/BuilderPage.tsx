@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, Link } from '../context/RouterContext';
 import { useLanguage, formatItemCount, translateCategory } from '../locales';
 import { useAuth } from '../context/AuthContext';
 import { mockTemplates } from '../data/mockTemplates';
 import { mockPlans } from '../data/mockPlans';
-import { InvitationData, ScheduleItem, DressCodeColor, Template, OrderStatus } from '../types';
+import { InvitationData, ScheduleItem, DressCodeColor, Template, OrderStatus, OrderItem } from '../types';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
@@ -12,7 +12,19 @@ import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
-import { formatPriceUZS, normalizeTime24h, get24hTimeSlots, formatLocalizedFullDate, deriveEventTitleFromHosts, healStaleBuilderDraft, truncateFilenameMiddle, formatFileSize } from '../utils/logic';
+import {
+  formatPriceUZS,
+  normalizeTime24h,
+  get24hTimeSlots,
+  formatLocalizedFullDate,
+  deriveEventTitleFromHosts,
+  healStaleBuilderDraft,
+  truncateFilenameMiddle,
+  formatFileSize,
+  resolveInvitationPaymentStatus,
+  formatRelativeTimeLocalized,
+  isReviewOverdue,
+} from '../utils/logic';
 import { generateInvitationSlug, cleanNameForSlug, parseHostNames, generate4DigitCode } from '../utils/slug';
 import {
   compressImageForUpload,
@@ -136,11 +148,19 @@ export const BuilderPage: React.FC = () => {
     return () => unsub();
   }, []);
 
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const initialSearchParams =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const queryInvitationId = initialSearchParams?.get('invitationId') || '';
+  const initialQueryStepRaw = parseInt(initialSearchParams?.get('step') || '', 10);
+  const initialQueryStep =
+    Number.isFinite(initialQueryStepRaw) && initialQueryStepRaw >= 1 && initialQueryStepRaw <= 11
+      ? initialQueryStepRaw
+      : 1;
+
+  const [currentStep, setCurrentStep] = useState<number>(initialQueryStep);
+  const [isLoadingInvitation, setIsLoadingInvitation] = useState<boolean>(Boolean(queryInvitationId));
   const [activeTabMobile, setActiveTabMobile] = useState<'settings' | 'preview'>('settings');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('plan-standard');
-  const [isDemoSubmitting, setIsDemoSubmitting] = useState<boolean>(false);
   const [isOrderComplete, setIsOrderComplete] = useState<boolean>(false);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
   const [previewAudioUrl, setPreviewAudioUrl] = useState<string>('');
@@ -148,6 +168,8 @@ export const BuilderPage: React.FC = () => {
   // Payment Receipt and Telegram Integration States
   const [activeOrderId, setActiveOrderId] = useState<string>('');
   const [orderStatus, setOrderStatus] = useState<OrderStatus>('draft');
+  const [orderRejectReason, setOrderRejectReason] = useState<string>('');
+  const [orderSentAt, setOrderSentAt] = useState<string>('');
   const [copiedCard, setCopiedCard] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
@@ -159,49 +181,52 @@ export const BuilderPage: React.FC = () => {
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const existingSlugsRef = useRef<Set<string>>(new Set());
-  const isSlugManualRef = useRef<boolean>(false);
-  const isTitleManualRef = useRef<boolean>(false);
+  const isSlugManualRef = useRef<boolean>(Boolean(queryInvitationId));
+  const isTitleManualRef = useRef<boolean>(Boolean(queryInvitationId));
   const sessionSlugCodeRef = useRef<string>(generate4DigitCode());
+  const orderTransitionBaselineRef = useRef<string | null>(null);
 
   // Main Builder State (Live reactive)
   const [invitationState, setInvitationState] = useState<InvitationData>(() => {
-    // Check saved draft in localStorage
-    try {
-      const draft = localStorage.getItem('taklifim_builder_draft');
-      if (draft) {
-        const parsed = JSON.parse(draft);
-        const healed = healStaleBuilderDraft(parsed);
-        if (healed.startTime) {
-          healed.startTime = normalizeTime24h(healed.startTime, '18:00');
-        }
-        if (Array.isArray(healed.schedule)) {
-          healed.schedule = healed.schedule.map((item: ScheduleItem) => ({
-            ...item,
-            time: normalizeTime24h(item.time, '18:00'),
-          }));
-        }
-        const tailMatch = typeof healed.slug === 'string' ? healed.slug.match(/-(\d{4})$/) : null;
-        if (tailMatch) {
-          sessionSlugCodeRef.current = tailMatch[1];
-        }
-        if (params.templateSlug && healed.templateSlug !== params.templateSlug) {
-          const matchTpl = mockTemplates.find((t) => t.slug === params.templateSlug);
-          if (matchTpl) {
-            healed.templateId = matchTpl.id;
-            healed.templateSlug = matchTpl.slug;
-            healed.coverImage = matchTpl.previewImage;
-            healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
-            healed.customColors = { ...matchTpl.colorStyle };
-            healed.customFonts = {
-              heading: matchTpl.typography.headingFont,
-              body: matchTpl.typography.bodyFont,
-            };
+    // Only hydrate local draft when NOT explicitly opening a specific ?invitationId=...
+    if (!queryInvitationId) {
+      try {
+        const draft = localStorage.getItem('taklifim_builder_draft');
+        if (draft) {
+          const parsed = JSON.parse(draft);
+          const healed = healStaleBuilderDraft(parsed);
+          if (healed.startTime) {
+            healed.startTime = normalizeTime24h(healed.startTime, '18:00');
           }
+          if (Array.isArray(healed.schedule)) {
+            healed.schedule = healed.schedule.map((item: ScheduleItem) => ({
+              ...item,
+              time: normalizeTime24h(item.time, '18:00'),
+            }));
+          }
+          const tailMatch = typeof healed.slug === 'string' ? healed.slug.match(/-(\d{4})$/) : null;
+          if (tailMatch) {
+            sessionSlugCodeRef.current = tailMatch[1];
+          }
+          if (params.templateSlug && healed.templateSlug !== params.templateSlug) {
+            const matchTpl = mockTemplates.find((t) => t.slug === params.templateSlug);
+            if (matchTpl) {
+              healed.templateId = matchTpl.id;
+              healed.templateSlug = matchTpl.slug;
+              healed.coverImage = matchTpl.previewImage;
+              healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
+              healed.customColors = { ...matchTpl.colorStyle };
+              healed.customFonts = {
+                heading: matchTpl.typography.headingFont,
+                body: matchTpl.typography.bodyFont,
+              };
+            }
+          }
+          return healed;
         }
-        return healed;
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
     const initialCode = sessionSlugCodeRef.current;
@@ -287,11 +312,116 @@ export const BuilderPage: React.FC = () => {
   const isSlugLocked =
     invitationState.status !== 'draft' || Boolean(activeOrderId) || isOrderComplete;
 
-  // Load known slugs once for uniqueness checks during auto-slug updates
+  // Hydrate existing invitation / order status from Firebase on load or F5 reload
   useEffect(() => {
     let active = true;
+
+    async function hydrateFromServer() {
+      const targetId = queryInvitationId || invitationState.id;
+      const storedOrderId = !queryInvitationId ? invitationState.orderId : '';
+
+      if (queryInvitationId) {
+        setIsLoadingInvitation(true);
+      }
+
+      try {
+        let remoteInv: InvitationData | null = null;
+        if (targetId && (queryInvitationId || storedOrderId || invitationState.status !== 'draft')) {
+          remoteInv = await api.getInvitationById(targetId);
+        }
+
+        if (!active) return;
+
+        if (remoteInv) {
+          isSlugManualRef.current = true;
+          isTitleManualRef.current = true;
+          lastSyncedSlugRef.current = remoteInv.templateSlug || lastSyncedSlugRef.current;
+
+          const normalizedInv: InvitationData = {
+            ...remoteInv,
+            startTime: normalizeTime24h(remoteInv.startTime, '18:00'),
+            schedule: Array.isArray(remoteInv.schedule)
+              ? remoteInv.schedule.map((s) => ({ ...s, time: normalizeTime24h(s.time, '18:00') }))
+              : [],
+          };
+
+          setInvitationState(normalizedInv);
+
+          const ordId = normalizedInv.orderId || storedOrderId || '';
+          if (ordId) {
+            setActiveOrderId(ordId);
+            const ordRes = await api.getOrderStatus(ordId);
+            if (!active) return;
+            const canonical = resolveInvitationPaymentStatus(
+              normalizedInv,
+              ordRes.success && ordRes.status ? { status: ordRes.status } : null
+            );
+            orderTransitionBaselineRef.current = canonical;
+            setOrderStatus(canonical);
+            if (ordRes.rejectReason || normalizedInv.rejectReason) {
+              setOrderRejectReason(ordRes.rejectReason || normalizedInv.rejectReason || '');
+            }
+            if (ordRes.receiptSentAt || normalizedInv.receiptSentAt) {
+              setOrderSentAt(ordRes.receiptSentAt || normalizedInv.receiptSentAt || '');
+            }
+            if (canonical === 'paid' && !queryInvitationId) {
+              try { localStorage.removeItem('taklifim_builder_draft'); } catch {}
+              setPublishedSlug(normalizedInv.slug);
+              setIsOrderComplete(true);
+            } else if (canonical === 'paid' && initialQueryStep === 11) {
+              setPublishedSlug(normalizedInv.slug);
+              setIsOrderComplete(true);
+            } else if (
+              initialQueryStep === 1 ||
+              (!initialSearchParams?.get('step') &&
+                (canonical === 'pending_review' || canonical === 'rejected'))
+            ) {
+              if (!initialSearchParams?.get('step') && (canonical === 'pending_review' || canonical === 'rejected')) {
+                setCurrentStep(11);
+              }
+            }
+          } else {
+            const canonical = resolveInvitationPaymentStatus(normalizedInv, null);
+            orderTransitionBaselineRef.current = canonical;
+            setOrderStatus(canonical);
+          }
+        } else if (storedOrderId) {
+          setActiveOrderId(storedOrderId);
+          const ordRes = await api.getOrderStatus(storedOrderId);
+          if (!active) return;
+          if (ordRes.success && ordRes.status) {
+            const canonical = resolveInvitationPaymentStatus(null, { status: ordRes.status });
+            orderTransitionBaselineRef.current = canonical;
+            setOrderStatus(canonical);
+            if (ordRes.rejectReason) setOrderRejectReason(ordRes.rejectReason);
+            if (ordRes.receiptSentAt) setOrderSentAt(ordRes.receiptSentAt);
+            if (canonical === 'paid') {
+              try { localStorage.removeItem('taklifim_builder_draft'); } catch {}
+              setPublishedSlug(ordRes.invitationSlug || invitationState.slug);
+              setIsOrderComplete(true);
+            } else if (canonical === 'pending_review' || canonical === 'rejected') {
+              setCurrentStep(11);
+            }
+          }
+        }
+      } finally {
+        if (active) setIsLoadingInvitation(false);
+      }
+    }
+
+    hydrateFromServer();
+
+    return () => {
+      active = false;
+    };
+  }, [queryInvitationId]);
+
+  // Load user's known slugs once for uniqueness checks during auto-slug updates
+  useEffect(() => {
+    let active = true;
+    if (!user?.id) return;
     api
-      .getInvitations()
+      .getInvitations(user.id)
       .then((list) => {
         if (!active || !Array.isArray(list)) return;
         const slugs = new Set<string>();
@@ -306,11 +436,11 @@ export const BuilderPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [invitationState.id]);
+  }, [invitationState.id, user?.id]);
 
   // Debounced automatic slug regeneration from hostNames while draft & not manually edited
   useEffect(() => {
-    if (isSlugLocked || isSlugManualRef.current) return;
+    if (isSlugLocked || isSlugManualRef.current || isLoadingInvitation) return;
 
     const timer = window.setTimeout(() => {
       const { groom, bride } = parseHostNames(invitationState.hostNames);
@@ -331,7 +461,7 @@ export const BuilderPage: React.FC = () => {
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [invitationState.hostNames, isSlugLocked]);
+  }, [invitationState.hostNames, isSlugLocked, isLoadingInvitation]);
 
   // Keep template sync if changed
   const handleSelectTemplate = (tpl: Template) => {
@@ -355,9 +485,9 @@ export const BuilderPage: React.FC = () => {
       },
     }));
 
-    // Update browser URL silently without full reload
+    // Update browser URL silently while preserving ?invitationId=...&step=... query params
     if (typeof window !== 'undefined' && window.history?.replaceState) {
-      window.history.replaceState({}, '', `/create/${tpl.slug}`);
+      window.history.replaceState({}, '', `/create/${tpl.slug}${window.location.search || ''}`);
     }
 
     showToast(`«${tpl.name}» ${t.builder.toasts.templateSelectedSuffix}`, 'info');
@@ -365,6 +495,7 @@ export const BuilderPage: React.FC = () => {
 
   // Synchronize ONLY when route URL templateSlug parameter changes externally
   useEffect(() => {
+    if (queryInvitationId) return;
     if (params.templateSlug && params.templateSlug !== lastSyncedSlugRef.current) {
       lastSyncedSlugRef.current = params.templateSlug;
       const match = availableTemplates.find(
@@ -374,40 +505,112 @@ export const BuilderPage: React.FC = () => {
         handleSelectTemplate(match);
       }
     }
-  }, [params.templateSlug, availableTemplates]);
+  }, [params.templateSlug, availableTemplates, queryInvitationId]);
 
-  // Realtime 5-second status polling timer when order is pending review
+  const handleResolvedOrderUpdate = useCallback(
+    (nextStatus: OrderStatus, reason?: string, sentAt?: string, slug?: string) => {
+      const canonical = resolveInvitationPaymentStatus(null, { status: nextStatus });
+      const prevCanonical = orderTransitionBaselineRef.current;
+
+      setOrderStatus(canonical);
+      if (reason !== undefined) setOrderRejectReason(reason);
+      if (sentAt) setOrderSentAt(sentAt);
+
+      if (canonical === 'paid') {
+        try { localStorage.removeItem('taklifim_builder_draft'); } catch {}
+        setInvitationState((prev) => ({
+          ...prev,
+          status: 'paid',
+          paymentStatus: 'paid',
+          orderId: activeOrderId || prev.orderId,
+        }));
+        setPublishedSlug(slug || invitationState.slug);
+        setIsOrderComplete(true);
+        if (prevCanonical && prevCanonical !== 'paid') {
+          showToast(t.builder.toasts.invitationActivated, 'success');
+          try {
+            confetti({
+              particleCount: 160,
+              spread: 90,
+              origin: { y: 0.5 },
+              colors: ['#F5C9D8', '#B9DFFA', '#B48B47', '#D9658B', '#FFD700'],
+            });
+          } catch {}
+        }
+      } else if (canonical === 'rejected' && prevCanonical && prevCanonical !== 'rejected') {
+        setInvitationState((prev) => ({
+          ...prev,
+          status: 'rejected',
+          paymentStatus: 'rejected',
+          rejectReason: reason,
+        }));
+        showToast(t.builder.toasts.receiptRejected, 'error');
+      }
+
+      orderTransitionBaselineRef.current = canonical;
+    },
+    [activeOrderId, invitationState.slug, showToast, t.builder.toasts.invitationActivated, t.builder.toasts.receiptRejected]
+  );
+
+  // Real-time RTDB subscription + visibility-aware 5s polling while order is pending_review
   useEffect(() => {
     if (!activeOrderId || orderStatus !== 'pending_review') return;
 
-    const interval = setInterval(async () => {
+    const unsubRtdb = api.subscribeOrder(activeOrderId, (ord: OrderItem | null) => {
+      if (!ord?.status) return;
+      handleResolvedOrderUpdate(
+        ord.status,
+        ord.rejectReason,
+        ord.receiptSentAt || ord.submittedAt,
+        ord.invitationSlug
+      );
+    });
+
+    let timerId: number | null = null;
+    const pollOnce = async () => {
       const res = await api.getOrderStatus(activeOrderId);
       if (res.success && res.status) {
-        setOrderStatus(res.status);
-
-        if (res.status === 'paid') {
-          // Activate invitation as paid
-          await api.saveInvitation({
-            ...invitationState,
-            status: 'paid',
-            orderId: activeOrderId,
-            updatedAt: new Date().toISOString(),
-          });
-
-          setIsOrderComplete(true);
-          setPublishedSlug(invitationState.slug);
-          showToast(t.builder.toasts.invitationActivated, 'success');
-          try {
-            confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 }, colors: ['#F5C9D8', '#B9DFFA', '#B48B47', '#D9658B', '#FFD700'] });
-          } catch {}
-        } else if (res.status === 'rejected') {
-          showToast(t.builder.toasts.receiptRejected, 'error');
-        }
+        handleResolvedOrderUpdate(
+          res.status,
+          res.rejectReason,
+          res.receiptSentAt,
+          res.invitationSlug
+        );
       }
-    }, 5000);
+    };
 
-    return () => clearInterval(interval);
-  }, [activeOrderId, orderStatus, invitationState]);
+    const startPolling = () => {
+      if (timerId !== null || document.hidden) return;
+      timerId = window.setInterval(() => {
+        if (!document.hidden) pollOnce();
+      }, 5000);
+    };
+
+    const stopPolling = () => {
+      if (timerId !== null) {
+        window.clearInterval(timerId);
+        timerId = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        pollOnce();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      unsubRtdb();
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [activeOrderId, orderStatus, handleResolvedOrderUpdate]);
 
   // Copy Card Number to clipboard
   const handleCopyCardNumber = () => {
@@ -466,7 +669,7 @@ export const BuilderPage: React.FC = () => {
     }
   };
 
-  // Upload receipt and send to Telegram admin
+  // Upload receipt and send to Telegram admin (server atomically commits order & pending_review)
   const handleSubmitReceiptUpload = async () => {
     const isPdf =
       preparedFileType === 'application/pdf' ||
@@ -494,10 +697,10 @@ export const BuilderPage: React.FC = () => {
     setUploadError('');
 
     try {
-      const currentTemplate = availableTemplates.find((t) => t.slug === invitationState.templateSlug) || initialTemplate;
+      const currentTemplate = availableTemplates.find((tpl) => tpl.slug === invitationState.templateSlug) || initialTemplate;
       const finalPrice = currentTemplate?.price || 60000;
 
-      let orderId = activeOrderId;
+      let orderId = activeOrderId || invitationState.orderId || '';
       if (!orderId) {
         const order = await api.createOrder({
           serviceType: 'website_invitation',
@@ -506,22 +709,28 @@ export const BuilderPage: React.FC = () => {
           price: finalPrice,
           customerName: invitationState.hostNames,
           customerPhone: cleanPhone,
+          ownerUid: user?.id,
           invitationId: invitationState.id,
           invitationSlug: invitationState.slug,
           templateName: currentTemplate.name,
           weddingDate: invitationState.eventDate,
           venueName: invitationState.venueName,
-          status: 'pending_review',
+          status: 'pending_payment',
         });
         orderId = order.id;
         setActiveOrderId(orderId);
       }
 
+      // Save invitation content first; keep draft/pending_payment client-side (server sets pending_review atomically)
+      const safeClientStatus =
+        invitationState.status === 'draft' || invitationState.status === 'pending_payment'
+          ? 'pending_payment'
+          : invitationState.status;
       await api.saveInvitation({
         ...invitationState,
-        status: 'pending_review',
-        orderId,
-        ownerId: user?.id || 'anonymous',
+        status: safeClientStatus,
+        ownerId: user?.id || invitationState.ownerId,
+        ownerUid: user?.id || invitationState.ownerUid,
         updatedAt: new Date().toISOString(),
       });
 
@@ -556,7 +765,40 @@ export const BuilderPage: React.FC = () => {
       });
 
       if (res.success) {
+        const nowSentAt = res.receiptSentAt || new Date().toISOString();
+        orderTransitionBaselineRef.current = 'pending_review';
+        setActiveOrderId(orderId);
         setOrderStatus('pending_review');
+        setOrderRejectReason('');
+        setOrderSentAt(nowSentAt);
+        setSelectedFile(null);
+        setFileBase64('');
+        setPreparedFileType('');
+        setPreparedFileName('');
+
+        const updatedInv: InvitationData = {
+          ...invitationState,
+          status: 'pending_review',
+          paymentStatus: 'pending_review',
+          orderId,
+          receiptSentAt: nowSentAt,
+          ownerId: user?.id || invitationState.ownerId,
+          ownerUid: user?.id || invitationState.ownerUid,
+        };
+        setInvitationState(updatedInv);
+        try {
+          if (!queryInvitationId) {
+            localStorage.setItem('taklifim_builder_draft', JSON.stringify(updatedInv));
+          }
+          if (typeof window !== 'undefined' && window.history?.replaceState) {
+            window.history.replaceState(
+              {},
+              '',
+              `/create/${updatedInv.templateSlug}?invitationId=${encodeURIComponent(updatedInv.id)}&step=11`
+            );
+          }
+        } catch {}
+
         showToast(t.builder.toasts.receiptSent, 'success');
       } else {
         setUploadError(res.error || t.builder.toasts.receiptSendError);
@@ -583,11 +825,13 @@ export const BuilderPage: React.FC = () => {
 
   const handleSaveDraft = async () => {
     try {
-      localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
-      // Shuningdek, api orqali ham saqlash, shunda mehmon ko'rinishida ham darhol aks etadi
+      if (!queryInvitationId) {
+        localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
+      }
       await api.saveInvitation({
         ...invitationState,
-        ownerId: user?.id || 'anonymous',
+        ownerId: user?.id || invitationState.ownerId,
+        ownerUid: user?.id || invitationState.ownerUid,
       });
       showToast(t.builder.toasts.draftSaved, 'success');
     } catch {
@@ -598,6 +842,10 @@ export const BuilderPage: React.FC = () => {
   const handleStartOverConfirm = () => {
     localStorage.removeItem('taklifim_builder_draft');
     setShowResetModal(false);
+    if (queryInvitationId) {
+      navigate(`/create/${invitationState.templateSlug}`);
+      return;
+    }
     window.location.reload();
   };
 
@@ -777,50 +1025,6 @@ export const BuilderPage: React.FC = () => {
     showToast(t.builder.toasts.allMusicRemoved, 'info');
   };
 
-  // Checkout submission using the template's real price (50 000 - 70 000 UZS)
-  const handleFinalCheckout = async () => {
-    if (isDemoSubmitting) return;
-
-    const currentTemplate = availableTemplates.find((t) => t.slug === invitationState.templateSlug) || initialTemplate;
-    const finalPrice = currentTemplate?.price || 60000;
-
-    setIsDemoSubmitting(true);
-
-    try {
-      const saved = await api.saveInvitation({
-        ...invitationState,
-        status: 'published',
-        ownerId: user?.id || 'anonymous',
-        updatedAt: new Date().toISOString(),
-      });
-
-      await api.createOrder({
-        serviceType: 'website_invitation',
-        serviceName: `${invitationState.eventTitle} (${invitationState.hostNames})`,
-        planName: `${currentTemplate.name} (${formatPriceUZS(finalPrice, language)})`,
-        price: finalPrice,
-        customerName: invitationState.hostNames,
-        invitationId: saved.id,
-      });
-
-      try { localStorage.removeItem('taklifim_builder_draft'); } catch { /* ignore */ }
-
-      setPublishedSlug(saved.slug);
-      setIsOrderComplete(true);
-
-      try {
-        confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 }, colors: ['#F5C9D8', '#B9DFFA', '#B48B47', '#D9658B', '#FFD700'] });
-      } catch {}
-
-      showToast(t.builder.toasts.invitationActivated, 'success');
-    } catch (err) {
-      console.error('Checkout error:', err);
-      showToast(t.builder.toasts.activateError, 'error');
-    } finally {
-      setIsDemoSubmitting(false);
-    }
-  };
-
   const stepsList = [
     { num: 1, title: t.builder.steps.template },
     { num: 2, title: t.builder.steps.details },
@@ -915,13 +1119,24 @@ export const BuilderPage: React.FC = () => {
 
           <div className="pt-2 border-t border-black/5">
             <Link
-              to="/dashboard"
+              to="/my-invitations"
               className="text-xs font-semibold text-[#4A383F] hover:text-[#1E1418] inline-flex items-center justify-center gap-1.5 transition-colors"
             >
               <Users className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>{t.builder.goDashboardCta}</span>
+              <span>{t.builder.goMyInvitationsBtn}</span>
             </Link>
           </div>
+        </GlassSurface>
+      </div>
+    );
+  }
+
+  if (isLoadingInvitation) {
+    return (
+      <div className="taklifim-page-top pb-16 min-h-screen flex items-center justify-center px-4">
+        <GlassSurface variant="elevated" rounded="3xl" className="p-8 text-center space-y-3 max-w-xs w-full">
+          <div className="w-9 h-9 border-[3px] border-[#E27B9B] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-[#4A383F]">{t.builder.loadingDraft}</p>
         </GlassSurface>
       </div>
     );
@@ -2350,6 +2565,11 @@ export const BuilderPage: React.FC = () => {
                           <h4 className="font-playfair text-lg sm:text-xl font-bold text-[#1E1418]">
                             {t.builder.receiptSentHeading}
                           </h4>
+                          {orderSentAt && (
+                            <p className="text-[11px] font-semibold text-amber-900">
+                              {t.myInvitations.receiptSentAtPrefix} {formatRelativeTimeLocalized(orderSentAt, language)}
+                            </p>
+                          )}
                         </div>
 
                         <p className="text-xs sm:text-sm font-semibold text-[#4A383F] leading-relaxed max-w-md mx-auto">
@@ -2360,6 +2580,48 @@ export const BuilderPage: React.FC = () => {
                           <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" aria-hidden="true" />
                           <span>{t.builder.autoCheckStatus}</span>
                         </div>
+
+                        {isReviewOverdue(orderSentAt, 2) && (
+                          <div className="p-3 rounded-2xl bg-white/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+                            <p className="font-medium">{t.myInvitations.overdueHint}</p>
+                            <a
+                              href="https://t.me/taklifim_support"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1E1418] text-white text-xs font-bold hover:bg-black transition-colors"
+                            >
+                              <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                              <span>{t.myInvitations.overdueTelegramBtn}</span>
+                            </a>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                          {activeOrderId && (
+                            <GlassButton
+                              tone="tinted"
+                              size="sm"
+                              href={`/order/${encodeURIComponent(activeOrderId)}`}
+                              onAnchorClick={(e) => {
+                                e.preventDefault();
+                                navigate(`/order/${encodeURIComponent(activeOrderId)}`);
+                              }}
+                            >
+                              {t.builder.trackOrderBtn}
+                            </GlassButton>
+                          )}
+                          <GlassButton
+                            tone="light"
+                            size="sm"
+                            href="/my-invitations"
+                            onAnchorClick={(e) => {
+                              e.preventDefault();
+                              navigate('/my-invitations');
+                            }}
+                          >
+                            {t.builder.goMyInvitationsBtn}
+                          </GlassButton>
+                        </div>
                       </GlassSurface>
                     ) : (
                       /* FILE UPLOAD FORM VIEW */
@@ -2368,7 +2630,8 @@ export const BuilderPage: React.FC = () => {
                           <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
                             <div>
-                              <strong>{t.builder.receiptRejectedTitle}</strong> {t.builder.receiptRejectedBody}
+                              <strong>{t.builder.receiptRejectedTitle}</strong>{' '}
+                              {orderRejectReason || t.builder.receiptRejectedBody}
                             </div>
                           </div>
                         )}
@@ -2522,11 +2785,14 @@ export const BuilderPage: React.FC = () => {
                   onClick={() => {
                     setCurrentStep((p) => p + 1);
                     try {
-                      localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
+                      if (!queryInvitationId) {
+                        localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
+                      }
                     } catch {}
                     api.saveInvitation({
                       ...invitationState,
-                      ownerId: user?.id || 'anonymous',
+                      ownerId: user?.id || invitationState.ownerId,
+                      ownerUid: user?.id || invitationState.ownerUid,
                     }).catch(() => {});
                   }}
                   rightIcon={<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}

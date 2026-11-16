@@ -13,6 +13,9 @@ import {
   healStaleBuilderDraft,
   truncateFilenameMiddle,
   formatFileSize,
+  resolveInvitationPaymentStatus,
+  formatRelativeTimeLocalized,
+  isReviewOverdue,
 } from './logic';
 import { Template, GuestRSVP } from '../types';
 
@@ -182,3 +185,44 @@ test('truncateFilenameMiddle preserves extension and fits within maxLength', () 
   assert.equal(formatFileSize(1536, 'uz'), '2 KB');
 });
 
+test('resolveInvitationPaymentStatus prioritizes live order and paid states over stale draft/pending flags', () => {
+  assert.equal(resolveInvitationPaymentStatus({ status: 'draft' }), 'draft');
+  assert.equal(resolveInvitationPaymentStatus({ status: 'pending_payment' }), 'pending_payment');
+  assert.equal(resolveInvitationPaymentStatus({ status: 'pending_review' }), 'pending_review');
+  assert.equal(resolveInvitationPaymentStatus({ status: 'paid' }), 'paid');
+  assert.equal(resolveInvitationPaymentStatus({ status: 'published' }), 'paid');
+  assert.equal(resolveInvitationPaymentStatus({ status: 'rejected' }), 'rejected');
+
+  // Order status paid overrides stale invitation pending_review
+  assert.equal(
+    resolveInvitationPaymentStatus({ status: 'pending_review', paymentStatus: 'pending_review' }, { status: 'paid' }),
+    'paid'
+  );
+  // Order status rejected overrides stale invitation pending_review
+  assert.equal(
+    resolveInvitationPaymentStatus({ status: 'pending_review' }, { status: 'rejected' }),
+    'rejected'
+  );
+  // Re-uploaded receipt on previously rejected invitation moves back to pending_review
+  assert.equal(
+    resolveInvitationPaymentStatus({ status: 'rejected' }, { status: 'pending_review' }),
+    'pending_review'
+  );
+  // Paid invitation never shows pending_review even if order sync lags
+  assert.equal(
+    resolveInvitationPaymentStatus({ status: 'paid' }, { status: 'pending_review' }),
+    'paid'
+  );
+});
+
+test('formatRelativeTimeLocalized and isReviewOverdue handle uz/ru/en and 2-hour thresholds', () => {
+  const nowMs = Date.parse('2026-09-01T12:00:00.000Z');
+  assert.equal(formatRelativeTimeLocalized('2026-09-01T11:59:30.000Z', 'uz', nowMs), 'Hozirgina');
+  assert.equal(formatRelativeTimeLocalized('2026-09-01T11:25:00.000Z', 'uz', nowMs), '35 daqiqa oldin');
+  assert.equal(formatRelativeTimeLocalized('2026-09-01T10:00:00.000Z', 'ru', nowMs), '2 ч. назад');
+  assert.equal(formatRelativeTimeLocalized('2026-08-31T12:00:00.000Z', 'en', nowMs), '1d ago');
+
+  assert.equal(isReviewOverdue('2026-09-01T10:30:00.000Z', 2, nowMs), false);
+  assert.equal(isReviewOverdue('2026-09-01T09:59:00.000Z', 2, nowMs), true);
+  assert.equal(isReviewOverdue(undefined, 2, nowMs), false);
+});

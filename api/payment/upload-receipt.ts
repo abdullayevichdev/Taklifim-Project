@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
-  getOrder,
-  updateInvitationStatus,
+  commitOrderPendingReview,
   upsertOrder,
+  verifyBearerToken,
 } from '../_lib/firebaseAdmin.js';
 import { checkRateLimit } from '../_lib/rateLimit.js';
 import { sendReceiptToTelegram } from '../_lib/telegram.js';
@@ -20,6 +20,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const authUser = await verifyBearerToken(req.headers.authorization);
+    if (!authUser) {
+      return res.status(401).json({
+        success: false,
+        error: "Chek yuborish uchun avval hisobingizga kiring (tasdiqlanmagan sessiya).",
+      });
+    }
+
     const {
       orderId,
       invitationId,
@@ -27,6 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customerName,
       customerPhone,
       templateName,
+      planName,
       weddingDate,
       venueName,
       price,
@@ -48,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress ||
       'unknown';
-    const clientKey = `${clientIp}_${customerPhone}`;
+    const clientKey = `${clientIp}_${authUser.uid}_${cleanPhone}`;
     if (!checkRateLimit(clientKey)) {
       return res.status(429).json({
         success: false,
@@ -83,39 +92,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const nowIso = new Date().toISOString();
-    const existing = await getOrder(orderId);
-
-    const orderData: Record<string, any> = {
-      id: orderId,
-      orderId,
-      customerName: customerName || existing?.customerName || 'Mijoz',
+    const commitRes = await commitOrderPendingReview({
+      verifiedUid: authUser.uid,
+      orderId: String(orderId),
+      invitationId: invitationId ? String(invitationId) : undefined,
+      invitationSlug: invitationSlug ? String(invitationSlug) : undefined,
+      customerName: customerName ? String(customerName) : 'Mijoz',
       customerPhone: cleanPhone,
-      templateName: templateName || existing?.templateName || 'Standart Shablon',
-      weddingDate: weddingDate || existing?.weddingDate || '-',
-      venueName: venueName || existing?.venueName || '-',
-      price: Number(price) || existing?.price || 180000,
-      status: 'pending_review',
-      createdAt: existing?.createdAt || nowIso,
-      updatedAt: nowIso,
-    };
+      templateName: templateName ? String(templateName) : 'Standart Shablon',
+      planName: planName ? String(planName) : undefined,
+      weddingDate: weddingDate ? String(weddingDate) : '-',
+      venueName: venueName ? String(venueName) : '-',
+      price: Number(price) || 180000,
+      receiptUrl: fileUrl ? String(fileUrl) : undefined,
+      receiptType: isPdf ? 'document' : 'photo',
+      nowIso,
+    });
 
-    const finalInvId = invitationId || existing?.invitationId;
-    if (finalInvId) orderData.invitationId = finalInvId;
-
-    const finalInvSlug = invitationSlug || existing?.invitationSlug;
-    if (finalInvSlug) orderData.invitationSlug = finalInvSlug;
-
-    const finalReceiptUrl = fileUrl || existing?.receiptUrl;
-    if (finalReceiptUrl) orderData.receiptUrl = finalReceiptUrl;
-
-    await upsertOrder(orderId, orderData);
-
-    if (orderData.invitationId) {
-      await updateInvitationStatus(orderData.invitationId, 'pending_review', nowIso);
+    if (commitRes.ok === false) {
+      return res.status(commitRes.statusCode).json({
+        success: false,
+        error: commitRes.error,
+      });
     }
 
+    const { orderData } = commitRes;
+
     const tgResult = await sendReceiptToTelegram({
-      orderId: orderData.orderId,
+      orderId: orderData.orderId || orderData.id,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
       templateName: orderData.templateName || 'Standart Shablon',
@@ -126,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileName,
       fileType,
       fileBuffer,
-      fileUrl: finalReceiptUrl,
+      fileUrl: orderData.receiptUrl,
     });
 
     if (!tgResult.ok) {
@@ -136,16 +140,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const patch: Record<string, any> = { updatedAt: new Date().toISOString() };
+    const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     if (tgResult.messageId) {
       patch.telegramMessageId = tgResult.messageId;
     }
-    await upsertOrder(orderId, patch);
+    await upsertOrder(orderData.id, patch);
 
     return res.json({
       success: true,
-      orderId: orderData.orderId,
+      orderId: orderData.orderId || orderData.id,
       status: orderData.status,
+      receiptSentAt: orderData.receiptSentAt,
+      updatedAt: orderData.updatedAt,
       message: "Chekingiz adminga yuborildi, tasdiqlanishini kuting.",
     });
   } catch (err: any) {

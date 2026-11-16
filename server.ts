@@ -9,9 +9,10 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import {
-  getOrder,
-  updateInvitationStatus,
+  commitOrderPendingReview,
+  getAuthorizedOrderForUser,
   upsertOrder,
+  verifyBearerToken,
 } from './api/_lib/firebaseAdmin.js';
 import { checkRateLimit } from './api/_lib/rateLimit.js';
 import { handleTelegramUpdate, sendReceiptToTelegram } from './api/_lib/telegram.js';
@@ -36,6 +37,14 @@ async function startServer() {
 
   app.post('/api/payment/upload-receipt', async (req: Request, res: Response) => {
     try {
+      const authUser = await verifyBearerToken(req.headers.authorization);
+      if (!authUser) {
+        return res.status(401).json({
+          success: false,
+          error: "Chek yuborish uchun avval hisobingizga kiring (tasdiqlanmagan sessiya).",
+        });
+      }
+
       const {
         orderId,
         invitationId,
@@ -43,6 +52,7 @@ async function startServer() {
         customerName,
         customerPhone,
         templateName,
+        planName,
         weddingDate,
         venueName,
         price,
@@ -60,7 +70,7 @@ async function startServer() {
         });
       }
 
-      const clientKey = `${req.ip}_${customerPhone}`;
+      const clientKey = `${req.ip}_${authUser.uid}_${cleanPhone}`;
       if (!checkRateLimit(clientKey)) {
         return res.status(429).json({
           success: false,
@@ -93,32 +103,34 @@ async function startServer() {
       }
 
       const nowIso = new Date().toISOString();
-      const existing = await getOrder(orderId);
-
-      const orderData = {
-        id: orderId,
-        orderId,
-        invitationId: invitationId || existing?.invitationId,
-        invitationSlug: invitationSlug || existing?.invitationSlug,
-        customerName: customerName || existing?.customerName || 'Mijoz',
+      const commitRes = await commitOrderPendingReview({
+        verifiedUid: authUser.uid,
+        orderId: String(orderId),
+        invitationId: invitationId ? String(invitationId) : undefined,
+        invitationSlug: invitationSlug ? String(invitationSlug) : undefined,
+        customerName: customerName ? String(customerName) : 'Mijoz',
         customerPhone: cleanPhone,
-        templateName: templateName || existing?.templateName || 'Standart Shablon',
-        weddingDate: weddingDate || existing?.weddingDate || '-',
-        venueName: venueName || existing?.venueName || '-',
-        price: Number(price) || existing?.price || 180000,
-        status: 'pending_review' as const,
-        receiptUrl: fileUrl || existing?.receiptUrl || undefined,
-        createdAt: existing?.createdAt || nowIso,
-        updatedAt: nowIso,
-      };
+        templateName: templateName ? String(templateName) : 'Standart Shablon',
+        planName: planName ? String(planName) : undefined,
+        weddingDate: weddingDate ? String(weddingDate) : '-',
+        venueName: venueName ? String(venueName) : '-',
+        price: Number(price) || 180000,
+        receiptUrl: fileUrl ? String(fileUrl) : undefined,
+        receiptType: isPdf ? 'document' : 'photo',
+        nowIso,
+      });
 
-      await upsertOrder(orderId, orderData);
-      if (orderData.invitationId) {
-        await updateInvitationStatus(orderData.invitationId, 'pending_review', nowIso);
+      if (commitRes.ok === false) {
+        return res.status(commitRes.statusCode).json({
+          success: false,
+          error: commitRes.error,
+        });
       }
 
+      const { orderData } = commitRes;
+
       const tgResult = await sendReceiptToTelegram({
-        orderId: orderData.orderId,
+        orderId: orderData.orderId || orderData.id,
         customerName: orderData.customerName,
         customerPhone: orderData.customerPhone,
         templateName: orderData.templateName || 'Standart Shablon',
@@ -129,7 +141,7 @@ async function startServer() {
         fileName,
         fileType,
         fileBuffer,
-        fileUrl: fileUrl || undefined,
+        fileUrl: orderData.receiptUrl,
       });
 
       if (!tgResult.ok) {
@@ -139,15 +151,18 @@ async function startServer() {
         });
       }
 
-      await upsertOrder(orderId, {
-        telegramMessageId: tgResult.messageId,
-        updatedAt: new Date().toISOString(),
-      });
+      const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+      if (tgResult.messageId) {
+        patch.telegramMessageId = tgResult.messageId;
+      }
+      await upsertOrder(orderData.id, patch);
 
       return res.json({
         success: true,
-        orderId: orderData.orderId,
+        orderId: orderData.orderId || orderData.id,
         status: orderData.status,
+        receiptSentAt: orderData.receiptSentAt,
+        updatedAt: orderData.updatedAt,
         message: "Chekingiz adminga yuborildi, tasdiqlanishini kuting.",
       });
     } catch (err: any) {
@@ -161,15 +176,28 @@ async function startServer() {
 
   app.get('/api/payment/status/:orderId', async (req: Request, res: Response) => {
     try {
-      const orderId = req.params.orderId;
-      const order = await getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({
+      const authUser = await verifyBearerToken(req.headers.authorization);
+      if (!authUser) {
+        return res.status(401).json({
           success: false,
-          error: 'Buyurtma topilmadi.',
+          error: 'Buyurtma holatini ko‘rish uchun tizimga kiring.',
         });
       }
 
+      const orderId = String(req.params.orderId || '');
+      if (!orderId) {
+        return res.status(400).json({ success: false, error: 'orderId majburiy' });
+      }
+
+      const result = await getAuthorizedOrderForUser(orderId, authUser.uid);
+      if ('error' in result) {
+        return res.status(result.statusCode).json({
+          success: false,
+          error: result.error,
+        });
+      }
+
+      const { order } = result;
       return res.json({
         success: true,
         orderId: order.id || orderId,
@@ -177,7 +205,13 @@ async function startServer() {
         invitationId: order.invitationId,
         invitationSlug: order.invitationSlug,
         customerName: order.customerName,
+        templateName: order.templateName,
+        weddingDate: order.weddingDate,
+        venueName: order.venueName,
         price: order.price,
+        receiptSentAt: order.receiptSentAt || order.submittedAt || order.createdAt,
+        decidedAt: order.decidedAt || order.reviewedAt,
+        rejectReason: order.rejectReason,
         updatedAt: order.updatedAt,
       });
     } catch (err: any) {

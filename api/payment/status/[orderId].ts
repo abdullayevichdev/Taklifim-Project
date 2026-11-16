@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getOrder } from '../../_lib/firebaseAdmin.js';
+import { getAuthorizedOrderForUser, verifyBearerToken } from '../../_lib/firebaseAdmin.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -8,19 +8,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const authUser = await verifyBearerToken(req.headers.authorization);
+    if (!authUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Buyurtma holatini ko‘rish uchun tizimga kiring.',
+      });
+    }
+
     const orderId = String(req.query.orderId || '');
     if (!orderId) {
       return res.status(400).json({ success: false, error: 'orderId majburiy' });
     }
 
-    const order = await getOrder(orderId);
-    if (!order) {
-      return res.status(404).json({
+    const result = await getAuthorizedOrderForUser(orderId, authUser.uid);
+    if ('error' in result) {
+      return res.status(result.statusCode).json({
         success: false,
-        error: 'Buyurtma topilmadi.',
+        error: result.error,
       });
     }
 
+    const { order } = result;
     return res.json({
       success: true,
       orderId: order.id || orderId,
@@ -28,7 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       invitationId: order.invitationId,
       invitationSlug: order.invitationSlug,
       customerName: order.customerName,
+      templateName: order.templateName,
+      weddingDate: order.weddingDate,
+      venueName: order.venueName,
       price: order.price,
+      receiptSentAt: order.receiptSentAt || order.submittedAt || order.createdAt,
+      decidedAt: order.decidedAt || order.reviewedAt,
+      rejectReason: order.rejectReason,
       updatedAt: order.updatedAt,
     });
   } catch (err: any) {
