@@ -104,7 +104,7 @@ export const GlassBottomNav: React.FC = () => {
 
       <nav
         aria-label={t.nav.mobileNavigation}
-        className="pointer-events-auto mx-auto w-full max-w-[460px] bg-white/94 backdrop-blur-[12px] border border-white rounded-[26px] p-1.5 flex items-center justify-between gap-1 shadow-[0_14px_34px_-8px_rgba(30,20,24,0.22),inset_0_1.5px_0_rgba(255,255,255,1)]"
+        className="pointer-events-auto mx-auto w-full max-w-[460px] bg-white/96 md:bg-white/94 md:backdrop-blur-[12px] border border-white rounded-[26px] p-1.5 flex items-center justify-between gap-1 shadow-[0_14px_34px_-8px_rgba(30,20,24,0.22),inset_0_1.5px_0_rgba(255,255,255,1)]"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;

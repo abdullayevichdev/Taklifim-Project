@@ -111,10 +111,10 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
 
   return (
     <div
-      className={`rounded-3xl taklifim-tpl-card space-y-6 shadow-lg backdrop-blur-md border ${
+      className={`rounded-3xl taklifim-tpl-card space-y-6 shadow-lg md:backdrop-blur-md border ${
         isDarkTheme
-          ? 'bg-white/5 border-white/10 text-white'
-          : 'bg-white/85 border-black/5 text-[#231E1B]'
+          ? 'bg-white/10 md:bg-white/5 border-white/12 text-white'
+          : 'bg-white/94 md:bg-white/85 border-black/5 text-[#231E1B]'
       }`}
     >
       <div className="taklifim-cq-grid-2 text-left">

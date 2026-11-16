@@ -229,7 +229,7 @@ export const TemplatesPage: React.FC = () => {
                 <TemplateCard
                   key={template.id}
                   template={template}
-                  priority={idx < 4}
+                  priority={idx < 2}
                 />
               ))}
             </div>

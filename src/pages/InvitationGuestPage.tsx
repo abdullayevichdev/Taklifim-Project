@@ -822,21 +822,21 @@ export const InvitationGuestPage: React.FC = () => {
           />
         </div>
 
-        {/* Soft floating romance ambient glow */}
+        {/* Soft floating romance ambient glow (CSS radial gradient — zero blur filter pass) */}
         <div
-          className="absolute top-1/4 -left-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none"
-          style={{ backgroundColor: secondaryColor }}
+          className="absolute top-1/4 -left-20 w-80 h-80 rounded-full opacity-35 pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${secondaryColor} 0%, transparent 70%)` }}
         />
         <div
-          className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full blur-3xl opacity-40 pointer-events-none"
-          style={{ backgroundColor: primaryColor }}
+          className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full opacity-35 pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${primaryColor} 0%, transparent 70%)` }}
         />
 
         {/* Liquid Glass Luxury Envelope Card */}
         <div
           className={`relative max-w-md w-full rounded-[36px] p-8 sm:p-10 text-center space-y-6 transition-all duration-700 motion-reduce:transition-none ${
             isDarkTheme
-              ? 'bg-[#0E1A2B]/88 backdrop-blur-2xl text-white border border-amber-300/35 shadow-[0_25px_80px_rgba(0,0,0,0.65)]'
+              ? 'bg-[#0E1A2B]/94 md:bg-[#0E1A2B]/88 md:backdrop-blur-2xl text-white border border-amber-300/35 shadow-[0_25px_80px_rgba(0,0,0,0.65)]'
               : 'glass-surface-elevated text-[#1E1418]'
           } ${
             isOpeningAnimation ? 'opacity-80 -translate-y-4' : 'animate-fadeIn motion-reduce:animate-none'
@@ -953,7 +953,7 @@ export const InvitationGuestPage: React.FC = () => {
           {/* Taklifim Platform Badge at bottom of Cover */}
           <div className="pt-2 flex items-center justify-center">
             {isDarkTheme ? (
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-amber-200 shadow-xs">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 md:bg-slate-900/80 md:backdrop-blur-md border border-white/15 text-[11px] font-semibold text-amber-200 shadow-xs">
                 <TaklifimLogo className="w-3.5 h-3.5" />
                 <span>{gt.createdOn}</span>
               </div>

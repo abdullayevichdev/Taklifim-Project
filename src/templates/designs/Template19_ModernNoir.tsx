@@ -22,7 +22,7 @@ export const Template19_ModernNoir: React.FC<TemplateRenderProps> = (props) => {
 
       <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Art-Deco Obsidian & Gold VIP Card */}
-        <div className="taklifim-tpl-hero-card-spacious relative rounded-3xl text-center space-y-6 bg-black/90 backdrop-blur-2xl border-2 border-[#D4AF37] shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
+        <div className="taklifim-tpl-hero-card-spacious relative rounded-3xl text-center space-y-6 bg-black/95 md:bg-black/90 md:backdrop-blur-2xl border-2 border-[#D4AF37] shadow-[0_30px_90px_rgba(0,0,0,0.9)]">
           {/* Geometric Corner Accents */}
           <div className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37]" />
           <div className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-[#D4AF37]" />

@@ -23,7 +23,7 @@ export const Template10_MidnightSapphire: React.FC<TemplateRenderProps> = (props
 
       <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Deep Midnight Sapphire Glowing Card */}
-        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-[#0E1B33]/90 backdrop-blur-xl border-2 border-[#D4AF37]/35 shadow-[0_25px_70px_rgba(0,0,0,0.7)]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-[#0E1B33]/96 md:bg-[#0E1B33]/90 md:backdrop-blur-xl border-2 border-[#D4AF37]/35 shadow-[0_25px_70px_rgba(0,0,0,0.7)]">
           <div className="flex items-center justify-center gap-2 text-amber-300 min-w-0">
             <Moon className="w-4 h-4 shrink-0" />
             <span className="taklifim-tpl-eyebrow uppercase font-bold text-amber-300 min-w-0">

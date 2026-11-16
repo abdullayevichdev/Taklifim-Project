@@ -34,7 +34,7 @@ const FALLBACK_TONES: Record<LgTone, string> = {
   light:
     'glass-surface text-[#1E1418] bg-white/84 border border-white/98 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_10px_26px_-8px_rgba(30,20,24,0.14)] hover:bg-white/95',
   clear:
-    'bg-white/62 backdrop-blur-md text-[#1E1418] border border-[#1E1418]/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_8px_22px_-6px_rgba(30,20,24,0.12)] hover:bg-white/82 hover:border-[#1E1418]/22',
+    'bg-white/82 md:bg-white/62 md:backdrop-blur-md text-[#1E1418] border border-[#1E1418]/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_8px_22px_-6px_rgba(30,20,24,0.12)] hover:bg-white/88 md:hover:bg-white/82 hover:border-[#1E1418]/22',
 };
 
 /**

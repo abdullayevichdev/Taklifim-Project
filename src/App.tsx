@@ -12,6 +12,7 @@ import { Footer } from './components/Footer';
 import { ToastContainer } from './components/ToastContainer';
 import { GlassBackground } from './components/glass/GlassBackground';
 import { GlassBottomNav } from './components/glass/GlassBottomNav';
+import { useCanUseLiquidGlass } from './components/glass/loader';
 import { ErrorBoundary, lazyWithRetry } from './components/ErrorBoundary';
 
 // Keep HomePage eager for instant landing page paint
@@ -95,6 +96,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const AppContent: React.FC = () => {
   const { path, navigate } = useRouter();
   const { language } = useLanguage();
+  const enableLgBackdrop = useCanUseLiquidGlass();
 
   const routePath = path.split('?')[0];
 
@@ -176,7 +178,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      data-lg-backdrop={!isGuestInvitation ? '#taklifim-backdrop' : undefined}
+      data-lg-backdrop={!isGuestInvitation && enableLgBackdrop ? '#taklifim-backdrop' : undefined}
       className="min-h-screen flex flex-col justify-between selection:bg-[#F5C9D8] selection:text-[#231E1B] relative"
     >
       {!isGuestInvitation && <GlassBackground />}

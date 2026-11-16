@@ -23,10 +23,37 @@ export const Header: React.FC = () => {
 
   const headerRef = React.useRef<HTMLElement | null>(null);
   const lastScrollYRef = React.useRef<number>(0);
+  const isScrolledRef = React.useRef<boolean>(false);
+  const isHiddenMobileRef = React.useRef<boolean>(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHiddenMobile, setIsHiddenMobile] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
 
-  // Sync --header-h and --header-visible-h dynamically via ResizeObserver
+  // Track lg+ breakpoint so desktop <GlassNavbar> and <GlassButton> do not mount hidden on mobile phones
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const syncDesktop = () => setIsDesktopViewport(mq.matches);
+    syncDesktop();
+    mq.addEventListener('change', syncDesktop);
+    return () => mq.removeEventListener('change', syncDesktop);
+  }, []);
+
+  // Keep --header-visible-h synced with mobile scroll-hide without tearing down ResizeObserver
+  useEffect(() => {
+    isHiddenMobileRef.current = isHiddenMobile;
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const h = document.documentElement.style.getPropertyValue('--header-h') || '64px';
+    const isMobile = window.innerWidth < 1024;
+    document.documentElement.style.setProperty(
+      '--header-visible-h',
+      isMobile && isHiddenMobile ? '0px' : h
+    );
+  }, [isHiddenMobile]);
+
+  // Sync --header-h dynamically via ResizeObserver only when layout structure changes
   useEffect(() => {
     const el = headerRef.current;
     if (!el || typeof document === 'undefined') return;
@@ -37,7 +64,7 @@ export const Header: React.FC = () => {
       document.documentElement.style.setProperty('--header-h', `${h}px`);
       document.documentElement.style.setProperty(
         '--header-visible-h',
-        isMobile && isHiddenMobile ? '0px' : `${h}px`
+        isMobile && isHiddenMobileRef.current ? '0px' : `${h}px`
       );
     };
 
@@ -49,40 +76,67 @@ export const Header: React.FC = () => {
       ro?.disconnect();
       window.removeEventListener('resize', updateVars);
     };
-  }, [isHiddenMobile, language, isLoggedIn]);
+  }, [language, isLoggedIn, isDesktopViewport]);
 
   // Reset mobile header visibility on route navigation
   useEffect(() => {
+    isHiddenMobileRef.current = false;
     setIsHiddenMobile(false);
   }, [path]);
 
+  // rAF-throttled scroll handler avoids redundant React state updates on 60-120Hz touch flings
   useEffect(() => {
-    const handleScroll = () => {
+    let rafId = 0;
+
+    const processScroll = () => {
+      rafId = 0;
       const currentY = Math.max(0, window.scrollY || 0);
-      setIsScrolled(currentY > 20);
+      const nextScrolled = currentY > 20;
+      if (nextScrolled !== isScrolledRef.current) {
+        isScrolledRef.current = nextScrolled;
+        setIsScrolled(nextScrolled);
+      }
 
       const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       const isMobile = window.innerWidth < 1024;
 
       if (!isMobile || prefersReduced) {
-        setIsHiddenMobile(false);
+        if (isHiddenMobileRef.current) {
+          isHiddenMobileRef.current = false;
+          setIsHiddenMobile(false);
+        }
         lastScrollYRef.current = currentY;
         return;
       }
 
       const delta = currentY - lastScrollYRef.current;
+      let nextHidden = isHiddenMobileRef.current;
       if (currentY <= 56) {
-        setIsHiddenMobile(false);
+        nextHidden = false;
       } else if (delta > 10 && currentY > 88) {
-        setIsHiddenMobile(true);
+        nextHidden = true;
       } else if (delta < -8) {
-        setIsHiddenMobile(false);
+        nextHidden = false;
+      }
+
+      if (nextHidden !== isHiddenMobileRef.current) {
+        isHiddenMobileRef.current = nextHidden;
+        setIsHiddenMobile(nextHidden);
       }
       lastScrollYRef.current = currentY;
     };
 
+    const handleScroll = () => {
+      if (!rafId) {
+        rafId = window.requestAnimationFrame(processScroll);
+      }
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, []);
 
   const languageOptions: DropdownOption<Language>[] = useMemo(
@@ -169,17 +223,13 @@ export const Header: React.FC = () => {
           : 'translate-y-0 opacity-100'
       }`}
     >
-      {/* Full-width translucent gradient & blur backdrop scrim so scrolled text never bleeds between capsules */}
+      {/* Fast multi-stop top scrim: avoids expensive full-width offscreen blur + mask compositing during mobile scroll */}
       <div
         aria-hidden="true"
         className="absolute inset-x-0 top-0 -bottom-4 pointer-events-none -z-10"
         style={{
           background:
-            'linear-gradient(180deg, rgba(252, 238, 244, 0.96) 0%, rgba(252, 238, 244, 0.86) 62%, rgba(252, 238, 244, 0) 100%)',
-          backdropFilter: 'blur(12px) saturate(1.35)',
-          WebkitBackdropFilter: 'blur(12px) saturate(1.35)',
-          maskImage: 'linear-gradient(to bottom, black 64%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 64%, transparent 100%)',
+            'linear-gradient(180deg, rgba(252, 238, 244, 0.96) 0%, rgba(252, 238, 244, 0.88) 64%, rgba(252, 238, 244, 0) 100%)',
         }}
       />
 
@@ -203,90 +253,93 @@ export const Header: React.FC = () => {
           </span>
         </Link>
 
-        {/* Desktop Center Floating Capsule Navigation (standalone capsule — never inside another capsule) */}
-        <div className="pointer-events-auto hidden lg:flex items-center justify-center min-w-0">
-          <GlassNavbar
-            items={navItems}
-            currentPath={path}
-            onNavigate={handleNavNavigate}
-            ariaLabel={t.nav.primaryNavigation}
-          />
-        </div>
+        {/* Desktop Center Floating Capsule Navigation & Controls (unmounted on mobile/tablet so hidden <lg-*> never runs) */}
+        {isDesktopViewport && (
+          <>
+            <div className="pointer-events-auto flex items-center justify-center min-w-0">
+              <GlassNavbar
+                items={navItems}
+                currentPath={path}
+                onNavigate={handleNavNavigate}
+                ariaLabel={t.nav.primaryNavigation}
+              />
+            </div>
 
-        {/* Desktop Right Controls */}
-        <div className="pointer-events-auto hidden lg:flex items-center gap-1.5 xl:gap-2 shrink-0">
-          <CustomDropdown<Language>
-            value={language}
-            onChange={(lang) => setLanguage(lang)}
-            options={languageOptions}
-            ariaLabel={t.nav.selectLanguage}
-            title={t.nav.selectLanguage}
-            buttonClassName="px-2 xl:px-2.5 py-1.5 min-h-[38px]"
-            renderTriggerLabel={(selected) => (
-              <span className="inline-flex items-center gap-1.5">
-                <FlagIcon code={selected.value} />
-                <span className="font-bold text-[11.5px] xl:text-[12px] tracking-wide">
-                  {selected.value.toUpperCase()}
-                </span>
-              </span>
-            )}
-          />
+            <div className="pointer-events-auto flex items-center gap-1.5 xl:gap-2 shrink-0">
+              <CustomDropdown<Language>
+                value={language}
+                onChange={(lang) => setLanguage(lang)}
+                options={languageOptions}
+                ariaLabel={t.nav.selectLanguage}
+                title={t.nav.selectLanguage}
+                buttonClassName="px-2 xl:px-2.5 py-1.5 min-h-[38px]"
+                renderTriggerLabel={(selected) => (
+                  <span className="inline-flex items-center gap-1.5">
+                    <FlagIcon code={selected.value} />
+                    <span className="font-bold text-[11.5px] xl:text-[12px] tracking-wide">
+                      {selected.value.toUpperCase()}
+                    </span>
+                  </span>
+                )}
+              />
 
-          {isLoggedIn ? (
-            <GlassActionMenu
-              ariaLabel={t.nav.profile}
-              header={
-                <div className="text-xs text-[#5C4F48]">
-                  <div className="font-semibold text-[#1E1418] truncate">{user?.name}</div>
-                  <div className="text-[11px] truncate opacity-80">
-                    {user?.phone ? user.phone : user?.email}
-                  </div>
-                </div>
-              }
-              items={userMenuItems}
-              triggerClassName="min-h-[38px] px-2 xl:px-2.5"
-              trigger={(isOpen) => (
-                <>
-                  <span className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] text-[#1E1418] flex items-center justify-center font-bold text-[11px] shrink-0 border border-white/80">
-                    {userInitial}
-                  </span>
-                  <span className="truncate font-semibold max-w-[56px] xl:max-w-[88px]">
-                    {userFirstName}
-                  </span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 opacity-60 shrink-0 transition-transform duration-200 ${
-                      isOpen ? 'rotate-180' : ''
-                    }`}
-                    aria-hidden="true"
-                  />
-                </>
+              {isLoggedIn ? (
+                <GlassActionMenu
+                  ariaLabel={t.nav.profile}
+                  header={
+                    <div className="text-xs text-[#5C4F48]">
+                      <div className="font-semibold text-[#1E1418] truncate">{user?.name}</div>
+                      <div className="text-[11px] truncate opacity-80">
+                        {user?.phone ? user.phone : user?.email}
+                      </div>
+                    </div>
+                  }
+                  items={userMenuItems}
+                  triggerClassName="min-h-[38px] px-2 xl:px-2.5"
+                  trigger={(isOpen) => (
+                    <>
+                      <span className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] text-[#1E1418] flex items-center justify-center font-bold text-[11px] shrink-0 border border-white/80">
+                        {userInitial}
+                      </span>
+                      <span className="truncate font-semibold max-w-[56px] xl:max-w-[88px]">
+                        {userFirstName}
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 opacity-60 shrink-0 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </>
+                  )}
+                />
+              ) : (
+                <Link
+                  to="/login"
+                  className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 min-h-[38px] px-2.5 xl:px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#1E1418] hover:bg-white/95 transition-all ${
+                    isScrolled ? 'glass-surface-elevated' : 'glass-surface'
+                  }`}
+                >
+                  {t.nav.login}
+                </Link>
               )}
-            />
-          ) : (
-            <Link
-              to="/login"
-              className={`whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 min-h-[38px] px-2.5 xl:px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#1E1418] hover:bg-white/95 transition-all ${
-                isScrolled ? 'glass-surface-elevated' : 'glass-surface'
-              }`}
-            >
-              {t.nav.login}
-            </Link>
-          )}
 
-          <GlassButton
-            tone="tinted"
-            size="sm"
-            href="/templates"
-            onAnchorClick={(e) => {
-              e.preventDefault();
-              navigate('/templates');
-            }}
-            leftIcon={<PlusCircle className="w-3.5 h-3.5 shrink-0 hidden xl:inline-block" />}
-            className="taklifim-nav-cta shrink-0"
-          >
-            {t.nav.createInvitation}
-          </GlassButton>
-        </div>
+              <GlassButton
+                tone="tinted"
+                size="sm"
+                href="/templates"
+                onAnchorClick={(e) => {
+                  e.preventDefault();
+                  navigate('/templates');
+                }}
+                leftIcon={<PlusCircle className="w-3.5 h-3.5 shrink-0 hidden xl:inline-block" />}
+                className="taklifim-nav-cta shrink-0"
+              >
+                {t.nav.createInvitation}
+              </GlassButton>
+            </div>
+          </>
+        )}
 
         {/* Mobile Compact Header Controls (NO duplicated hamburger drawer — handled by GlassBottomNav) */}
         <div className="pointer-events-auto flex items-center gap-1.5 lg:hidden shrink-0">

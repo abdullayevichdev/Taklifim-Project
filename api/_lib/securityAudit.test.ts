@@ -2,12 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import {
   computeReceiptIdempotencyKey,
   processUploadReceipt,
   type UploadReceiptDeps,
 } from './uploadReceiptService.js';
-import type { ReceiptAttemptRecord, ServerOrder } from './firebaseAdmin.js';
+import {
+  verifyBearerToken,
+  type ReceiptAttemptRecord,
+  type ServerOrder,
+} from './firebaseAdmin.js';
+import uploadReceiptHandler from '../payment/upload-receipt.js';
+import paymentStatusHandler from '../payment/status/[orderId].js';
+import telegramWebhookHandler from '../telegram/webhook.js';
 
 // ---------------------------------------------------------------------------
 // Minimal RTDB Security Rules Expression Evaluator (tests real database.rules.json)
@@ -969,3 +977,137 @@ test('upload-receipt: blocks cross-user access (403), paid orders (400), handles
   assert.equal(rPaid.statusCode, 400);
   assert.equal(slowCalls, 2);
 });
+
+// ---------------------------------------------------------------------------
+// 3. CJS/ESM Compatibility, Firebase ID Token Verification & Vercel Handler Tests
+// ---------------------------------------------------------------------------
+function makeMockVercelRes() {
+  const headers: Record<string, string> = {};
+  const state: { statusCode: number; body: any; headers: Record<string, string> } = {
+    statusCode: 200,
+    body: undefined,
+    headers,
+  };
+  const res: any = {
+    setHeader(name: string, val: string) {
+      headers[name] = val;
+      return res;
+    },
+    status(code: number) {
+      state.statusCode = code;
+      return res;
+    },
+    json(payload: any) {
+      state.body = payload;
+      return res;
+    },
+  };
+  return { res, state };
+}
+
+test('CJS/ESM compatibility: jwks-rsa require(jose) and firebase-admin/auth load without ERR_REQUIRE_ESM', async () => {
+  const req = createRequire(import.meta.url);
+  const jwks = req('jwks-rsa');
+  const jose = req('jose');
+  const adminApp = req('firebase-admin/app');
+  const adminAuth = req('firebase-admin/auth');
+
+  assert.equal(typeof jwks, 'function');
+  assert.equal(typeof jose.jwtVerify, 'function');
+  assert.equal(typeof adminAuth.getAuth, 'function');
+
+  const appName = `cjs-esm-test-${Date.now()}`;
+  const app = adminApp.initializeApp({ projectId: 'test-project' }, appName);
+  try {
+    await assert.rejects(
+      () => adminAuth.getAuth(app).verifyIdToken('invalid.jwt.token'),
+      (err: any) => err?.code === 'auth/argument-error'
+    );
+  } finally {
+    await adminApp.deleteApp(app);
+  }
+});
+
+test('verifyBearerToken handles missing/malformed headers and missing credentials cleanly', async () => {
+  assert.equal(await verifyBearerToken(undefined), null);
+  assert.equal(await verifyBearerToken(''), null);
+  assert.equal(await verifyBearerToken('Basic abcdef'), null);
+  assert.equal(await verifyBearerToken('Bearer   '), null);
+  assert.equal(await verifyBearerToken(['Bearer   ']), null);
+  // With a non-JWT token and without real Firebase project/network match, never throws 500
+  const result = await verifyBearerToken('Bearer invalid.token.value');
+  assert.equal(result, null);
+});
+
+test('POST /api/payment/upload-receipt handler rejects non-POST (405) and unauthenticated requests (401) cleanly', async () => {
+  const getMock = makeMockVercelRes();
+  await uploadReceiptHandler({ method: 'GET', headers: {} } as any, getMock.res);
+  assert.equal(getMock.state.statusCode, 405);
+  assert.equal(getMock.state.headers.Allow, 'POST');
+
+  const postNoAuth = makeMockVercelRes();
+  await uploadReceiptHandler(
+    {
+      method: 'POST',
+      headers: {},
+      body: { orderId: 'ORD-1', customerPhone: '+998901234567' },
+    } as any,
+    postNoAuth.res
+  );
+  assert.equal(postNoAuth.state.statusCode, 401);
+  assert.equal(postNoAuth.state.body.success, false);
+});
+
+test('GET /api/payment/status/[orderId] rejects non-GET (405) and unauthenticated requests (401)', async () => {
+  const postMock = makeMockVercelRes();
+  await paymentStatusHandler({ method: 'POST', headers: {}, query: {} } as any, postMock.res);
+  assert.equal(postMock.state.statusCode, 405);
+
+  const getNoAuth = makeMockVercelRes();
+  await paymentStatusHandler(
+    { method: 'GET', headers: {}, query: { orderId: 'ORD-1' } } as any,
+    getNoAuth.res
+  );
+  assert.equal(getNoAuth.state.statusCode, 401);
+  assert.equal(getNoAuth.state.body.success, false);
+});
+
+test('POST /api/telegram/webhook validates method (405), secret token (403), and accepts valid webhook payload (200)', async () => {
+  const prevSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  process.env.TELEGRAM_WEBHOOK_SECRET = 'test-webhook-secret-xyz';
+  try {
+    const getMock = makeMockVercelRes();
+    await telegramWebhookHandler({ method: 'GET', headers: {} } as any, getMock.res);
+    assert.equal(getMock.state.statusCode, 405);
+
+    const badSecretMock = makeMockVercelRes();
+    await telegramWebhookHandler(
+      {
+        method: 'POST',
+        headers: { 'x-telegram-bot-api-secret-token': 'wrong-secret' },
+        body: { update_id: 1 },
+      } as any,
+      badSecretMock.res
+    );
+    assert.equal(badSecretMock.state.statusCode, 403);
+
+    const okMock = makeMockVercelRes();
+    await telegramWebhookHandler(
+      {
+        method: 'POST',
+        headers: { 'x-telegram-bot-api-secret-token': 'test-webhook-secret-xyz' },
+        body: { update_id: 2 },
+      } as any,
+      okMock.res
+    );
+    assert.equal(okMock.state.statusCode, 200);
+    assert.deepEqual(okMock.state.body, { status: 'ok' });
+  } finally {
+    if (prevSecret === undefined) {
+      delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    } else {
+      process.env.TELEGRAM_WEBHOOK_SECRET = prevSecret;
+    }
+  }
+});
+

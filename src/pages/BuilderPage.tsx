@@ -161,7 +161,19 @@ export const BuilderPage: React.FC = () => {
   const [isLoadingInvitation, setIsLoadingInvitation] = useState<boolean>(Boolean(queryInvitationId));
   const [activeTabMobile, setActiveTabMobile] = useState<'settings' | 'preview'>('settings');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
   const [isOrderComplete, setIsOrderComplete] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const syncDesktop = () => setIsDesktopViewport(mq.matches);
+    syncDesktop();
+    mq.addEventListener('change', syncDesktop);
+    return () => mq.removeEventListener('change', syncDesktop);
+  }, []);
   const [publishedSlug, setPublishedSlug] = useState<string>('');
   const [previewAudioUrl, setPreviewAudioUrl] = useState<string>('');
 
@@ -2855,93 +2867,69 @@ export const BuilderPage: React.FC = () => {
             </div>
           </GlassSurface>
 
-          {/* RIGHT: LIVE REACTIVE PREVIEW ON DESKTOP & MOBILE */}
-          {(() => {
-            const previewTpl =
-              availableTemplates.find(
-                (t) =>
-                  t.slug === invitationState.templateSlug ||
-                  t.id === invitationState.templateId
-              ) || mockTemplates[0];
-
-            const isDarkPreview =
-              invitationState.templateSlug === 'template-19' ||
-              invitationState.templateSlug === 'template-10' ||
-              invitationState.templateSlug === 'template-18' ||
-              invitationState.templateSlug === 'template-3' ||
-              invitationState.templateSlug === 'template-5' ||
-              (invitationState.customColors?.background &&
-                (invitationState.customColors.background.startsWith('#0') ||
-                  invitationState.customColors.background.startsWith('#1') ||
-                  invitationState.customColors.background.startsWith('#2')));
-
-            return (
-              <div
-                className={`lg:col-span-6 flex flex-col items-center lg:sticky lg:top-[var(--header-sticky-top,76px)] ${
-                  activeTabMobile === 'settings' ? 'hidden lg:flex' : 'flex'
-                }`}
-              >
-                {/* Device View Toggle */}
-                <div className="mb-4">
-                  <GlassSegmented
-                    ariaLabel={t.builder.previewShortTab}
-                    value={previewDevice}
-                    onChange={(val) => setPreviewDevice(val)}
-                    options={[
-                      {
-                        value: 'mobile',
-                        label: t.builder.mobileView,
-                        icon: <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />,
-                      },
-                      {
-                        value: 'desktop',
-                        label: t.builder.desktopView,
-                        icon: <Monitor className="w-3.5 h-3.5" aria-hidden="true" />,
-                      },
-                    ]}
-                  />
-                </div>
-
-                {previewDevice === 'mobile' ? (
-                  <div className="w-[320px] sm:w-[350px] rounded-[44px] p-4 bg-[#231E1B] shadow-2xl ring-1 ring-white/20 relative transition-all">
-                    {/* Speaker Notch */}
-                    <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-30" />
-
-                    <div className="w-full h-[620px] rounded-[36px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll pt-6 border border-black/10 select-none shadow-inner relative bg-white">
-                      <TemplateRenderer
-                        invitation={invitationState}
-                        language={language}
-                        isPreview={true}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full max-w-[560px] rounded-2xl bg-[#231E1B] shadow-2xl ring-1 ring-white/20 overflow-hidden transition-all">
-                    {/* Desktop Browser Window Header */}
-                    <div className="px-4 py-2.5 bg-[#151210] flex items-center justify-between border-b border-white/10">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-                      </div>
-                      <div className="flex-1 mx-4 px-3 py-1 rounded-lg bg-black/40 text-[10px] text-gray-400 font-mono truncate text-center border border-white/5">
-                        taklifim.uz/i/{invitationState.slug || invitationState.templateSlug}
-                      </div>
-                      <div className="w-8" />
-                    </div>
-
-                    <div className="w-full h-[600px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll select-none shadow-inner relative bg-white">
-                      <TemplateRenderer
-                        invitation={invitationState}
-                        language={language}
-                        isPreview={true}
-                      />
-                    </div>
-                  </div>
-                )}
+          {/* RIGHT: LIVE REACTIVE PREVIEW (mounted on mobile only when Preview tab is active so settings typing has zero hidden re-render overhead) */}
+          {(isDesktopViewport || activeTabMobile === 'preview') && (
+            <div className="lg:col-span-6 flex flex-col items-center lg:sticky lg:top-[var(--header-sticky-top,76px)]">
+              {/* Device View Toggle */}
+              <div className="mb-4">
+                <GlassSegmented
+                  ariaLabel={t.builder.previewShortTab}
+                  value={previewDevice}
+                  onChange={(val) => setPreviewDevice(val)}
+                  options={[
+                    {
+                      value: 'mobile',
+                      label: t.builder.mobileView,
+                      icon: <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />,
+                    },
+                    {
+                      value: 'desktop',
+                      label: t.builder.desktopView,
+                      icon: <Monitor className="w-3.5 h-3.5" aria-hidden="true" />,
+                    },
+                  ]}
+                />
               </div>
-            );
-          })()}
+
+              {previewDevice === 'mobile' ? (
+                <div className="w-[320px] sm:w-[350px] rounded-[44px] p-4 bg-[#231E1B] shadow-2xl ring-1 ring-white/20 relative transition-all">
+                  {/* Speaker Notch */}
+                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-30" />
+
+                  <div className="w-full h-[620px] rounded-[36px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll pt-6 border border-black/10 select-none shadow-inner relative bg-white">
+                    <TemplateRenderer
+                      invitation={invitationState}
+                      language={language}
+                      isPreview={true}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full max-w-[560px] rounded-2xl bg-[#231E1B] shadow-2xl ring-1 ring-white/20 overflow-hidden transition-all">
+                  {/* Desktop Browser Window Header */}
+                  <div className="px-4 py-2.5 bg-[#151210] flex items-center justify-between border-b border-white/10">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                    </div>
+                    <div className="flex-1 mx-4 px-3 py-1 rounded-lg bg-black/40 text-[10px] text-gray-400 font-mono truncate text-center border border-white/5">
+                      taklifim.uz/i/{invitationState.slug || invitationState.templateSlug}
+                    </div>
+                    <div className="w-8" />
+                  </div>
+
+                  <div className="w-full h-[600px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll select-none shadow-inner relative bg-white">
+                    <TemplateRenderer
+                      invitation={invitationState}
+                      language={language}
+                      isPreview={true}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

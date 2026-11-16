@@ -136,7 +136,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
 
   const modalNode = (
     <div
-      className="fixed inset-0 z-[10000] w-full h-[100dvh] flex items-center justify-center p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto bg-[#1E1418]/48 backdrop-blur-md animate-fadeIn motion-reduce:animate-none"
+      className="fixed inset-0 z-[10000] w-full h-[100dvh] flex items-center justify-center p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto bg-[#1E1418]/60 md:bg-[#1E1418]/48 md:backdrop-blur-md animate-fadeIn motion-reduce:animate-none"
       onClick={(e) => {
         if (closeOnBackdropClick && e.target === e.currentTarget) {
           onClose();

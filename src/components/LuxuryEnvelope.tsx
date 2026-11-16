@@ -187,14 +187,6 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
         }}
       />
 
-      {/* Subtle Handcrafted Paper Grain Overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.035] pointer-events-none"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
       {/* Layer 2: Inner Luxury Wedding Invitation Card (Slides out cleanly below notch) */}
       <div
         className={`absolute inset-x-3 sm:inset-x-4 top-12 bottom-6 rounded-2xl bg-[#FFFDFB] border border-[#E8DEC8] flex flex-col justify-between p-4 sm:p-6 text-center transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
@@ -263,13 +255,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
       </div>
 
       {/* Layer 3: Embossed Botanical Flora (Left Flap Edge) */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-24 sm:w-28 pointer-events-none z-10 overflow-hidden"
-        style={{
-          filter:
-            'drop-shadow(-0.8px -0.8px 0.5px rgba(255, 255, 255, 0.98)) drop-shadow(1.2px 1.2px 1.2px rgba(150, 130, 110, 0.45))',
-        }}
-      >
+      <div className="absolute left-0 top-0 bottom-0 w-24 sm:w-28 pointer-events-none z-10 overflow-hidden opacity-90">
         <svg
           viewBox="0 0 80 540"
           className="w-full h-full object-cover"
@@ -280,13 +266,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
       </div>
 
       {/* Layer 4: Embossed Botanical Flora (Right Flap Edge - Perfectly Symmetrical Mirror) */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-24 sm:w-28 pointer-events-none z-10 overflow-hidden -scale-x-100"
-        style={{
-          filter:
-            'drop-shadow(-0.8px -0.8px 0.5px rgba(255, 255, 255, 0.98)) drop-shadow(1.2px 1.2px 1.2px rgba(150, 130, 110, 0.45))',
-        }}
-      >
+      <div className="absolute right-0 top-0 bottom-0 w-24 sm:w-28 pointer-events-none z-10 overflow-hidden -scale-x-100 opacity-90">
         <svg
           viewBox="0 0 80 540"
           className="w-full h-full object-cover"
@@ -319,9 +299,6 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           d="M 0 540 L 160 270 L 320 540 Z"
           fill="url(#bottom-fold-grad)"
           opacity="0.98"
-          style={{
-            filter: 'drop-shadow(0px -3px 6px rgba(110, 85, 65, 0.12))',
-          }}
         />
 
         {/* Diagonal Crease Paper Fold Relief Lines */}
@@ -411,11 +388,6 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           viewBox="0 0 320 270"
           className="w-full h-full"
           preserveAspectRatio="none"
-          style={{
-            filter: isOpened
-              ? 'none'
-              : 'drop-shadow(0 6px 12px rgba(120, 95, 75, 0.18)) drop-shadow(0 2px 4px rgba(0,0,0,0.08))',
-          }}
         >
           {/* Top Triangle Fold */}
           <path
@@ -456,10 +428,16 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           height: '106px',
         }}
       >
-        {/* Soft natural drop-shadow under the wax seal */}
-        <div className="absolute inset-1.5 rounded-full bg-[#180206]/45 blur-md translate-y-2 pointer-events-none" />
+        {/* Soft natural gradient shadow under the wax seal (zero filter blur cost) */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full translate-y-2 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(24, 2, 6, 0.42) 0%, rgba(24, 2, 6, 0) 70%)',
+          }}
+        />
 
-        <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+        <svg viewBox="0 0 100 100" className="w-full h-full relative">
           <defs>
             {/* Dark Burgundy 3D Radial Depth */}
             <radialGradient id="wax-body-grad" cx="36%" cy="32%" r="65%">
@@ -550,12 +528,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           />
 
           {/* Two Interlocking Gold Wedding Rings (Centrally Engraved) */}
-          <g
-            style={{
-              filter:
-                'drop-shadow(0 1.2px 1.5px rgba(0,0,0,0.7)) drop-shadow(0 -0.6px 0.6px rgba(255,255,255,0.45))',
-            }}
-          >
+          <g>
             {/* Left Ring */}
             <circle
               cx="43.5"
@@ -601,7 +574,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
           <button
             type="button"
             onClick={handleOpenClick}
-            className="flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-white text-[#1E1418] font-extrabold text-xs tracking-wide shadow-[0_10px_25px_rgba(40,20,30,0.18)] hover:shadow-[0_14px_30px_rgba(226,123,155,0.35)] hover:scale-105 active:scale-95 transition-all duration-300 border border-white/90 group backdrop-blur-md"
+            className="flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-white text-[#1E1418] font-extrabold text-xs tracking-wide shadow-[0_10px_25px_rgba(40,20,30,0.18)] hover:shadow-[0_14px_30px_rgba(226,123,155,0.35)] hover:scale-105 active:scale-95 transition-all duration-300 border border-white/90 group"
           >
             <span className="text-sm">💌</span>
             <span>{buttonLabel}</span>

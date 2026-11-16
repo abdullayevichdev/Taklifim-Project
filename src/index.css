@@ -248,19 +248,59 @@
   }
 }
 
-/* Keep mobile scrolling smooth by capping blur radius on small viewports */
-@media (max-width: 767px) {
+/* Zero-backdrop-filter mobile & coarse-touch optimization:
+ * Replaces heavy per-pixel offscreen blurs on scrolling elements with crisp
+ * multi-stop specular translucent fills so every phone runs at smooth 60-120fps.
+ */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
   .glass-surface,
-  .glass-panel,
+  .glass-panel {
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 248, 251, 0.82) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .glass-surface-elevated,
-  .glass-panel-elevated,
+  .glass-panel-elevated {
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 252, 0.88) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-surface-subtle,
+  .glass-panel-subtle,
+  .glass-surface-neutral,
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .glass-surface-tinted-pink,
-  .glass-liquid-pink,
+  .glass-liquid-pink {
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.92) 0%, rgba(250, 214, 228, 0.78) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .glass-surface-tinted-sky,
-  .glass-liquid-sky,
+  .glass-liquid-sky {
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.92) 0%, rgba(196, 228, 252, 0.78) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .glass-liquid-wedding {
-    backdrop-filter: blur(10px) saturate(1.4);
-    -webkit-backdrop-filter: blur(10px) saturate(1.4);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(250, 218, 230, 0.72) 52%, rgba(206, 232, 252, 0.72) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .glass-template-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 440px;
   }
 }
 
@@ -720,8 +760,14 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   .animate-glass-blob-a,
   .animate-glass-blob-b,
   .animate-glass-blob-c,
-  .animate-pulse-glow {
+  .animate-pulse-glow,
+  .animate-float-smooth,
+  .animate-bounce-gentle {
     animation: none;
+    will-change: auto;
+  }
+
+  .taklifim-seg-indicator {
     will-change: auto;
   }
 

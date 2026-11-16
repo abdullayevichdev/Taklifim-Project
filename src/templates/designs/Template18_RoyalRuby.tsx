@@ -20,7 +20,7 @@ export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
 
       <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Deep Velvet Ruby Baroque Card */}
-        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-[#360B18]/90 backdrop-blur-xl border-2 border-amber-400/40 shadow-[0_25px_80px_rgba(0,0,0,0.8)]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-[#360B18]/96 md:bg-[#360B18]/90 md:backdrop-blur-xl border-2 border-amber-400/40 shadow-[0_25px_80px_rgba(0,0,0,0.8)]">
           <div className="flex items-center justify-center gap-2 text-amber-300 min-w-0">
             <Crown className="w-5 h-5 shrink-0" />
             <span className="taklifim-tpl-eyebrow uppercase font-bold text-amber-300 min-w-0">

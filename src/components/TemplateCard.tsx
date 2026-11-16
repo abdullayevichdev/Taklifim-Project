@@ -109,11 +109,11 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
     <article className="glass-template-card overflow-hidden h-full flex flex-col group">
       {/* Preview Frame */}
       <div className="aspect-[4/5] w-full relative overflow-hidden rounded-t-[27px] shrink-0 bg-gradient-to-br from-[#FBF2F6] via-[#FDF9F5] to-[#EDF5FD]">
-        {/* Glass Skeleton Shimmer while image loads */}
+        {/* Static pastel glass placeholder while image loads (no per-card continuous pulse ticks) */}
         {!isLoaded && !hasError && (
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-br from-white/70 via-[#F8DCE6]/55 to-[#DCEEFF]/60 animate-pulse"
+            className="absolute inset-0 bg-gradient-to-br from-white/75 via-[#F8DCE6]/50 to-[#DCEEFF]/55"
           />
         )}
 
@@ -133,7 +133,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
             width={480}
             height={600}
             loading={priority ? 'eager' : 'lazy'}
-            fetchPriority={priority ? 'high' : undefined}
+            fetchPriority={priority ? 'high' : 'low'}
             decoding="async"
             referrerPolicy="no-referrer"
             onLoad={() => setIsLoaded(true)}

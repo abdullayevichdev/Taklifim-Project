@@ -74,7 +74,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     window.history.pushState({}, '', cleanPath);
     setCurrentPath(cleanPath);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
   }, []);
 
   // Compute matched params based on known parametric patterns

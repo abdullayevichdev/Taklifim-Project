@@ -18,14 +18,20 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
     <div className="taklifim-tpl-root w-full min-h-screen text-[#231E1B] relative overflow-hidden" style={{ backgroundColor: bg }}>
       {musicPlayer && <div className="fixed top-4 right-4 z-50">{musicPlayer}</div>}
 
-      {/* Floating Floral Petal Glow Accents */}
-      <div className="absolute top-10 left-1/4 w-72 h-72 rounded-full bg-gradient-to-br from-[#F5C9D8]/40 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute bottom-20 right-1/4 w-80 h-80 rounded-full bg-gradient-to-tl from-[#FFF5F8] via-[#F5C9D8]/30 to-transparent blur-3xl pointer-events-none" />
+      {/* Floating Floral Petal Glow Accents (fast radial gradients, no filter blur) */}
+      <div
+        className="hidden sm:block absolute top-10 left-1/4 w-72 h-72 rounded-full pointer-events-none opacity-60"
+        style={{ background: 'radial-gradient(circle, rgba(245, 201, 216, 0.45) 0%, transparent 70%)' }}
+      />
+      <div
+        className="hidden sm:block absolute bottom-20 right-1/4 w-80 h-80 rounded-full pointer-events-none opacity-60"
+        style={{ background: 'radial-gradient(circle, rgba(245, 201, 216, 0.35) 0%, transparent 70%)' }}
+      />
 
       {/* Main Container */}
       <div className="taklifim-tpl-wrap relative z-10 space-y-12">
         {/* HERO: Romantic White & Blush Floral Card */}
-        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-white/90 backdrop-blur-xl border border-white shadow-[0_20px_60px_rgba(217,101,139,0.15)]">
+        <div className="taklifim-tpl-hero-card relative rounded-[36px] text-center space-y-6 bg-white/95 md:bg-white/90 md:backdrop-blur-xl border border-white shadow-[0_20px_60px_rgba(217,101,139,0.15)]">
           {/* Top Delicate Floral Blossom Wreath */}
           <div className="flex items-center justify-center gap-2 text-[#D9658B]">
             <Flower2 className="w-5 h-5 shrink-0 animate-pulse" />

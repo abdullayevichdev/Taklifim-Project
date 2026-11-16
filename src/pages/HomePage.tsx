@@ -416,7 +416,7 @@ export const HomePage: React.FC = () => {
         <div className="taklifim-section-mesh">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr gap-5 lg:gap-6 items-stretch relative z-10">
             {featuredTemplates.map((template, idx) => (
-              <TemplateCard key={template.id} template={template} priority={idx < 4} />
+              <TemplateCard key={template.id} template={template} priority={idx < 2} />
             ))}
           </div>
         </div>
