@@ -1,12 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  commitOrderPendingReview,
-  upsertOrder,
-  verifyBearerToken,
-} from '../_lib/firebaseAdmin.js';
-import { checkRateLimit } from '../_lib/rateLimit.js';
-import { sendReceiptToTelegram } from '../_lib/telegram.js';
+import { verifyBearerToken } from '../_lib/firebaseAdmin.js';
 import { cleanAndValidateUzPhone } from '../_lib/phone.js';
+import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
@@ -28,6 +23,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    let parsedBody: Record<string, any> = {};
+    if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body);
+      } catch {
+        return res.status(400).json({ success: false, error: "So'rov formati noto'g'ri (JSON)." });
+      }
+    } else if (req.body && typeof req.body === 'object') {
+      parsedBody = req.body;
+    }
+
     const {
       orderId,
       invitationId,
@@ -43,26 +49,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileType,
       fileBase64,
       fileUrl,
-    } = req.body || {};
+      idempotencyKey,
+    } = parsedBody;
 
     const cleanPhone = cleanAndValidateUzPhone(customerPhone);
     if (!orderId || !cleanPhone || (!fileBase64 && !fileUrl)) {
       return res.status(400).json({
         success: false,
         error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX) va chek faylini yuklang.",
-      });
-    }
-
-    const clientIp =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.socket?.remoteAddress ||
-      'unknown';
-    const clientKey = `${clientIp}_${authUser.uid}_${cleanPhone}`;
-    if (!checkRateLimit(clientKey)) {
-      return res.status(429).json({
-        success: false,
-        error:
-          "Juda ko'p so'rov yuborildi. Iltimos, 10 soniya kutib qayta urinib ko'ring.",
       });
     }
 
@@ -91,74 +85,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileBuffer = Buffer.from(base64Data, 'base64');
     }
 
-    const nowIso = new Date().toISOString();
-    const commitRes = await commitOrderPendingReview({
+    const clientIp =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      'unknown';
+
+    const headerIdem = req.headers['x-idempotency-key'];
+    const resolvedIdem =
+      typeof headerIdem === 'string'
+        ? headerIdem
+        : idempotencyKey
+        ? String(idempotencyKey)
+        : undefined;
+
+    const result = await processUploadReceipt({
       verifiedUid: authUser.uid,
       orderId: String(orderId),
       invitationId: invitationId ? String(invitationId) : undefined,
       invitationSlug: invitationSlug ? String(invitationSlug) : undefined,
-      customerName: customerName ? String(customerName) : 'Mijoz',
+      customerName: customerName ? String(customerName) : '',
       customerPhone: cleanPhone,
-      templateName: templateName ? String(templateName) : 'Standart Shablon',
+      templateName: templateName ? String(templateName) : '',
       planName: planName ? String(planName) : undefined,
-      weddingDate: weddingDate ? String(weddingDate) : '-',
-      venueName: venueName ? String(venueName) : '-',
-      price: Number(price) || 180000,
-      receiptUrl: fileUrl ? String(fileUrl) : undefined,
-      receiptType: isPdf ? 'document' : 'photo',
-      nowIso,
-    });
-
-    if (commitRes.ok === false) {
-      return res.status(commitRes.statusCode).json({
-        success: false,
-        error: commitRes.error,
-      });
-    }
-
-    const { orderData } = commitRes;
-
-    const tgResult = await sendReceiptToTelegram({
-      orderId: orderData.orderId || orderData.id,
-      customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
-      templateName: orderData.templateName || 'Standart Shablon',
-      weddingDate: orderData.weddingDate || '-',
-      venueName: orderData.venueName || '-',
-      price: orderData.price,
+      weddingDate: weddingDate ? String(weddingDate) : '',
+      venueName: venueName ? String(venueName) : '',
+      price: Number(price) || 0,
       isPdf,
-      fileName,
-      fileType,
+      fileName: fileName ? String(fileName) : undefined,
+      fileType: fileType ? String(fileType) : undefined,
       fileBuffer,
-      fileUrl: orderData.receiptUrl,
+      fileUrl: fileUrl ? String(fileUrl) : undefined,
+      clientIp,
+      idempotencyKey: resolvedIdem,
     });
 
-    if (!tgResult.ok) {
-      return res.status(500).json({
-        success: false,
-        error: tgResult.error || 'Telegram xatosi',
-      });
-    }
-
-    const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    if (tgResult.messageId) {
-      patch.telegramMessageId = tgResult.messageId;
-    }
-    await upsertOrder(orderData.id, patch);
-
-    return res.json({
-      success: true,
-      orderId: orderData.orderId || orderData.id,
-      status: orderData.status,
-      receiptSentAt: orderData.receiptSentAt,
-      updatedAt: orderData.updatedAt,
-      message: "Chekingiz adminga yuborildi, tasdiqlanishini kuting.",
-    });
+    return res.status(result.statusCode).json(result.body);
   } catch (err: any) {
-    console.error('Upload receipt handler error:', err);
+    console.error('Upload receipt handler error:', {
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack,
+    });
     return res.status(500).json({
       success: false,
-      error: 'Serverda xatolik yuz berdi: ' + (err.message || "Noma'lum xatolik"),
+      error: 'Serverda xatolik yuz berdi: ' + (err?.message || "Noma'lum xatolik"),
     });
   }
 }

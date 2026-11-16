@@ -4,6 +4,14 @@ import {
   decideOrderPayment,
 } from './firebaseAdmin.js';
 
+function escapeTelegramHtml(value?: string | number | null): string {
+  if (value === undefined || value === null) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 async function tgApi(method: string, body: Record<string, unknown> | FormData) {
   const { botToken } = getTelegramConfig();
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
@@ -16,7 +24,16 @@ async function tgApi(method: string, body: Record<string, unknown> | FormData) {
           body: JSON.stringify(body),
         }),
   });
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      error_code: res.status,
+      description: text.slice(0, 200) || `HTTP ${res.status}`,
+    };
+  }
 }
 
 export async function handleTelegramUpdate(update: any): Promise<void> {
@@ -147,22 +164,45 @@ export async function sendReceiptToTelegram(params: {
   fileBuffer?: Buffer;
   fileUrl?: string;
 }): Promise<{ ok: boolean; messageId?: number; error?: string }> {
-  const { adminChatId } = getTelegramConfig();
+  const { botToken, adminChatId } = getTelegramConfig();
 
-  const formattedPrice = new Intl.NumberFormat('uz-UZ').format(params.price);
+  if (!botToken || botToken === 'MOCK_BOT_TOKEN' || !adminChatId || adminChatId === 'MOCK_ADMIN_CHAT_ID') {
+    console.error('Telegram configuration missing:', {
+      hasBotToken: Boolean(botToken && botToken !== 'MOCK_BOT_TOKEN'),
+      hasAdminChatId: Boolean(adminChatId && adminChatId !== 'MOCK_ADMIN_CHAT_ID'),
+    });
+    return {
+      ok: false,
+      error: "Telegram bot sozlamalari (TELEGRAM_BOT_TOKEN / TELEGRAM_ADMIN_CHAT_ID) serverda sozlanmagan.",
+    };
+  }
+
+  const safePrice = Number.isFinite(Number(params.price)) ? Number(params.price) : 0;
+  const formattedPrice = new Intl.NumberFormat('uz-UZ').format(safePrice);
   const formattedDate = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
 
-  const captionHtml =
-    `🧾 <b>YANGI TO'LOV CHEKI #${params.orderId}</b>\n\n` +
-    `👤 <b>Mijoz:</b> ${params.customerName}\n` +
-    `📞 <b>Telefon:</b> ${formatUzPhoneForDisplay(params.customerPhone)}\n` +
-    `🎨 <b>Shablon:</b> ${params.templateName}\n` +
-    `📅 <b>To'y sanasi:</b> ${params.weddingDate}\n` +
-    `📍 <b>To'yxona:</b> ${params.venueName}\n` +
+  const safeOrderId = escapeTelegramHtml(params.orderId);
+  const safeCustomerName = escapeTelegramHtml((params.customerName || 'Mijoz').slice(0, 120));
+  const safePhone = escapeTelegramHtml(formatUzPhoneForDisplay(params.customerPhone));
+  const safeTemplate = escapeTelegramHtml((params.templateName || 'Standart Shablon').slice(0, 100));
+  const safeWeddingDate = escapeTelegramHtml((params.weddingDate || '-').slice(0, 60));
+  const safeVenue = escapeTelegramHtml((params.venueName || '-').slice(0, 160));
+
+  let captionHtml =
+    `🧾 <b>YANGI TO'LOV CHEKI #${safeOrderId}</b>\n\n` +
+    `👤 <b>Mijoz:</b> ${safeCustomerName}\n` +
+    `📞 <b>Telefon:</b> ${safePhone}\n` +
+    `🎨 <b>Shablon:</b> ${safeTemplate}\n` +
+    `📅 <b>To'y sanasi:</b> ${safeWeddingDate}\n` +
+    `📍 <b>To'yxona:</b> ${safeVenue}\n` +
     `💰 <b>To'lov summasi:</b> ${formattedPrice} so'm\n` +
     `💳 <b>Karta:</b> 5614 6822 0920 2581 (ABDULLA DEDAXANOV)\n` +
-    `⏱ <b>Yuklangan vaqt:</b> ${formattedDate}\n\n` +
+    `⏱ <b>Yuklangan vaqt:</b> ${escapeTelegramHtml(formattedDate)}\n\n` +
     `👇 <i>Iltimos, to'lovni tasdiqlang yoki rad eting:</i>`;
+
+  if (captionHtml.length > 1000) {
+    captionHtml = captionHtml.slice(0, 997) + '...';
+  }
 
   const replyMarkup = {
     inline_keyboard: [
@@ -176,6 +216,26 @@ export async function sendReceiptToTelegram(params: {
   const tgMethod = params.isPdf ? 'sendDocument' : 'sendPhoto';
   const fieldName = params.isPdf ? 'document' : 'photo';
 
+  const sendViaBuffer = async (buf: Buffer) => {
+    const formData = new FormData();
+    formData.append('chat_id', adminChatId);
+    formData.append('caption', captionHtml);
+    formData.append('parse_mode', 'HTML');
+    formData.append('reply_markup', JSON.stringify(replyMarkup));
+
+    const fileBlob = new Blob([new Uint8Array(buf)], {
+      type: params.isPdf ? 'application/pdf' : params.fileType || 'image/jpeg',
+    });
+    const fileExt = params.isPdf ? '.pdf' : '.jpg';
+    formData.append(
+      fieldName,
+      fileBlob,
+      params.fileName || `receipt_${params.orderId}${fileExt}`
+    );
+
+    return tgApi(tgMethod, formData);
+  };
+
   let tgData: any;
 
   if (params.fileUrl) {
@@ -186,30 +246,30 @@ export async function sendReceiptToTelegram(params: {
       parse_mode: 'HTML',
       reply_markup: replyMarkup,
     });
+
+    // If Telegram cannot fetch the Firebase Storage URL directly, fetch server-side and upload bytes
+    if (!tgData?.ok) {
+      try {
+        const fileRes = await fetch(params.fileUrl);
+        if (fileRes.ok) {
+          const arrBuf = await fileRes.arrayBuffer();
+          tgData = await sendViaBuffer(Buffer.from(arrBuf));
+        }
+      } catch (fetchErr) {
+        console.warn('Fallback fileUrl download failed:', fetchErr);
+      }
+    }
   } else if (params.fileBuffer) {
-    const formData = new FormData();
-    formData.append('chat_id', adminChatId);
-    formData.append('caption', captionHtml);
-    formData.append('parse_mode', 'HTML');
-    formData.append('reply_markup', JSON.stringify(replyMarkup));
-
-    const fileBlob = new Blob([new Uint8Array(params.fileBuffer)], {
-      type: params.isPdf ? 'application/pdf' : params.fileType || 'image/jpeg',
-    });
-    const fileExt = params.isPdf ? '.pdf' : '.jpg';
-    formData.append(
-      fieldName,
-      fileBlob,
-      params.fileName || `receipt_${params.orderId}${fileExt}`
-    );
-
-    tgData = await tgApi(tgMethod, formData);
+    tgData = await sendViaBuffer(params.fileBuffer);
   } else {
     return { ok: false, error: 'Fayl topilmadi' };
   }
 
   if (!tgData?.ok) {
-    console.error('Telegram Bot API Error:', tgData);
+    console.error('Telegram Bot API Error:', {
+      error_code: tgData?.error_code,
+      description: tgData?.description,
+    });
     return {
       ok: false,
       error:

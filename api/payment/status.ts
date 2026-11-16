@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '../_lib/types.js';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import statusHandler from './status/[orderId].js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

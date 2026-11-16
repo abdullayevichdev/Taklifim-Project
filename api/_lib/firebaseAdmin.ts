@@ -27,7 +27,9 @@ export interface ServerOrder {
   status: OrderStatus;
   receiptUrl?: string;
   telegramMessageId?: number;
+  lastIdempotencyKey?: string;
   receiptSentAt?: string;
+  submittedAt?: string;
   decidedAt?: string;
   reviewedAt?: string;
   decidedBy?: string;
@@ -42,6 +44,13 @@ export interface VerifiedAuthUser {
   email?: string;
 }
 
+function sanitizeRtdbKeySegment(raw?: string): string {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/[.#$\[\]/\\]+/g, '-');
+}
+
 function parseServiceAccount(): {
   projectId: string;
   clientEmail: string;
@@ -49,24 +58,32 @@ function parseServiceAccount(): {
 } | null {
   const jsonRaw = cleanEnvString(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (jsonRaw) {
-    try {
-      const parsed = JSON.parse(jsonRaw) as {
-        project_id?: string;
-        client_email?: string;
-        private_key?: string;
-        projectId?: string;
-        clientEmail?: string;
-        privateKey?: string;
-      };
-      const projectId = cleanEnvString(parsed.project_id || parsed.projectId);
-      const clientEmail = cleanEnvString(parsed.client_email || parsed.clientEmail);
-      const privateKey = cleanPrivateKey(parsed.private_key || parsed.privateKey);
-      if (projectId && clientEmail && privateKey) {
-        return { projectId, clientEmail, privateKey };
+    const candidates = [
+      jsonRaw,
+      // Recover if newlines inside JSON string were pasted literally without escaping
+      jsonRaw.replace(/\r?\n/g, '\\n'),
+    ];
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(candidate) as {
+          project_id?: string;
+          client_email?: string;
+          private_key?: string;
+          projectId?: string;
+          clientEmail?: string;
+          privateKey?: string;
+        };
+        const projectId = cleanEnvString(parsed.project_id || parsed.projectId);
+        const clientEmail = cleanEnvString(parsed.client_email || parsed.clientEmail);
+        const privateKey = cleanPrivateKey(parsed.private_key || parsed.privateKey);
+        if (projectId && clientEmail && privateKey) {
+          return { projectId, clientEmail, privateKey };
+        }
+      } catch {
+        // try next candidate
       }
-    } catch (e) {
-      console.error('FIREBASE_SERVICE_ACCOUNT_JSON parse error:', e);
     }
+    console.error('FIREBASE_SERVICE_ACCOUNT_JSON parse error: invalid JSON or missing project_id/client_email/private_key');
   }
 
   const projectId = cleanEnvString(process.env.FIREBASE_PROJECT_ID);
@@ -80,6 +97,10 @@ function parseServiceAccount(): {
   return null;
 }
 
+export function hasFirebaseAdmin(): boolean {
+  return getAdminApp() !== null;
+}
+
 export function getAdminApp(): App | null {
   if (getApps().length > 0) {
     return getApp();
@@ -91,10 +112,15 @@ export function getAdminApp(): App | null {
     return null;
   }
 
-  return initializeApp({
-    credential: cert(serviceAccount),
-    databaseURL: getFirebaseDatabaseUrl(),
-  });
+  try {
+    return initializeApp({
+      credential: cert(serviceAccount),
+      databaseURL: getFirebaseDatabaseUrl(),
+    });
+  } catch (err) {
+    console.error('[Taklifim] Firebase Admin initializeApp failed:', (err as Error)?.message || err);
+    return null;
+  }
 }
 
 export function getRtdb() {
@@ -163,6 +189,34 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): Recor
   return result;
 }
 
+export interface ReceiptAttemptRecord {
+  key: string;
+  orderId: string;
+  ownerUid: string;
+  telegramSent: boolean;
+  telegramMessageId?: number;
+  committed: boolean;
+  updatedAt: string;
+}
+
+async function retryRtdbOperation<T>(
+  operation: () => Promise<T>,
+  maxAttempts = 3
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 180));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 export async function getOrder(orderId: string): Promise<ServerOrder | null> {
   const snap = await getRtdb().ref(`orders/${orderId}`).get();
   if (!snap.exists()) return null;
@@ -181,6 +235,16 @@ export async function getInvitationRecord(
   const snap = await getRtdb().ref(`invitations/${invitationId}`).get();
   if (!snap.exists()) return null;
   return snap.val() as Record<string, any>;
+}
+
+export async function getReceiptAttempt(
+  attemptKey: string
+): Promise<ReceiptAttemptRecord | null> {
+  const safeKey = sanitizeRtdbKeySegment(attemptKey);
+  if (!safeKey) return null;
+  const snap = await getRtdb().ref(`receiptAttempts/${safeKey}`).get();
+  if (!snap.exists()) return null;
+  return snap.val() as ReceiptAttemptRecord;
 }
 
 export async function upsertOrder(
@@ -207,6 +271,189 @@ export async function updateInvitationStatus(
 }
 
 /**
+ * Pre-validates order & invitation ownership and paid state BEFORE sending receipt to Telegram,
+ * preventing failed uploads or unauthorized callers from triggering admin messages.
+ */
+export async function validateOrderBeforeReceipt(params: {
+  verifiedUid: string;
+  orderId: string;
+  invitationId?: string;
+}): Promise<
+  | { ok: true; existingOrder: ServerOrder | null; existingInv: Record<string, any> | null }
+  | { ok: false; statusCode: number; error: string }
+> {
+  const safeOrderId = sanitizeRtdbKeySegment(params.orderId);
+  if (!safeOrderId) {
+    return { ok: false, statusCode: 400, error: "Buyurtma raqami noto'g'ri." };
+  }
+
+  const existingOrder = await getOrder(safeOrderId);
+
+  if (existingOrder?.ownerUid && existingOrder.ownerUid !== params.verifiedUid) {
+    return {
+      ok: false,
+      statusCode: 403,
+      error: "Bu buyurtma boshqa foydalanuvchiga tegishli.",
+    };
+  }
+
+  if (existingOrder?.status === 'paid') {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "Ushbu buyurtma allaqachon tasdiqlangan.",
+    };
+  }
+
+  const finalInvId = sanitizeRtdbKeySegment(params.invitationId || existingOrder?.invitationId);
+  let existingInv: Record<string, any> | null = null;
+  if (finalInvId) {
+    existingInv = await getInvitationRecord(finalInvId);
+    const invOwner = existingInv?.ownerUid || existingInv?.ownerId;
+    if (invOwner && invOwner !== 'anonymous' && invOwner !== params.verifiedUid) {
+      return {
+        ok: false,
+        statusCode: 403,
+        error: "Bu taklifnoma boshqa foydalanuvchiga tegishli.",
+      };
+    }
+  }
+
+  return { ok: true, existingOrder, existingInv };
+}
+
+/**
+ * Seeds pre-flight order & invitation linkage BEFORE calling Telegram so an order
+ * is never orphaned if Telegram succeeds and subsequent DB commit retries hit an outage.
+ * Never sets pending_review prematurely.
+ */
+export async function seedPreflightOrderRecord(params: {
+  verifiedUid: string;
+  orderId: string;
+  invitationId?: string;
+  invitationSlug?: string;
+  customerName: string;
+  customerPhone: string;
+  templateName: string;
+  planName?: string;
+  weddingDate: string;
+  venueName: string;
+  price: number;
+  receiptUrl?: string;
+  existingOrder: ServerOrder | null;
+  existingInv: Record<string, any> | null;
+  nowIso: string;
+}): Promise<void> {
+  const safeOrderId = sanitizeRtdbKeySegment(params.orderId);
+  const finalInvId = sanitizeRtdbKeySegment(params.invitationId || params.existingOrder?.invitationId);
+  const rawSlug = params.invitationSlug || params.existingOrder?.invitationSlug || params.existingInv?.slug || '';
+  const cleanSlug = String(rawSlug)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const preservedStatus: OrderStatus =
+    params.existingOrder?.status === 'rejected'
+      ? 'rejected'
+      : params.existingOrder?.status === 'pending_review'
+      ? 'pending_review'
+      : 'pending_payment';
+
+  const parsedPrice = Number(params.price);
+  const existingPrice = Number(params.existingOrder?.price);
+  const safePrice =
+    Number.isFinite(parsedPrice) && parsedPrice > 0
+      ? parsedPrice
+      : Number.isFinite(existingPrice) && existingPrice > 0
+      ? existingPrice
+      : 180000;
+
+  const updates: Record<string, unknown> = {
+    [`orders/${safeOrderId}`]: stripUndefined({
+      ...(params.existingOrder || {}),
+      id: safeOrderId,
+      orderId: safeOrderId,
+      orderNumber: params.existingOrder?.orderNumber || safeOrderId.replace(/^ORD-/, 'TK-'),
+      ownerUid: params.verifiedUid,
+      invitationId: finalInvId || undefined,
+      invitationSlug: cleanSlug || undefined,
+      customerName: params.customerName || params.existingOrder?.customerName || 'Mijoz',
+      customerPhone: params.customerPhone,
+      templateName: params.templateName || params.existingOrder?.templateName || 'Standart Shablon',
+      planName: params.planName || params.existingOrder?.planName,
+      weddingDate: params.weddingDate || params.existingOrder?.weddingDate || '-',
+      venueName: params.venueName || params.existingOrder?.venueName || '-',
+      price: safePrice,
+      status: preservedStatus,
+      receiptUrl: params.receiptUrl || params.existingOrder?.receiptUrl,
+      createdAt: params.existingOrder?.createdAt || params.nowIso,
+      updatedAt: params.nowIso,
+    }),
+    [`userOrders/${params.verifiedUid}/${safeOrderId}`]: preservedStatus,
+  };
+
+  if (finalInvId) {
+    if (!params.existingInv) {
+      updates[`invitations/${finalInvId}/id`] = finalInvId;
+      if (cleanSlug) updates[`invitations/${finalInvId}/slug`] = cleanSlug;
+      updates[`invitations/${finalInvId}/hostNames`] = params.customerName || 'Mijoz';
+      updates[`invitations/${finalInvId}/eventTitle`] = params.customerName || 'Taklifnoma';
+      updates[`invitations/${finalInvId}/eventType`] = 'To‘y va Nikoh Oqshomi';
+      updates[`invitations/${finalInvId}/eventDate`] = params.weddingDate || '';
+      updates[`invitations/${finalInvId}/venueName`] = params.venueName || '';
+      updates[`invitations/${finalInvId}/templateSlug`] = 'template-1';
+      updates[`invitations/${finalInvId}/status`] = preservedStatus;
+      updates[`invitations/${finalInvId}/paymentStatus`] = preservedStatus;
+      updates[`invitations/${finalInvId}/createdAt`] = params.nowIso;
+    }
+    updates[`invitations/${finalInvId}/orderId`] = safeOrderId;
+    updates[`invitations/${finalInvId}/ownerUid`] = params.verifiedUid;
+    if (!params.existingInv?.ownerId || params.existingInv.ownerId === 'anonymous') {
+      updates[`invitations/${finalInvId}/ownerId`] = params.verifiedUid;
+    }
+    updates[`invitations/${finalInvId}/updatedAt`] = params.nowIso;
+    if (cleanSlug) {
+      updates[`slugs/${cleanSlug}`] = finalInvId;
+    }
+  }
+
+  await retryRtdbOperation(() => getRtdb().ref().update(updates), 2);
+}
+
+export async function markTelegramAttemptDispatched(params: {
+  attemptKey: string;
+  orderId: string;
+  verifiedUid: string;
+  telegramMessageId?: number;
+  nowIso: string;
+}): Promise<void> {
+  const safeAttemptKey = sanitizeRtdbKeySegment(params.attemptKey);
+  const safeOrderId = sanitizeRtdbKeySegment(params.orderId);
+  if (!safeAttemptKey || !safeOrderId) return;
+
+  const updates: Record<string, unknown> = {
+    [`receiptAttempts/${safeAttemptKey}`]: stripUndefined({
+      key: safeAttemptKey,
+      orderId: safeOrderId,
+      ownerUid: params.verifiedUid,
+      telegramSent: true,
+      telegramMessageId: params.telegramMessageId,
+      committed: false,
+      updatedAt: params.nowIso,
+    }),
+    [`orders/${safeOrderId}/dispatchedAttempt`]: stripUndefined({
+      key: safeAttemptKey,
+      telegramSent: true,
+      messageId: params.telegramMessageId,
+      updatedAt: params.nowIso,
+    }),
+  };
+
+  await retryRtdbOperation(() => getRtdb().ref().update(updates), 2);
+}
+
+/**
  * Atomically saves a newly submitted receipt order as pending_review,
  * indexes it under userOrders/{uid}/{orderId}, and links invitations/{id}.
  */
@@ -224,82 +471,112 @@ export async function commitOrderPendingReview(params: {
   price: number;
   receiptUrl?: string;
   receiptType?: 'photo' | 'document';
+  telegramMessageId?: number;
+  idempotencyKey?: string;
   nowIso: string;
 }): Promise<{ ok: true; orderData: ServerOrder } | { ok: false; statusCode: number; error: string }> {
-  const existing = await getOrder(params.orderId);
+  const safeOrderId = sanitizeRtdbKeySegment(params.orderId);
+  const safeInvIdParam = sanitizeRtdbKeySegment(params.invitationId);
+  const safeAttemptKey = sanitizeRtdbKeySegment(params.idempotencyKey);
 
-  if (existing?.ownerUid && existing.ownerUid !== params.verifiedUid) {
-    return {
-      ok: false,
-      statusCode: 403,
-      error: "Bu buyurtma boshqa foydalanuvchiga tegishli.",
-    };
+  const preCheck = await validateOrderBeforeReceipt({
+    verifiedUid: params.verifiedUid,
+    orderId: safeOrderId,
+    invitationId: safeInvIdParam,
+  });
+
+  if (preCheck.ok === false) {
+    return preCheck;
   }
 
-  if (existing?.status === 'paid') {
-    return {
-      ok: false,
-      statusCode: 400,
-      error: "Ushbu buyurtma allaqachon tasdiqlangan.",
-    };
-  }
+  const { existingOrder: existing, existingInv } = preCheck;
 
-  const finalInvId = params.invitationId || existing?.invitationId;
-  const finalInvSlug = params.invitationSlug || existing?.invitationSlug;
+  const finalInvId = sanitizeRtdbKeySegment(safeInvIdParam || existing?.invitationId);
+  const rawSlug = params.invitationSlug || existing?.invitationSlug || existingInv?.slug || '';
+  const cleanSlug = String(rawSlug)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   const finalReceiptUrl = params.receiptUrl || existing?.receiptUrl;
 
-  let existingInv: Record<string, any> | null = null;
-  if (finalInvId) {
-    existingInv = await getInvitationRecord(finalInvId);
-    const invOwner = existingInv?.ownerUid || existingInv?.ownerId;
-    if (invOwner && invOwner !== 'anonymous' && invOwner !== params.verifiedUid) {
-      return {
-        ok: false,
-        statusCode: 403,
-        error: "Bu taklifnoma boshqa foydalanuvchiga tegishli.",
-      };
-    }
-  }
+  const parsedPrice = Number(params.price);
+  const existingPrice = Number(existing?.price);
+  const safePrice =
+    Number.isFinite(parsedPrice) && parsedPrice > 0
+      ? parsedPrice
+      : Number.isFinite(existingPrice) && existingPrice > 0
+      ? existingPrice
+      : 180000;
 
   const orderData = stripUndefined({
     ...(existing || {}),
-    id: params.orderId,
-    orderId: params.orderId,
-    orderNumber: existing?.orderNumber || params.orderId.replace(/^ORD-/, 'TK-'),
+    id: safeOrderId,
+    orderId: safeOrderId,
+    orderNumber: existing?.orderNumber || safeOrderId.replace(/^ORD-/, 'TK-'),
     ownerUid: params.verifiedUid,
-    invitationId: finalInvId,
-    invitationSlug: finalInvSlug || existingInv?.slug,
+    invitationId: finalInvId || undefined,
+    invitationSlug: cleanSlug || undefined,
     customerName: params.customerName || existing?.customerName || 'Mijoz',
     customerPhone: params.customerPhone,
     templateName: params.templateName || existing?.templateName || 'Standart Shablon',
     planName: params.planName || existing?.planName,
     weddingDate: params.weddingDate || existing?.weddingDate || '-',
     venueName: params.venueName || existing?.venueName || '-',
-    price: Number(params.price) || existing?.price || 180000,
+    price: safePrice,
     status: 'pending_review',
     receiptUrl: finalReceiptUrl,
     receiptType: params.receiptType || existing?.receiptType,
+    telegramMessageId: params.telegramMessageId || existing?.telegramMessageId,
+    lastIdempotencyKey: safeAttemptKey || existing?.lastIdempotencyKey,
     receiptSentAt: params.nowIso,
     submittedAt: params.nowIso,
     createdAt: existing?.createdAt || params.nowIso,
     updatedAt: params.nowIso,
   }) as ServerOrder;
 
-  // Clear previous rejection reason if re-uploading
+  // Clear previous rejection reason and temporary dispatch lock if re-uploading
   delete orderData.rejectReason;
+  delete orderData.dispatchedAttempt;
 
   const updates: Record<string, unknown> = {
-    [`orders/${params.orderId}`]: {
+    [`orders/${safeOrderId}`]: {
       ...orderData,
       rejectReason: null,
+      dispatchedAttempt: null,
     },
-    [`userOrders/${params.verifiedUid}/${params.orderId}`]: 'pending_review',
+    [`userOrders/${params.verifiedUid}/${safeOrderId}`]: 'pending_review',
   };
 
+  if (safeAttemptKey) {
+    updates[`receiptAttempts/${safeAttemptKey}`] = stripUndefined({
+      key: safeAttemptKey,
+      orderId: safeOrderId,
+      ownerUid: params.verifiedUid,
+      telegramSent: true,
+      telegramMessageId: params.telegramMessageId || existing?.telegramMessageId,
+      committed: true,
+      updatedAt: params.nowIso,
+    });
+  }
+
   if (finalInvId) {
+    if (!existingInv) {
+      // Seed minimal invitation record if client RTDB save had not happened yet
+      updates[`invitations/${finalInvId}/id`] = finalInvId;
+      if (cleanSlug) updates[`invitations/${finalInvId}/slug`] = cleanSlug;
+      updates[`invitations/${finalInvId}/hostNames`] = params.customerName || 'Mijoz';
+      updates[`invitations/${finalInvId}/eventTitle`] = params.customerName || 'Taklifnoma';
+      updates[`invitations/${finalInvId}/eventType`] = 'To‘y va Nikoh Oqshomi';
+      updates[`invitations/${finalInvId}/eventDate`] = params.weddingDate || '';
+      updates[`invitations/${finalInvId}/venueName`] = params.venueName || '';
+      updates[`invitations/${finalInvId}/templateSlug`] = 'template-1';
+      updates[`invitations/${finalInvId}/createdAt`] = params.nowIso;
+    }
+
     updates[`invitations/${finalInvId}/status`] = 'pending_review';
     updates[`invitations/${finalInvId}/paymentStatus`] = 'pending_review';
-    updates[`invitations/${finalInvId}/orderId`] = params.orderId;
+    updates[`invitations/${finalInvId}/orderId`] = safeOrderId;
     updates[`invitations/${finalInvId}/ownerUid`] = params.verifiedUid;
     if (!existingInv?.ownerId || existingInv.ownerId === 'anonymous') {
       updates[`invitations/${finalInvId}/ownerId`] = params.verifiedUid;
@@ -308,13 +585,12 @@ export async function commitOrderPendingReview(params: {
     updates[`invitations/${finalInvId}/updatedAt`] = params.nowIso;
     updates[`invitations/${finalInvId}/rejectReason`] = null;
 
-    const cleanSlug = (finalInvSlug || existingInv?.slug || '').toString().toLowerCase().trim();
     if (cleanSlug) {
       updates[`slugs/${cleanSlug}`] = finalInvId;
     }
   }
 
-  await getRtdb().ref().update(updates);
+  await retryRtdbOperation(() => getRtdb().ref().update(updates), 3);
 
   return { ok: true, orderData };
 }
@@ -370,6 +646,7 @@ export async function decideOrderPayment(params: {
     [`orders/${params.orderId}/decidedAt`]: nowIso,
     [`orders/${params.orderId}/reviewedAt`]: nowIso,
     [`orders/${params.orderId}/rejectReason`]: resolvedReason,
+    [`orders/${params.orderId}/dispatchedAttempt`]: null,
   };
 
   if (params.adminName) {

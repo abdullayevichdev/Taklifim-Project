@@ -156,8 +156,8 @@ export const CustomerDashboard: React.FC = () => {
       }
     );
 
-    const unsubGuests = api.subscribe<GuestRSVP[]>('guests', (data) => {
-      setGuests((data || []).filter((g) => g.invitationOwnerId === user.id));
+    const unsubGuests = api.subscribeUserGuests(user.id, (data) => {
+      setGuests(data || []);
     });
 
     return () => {

@@ -401,8 +401,8 @@ export const InvitationGuestPage: React.FC = () => {
           setGuestList(guests);
           api.incrementViews(slug);
 
-          unsubscribeGuests = api.subscribe<GuestRSVP[]>('guests', (allGuests) => {
-            setGuestList(allGuests.filter((g) => g.invitationSlug === slug));
+          unsubscribeGuests = api.subscribeInvitationGuests(slug, (scopedGuests) => {
+            setGuestList(scopedGuests);
           });
         }
       } else {
@@ -498,7 +498,7 @@ export const InvitationGuestPage: React.FC = () => {
       const newGuest = await api.submitRSVP({
         invitationId: invitation?.id || 'inv-1',
         invitationSlug: slug,
-        invitationOwnerId: invitation?.ownerId, // Invitation egasini saqlash
+        invitationOwnerId: invitation?.ownerUid || invitation?.ownerId || '',
         fullName: rsvpFullName.trim(),
         phone: rsvpPhone.trim(),
         attending: rsvpAttending,
@@ -538,7 +538,7 @@ export const InvitationGuestPage: React.FC = () => {
       const newGuest = await api.submitRSVP({
         invitationId: invitation?.id || 'inv-1',
         invitationSlug: slug,
-        invitationOwnerId: invitation?.ownerId,
+        invitationOwnerId: invitation?.ownerUid || invitation?.ownerId || '',
         fullName: (data.fullName || '').trim(),
         phone: (data.phone || '').trim(),
         attending: data.attending ?? true,
@@ -572,7 +572,7 @@ export const InvitationGuestPage: React.FC = () => {
       const newGuest = await api.submitRSVP({
         invitationId: invitation?.id || 'inv-1',
         invitationSlug: slug,
-        invitationOwnerId: invitation?.ownerId,
+        invitationOwnerId: invitation?.ownerUid || invitation?.ownerId || '',
         fullName: wish.name.trim(),
         phone: '',
         attending: true,

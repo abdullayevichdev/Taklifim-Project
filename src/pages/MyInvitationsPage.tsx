@@ -127,8 +127,7 @@ export const MyInvitationsPage: React.FC = () => {
       }
     );
 
-    const unsubGuests = api.subscribe<GuestRSVP[]>('guests', (updatedGuests) => {
-      const scoped = (updatedGuests || []).filter((g) => g.invitationOwnerId === user.id);
+    const unsubGuests = api.subscribeUserGuests(user.id, (scoped) => {
       setGuests(scoped);
       if (
         initialGuestCountRef.current !== null &&

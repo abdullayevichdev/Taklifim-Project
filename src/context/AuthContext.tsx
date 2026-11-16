@@ -247,7 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('taklifim_active_user', JSON.stringify(resolvedUser));
     } catch {}
 
-    if (isFirebaseConfigured() && rtdb && resolvedUser.id) {
+    if (isFirebaseConfigured() && rtdb && resolvedUser.id && auth?.currentUser?.uid === resolvedUser.id) {
       try {
         await rtdbSet(rtdbRef(rtdb, `users/${resolvedUser.id}`), resolvedUser);
       } catch (err) {

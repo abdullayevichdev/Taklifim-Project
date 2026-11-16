@@ -32,6 +32,6 @@ export function getTelegramConfig() {
 }
 
 export function getFirebaseDatabaseUrl(): string {
-  const url = cleanEnvString(process.env.FIREBASE_DATABASE_URL);
+  const url = cleanEnvString(process.env.FIREBASE_DATABASE_URL).replace(/\/+$/, '');
   return url || 'https://teklifim-9dae7-default-rtdb.firebaseio.com';
 }

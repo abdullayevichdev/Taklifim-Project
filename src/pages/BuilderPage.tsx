@@ -726,13 +726,28 @@ export const BuilderPage: React.FC = () => {
         invitationState.status === 'draft' || invitationState.status === 'pending_payment'
           ? 'pending_payment'
           : invitationState.status;
-      await api.saveInvitation({
+      const savedInv = await api.saveInvitation({
         ...invitationState,
         status: safeClientStatus,
         ownerId: user?.id || invitationState.ownerId,
         ownerUid: user?.id || invitationState.ownerUid,
         updatedAt: new Date().toISOString(),
       });
+
+      if (
+        savedInv.id !== invitationState.id ||
+        savedInv.slug !== invitationState.slug ||
+        savedInv.ownerId !== invitationState.ownerId ||
+        savedInv.ownerUid !== invitationState.ownerUid
+      ) {
+        setInvitationState((prev) => ({
+          ...prev,
+          id: savedInv.id,
+          slug: savedInv.slug,
+          ownerId: savedInv.ownerId,
+          ownerUid: savedInv.ownerUid,
+        }));
+      }
 
       let fileUrl: string | undefined;
       let fileBase64Payload: string | undefined = fileBase64 || undefined;
@@ -750,13 +765,13 @@ export const BuilderPage: React.FC = () => {
 
       const res = await api.uploadReceipt({
         orderId,
-        invitationId: invitationState.id,
-        invitationSlug: invitationState.slug,
-        customerName: invitationState.hostNames,
+        invitationId: savedInv.id,
+        invitationSlug: savedInv.slug,
+        customerName: savedInv.hostNames,
         customerPhone: cleanPhone,
         templateName: currentTemplate.name,
-        weddingDate: invitationState.eventDate,
-        venueName: invitationState.venueName,
+        weddingDate: savedInv.eventDate,
+        venueName: savedInv.venueName,
         price: finalPrice,
         fileName: preparedFileName || selectedFile.name,
         fileType: preparedFileType || selectedFile.type,
@@ -778,12 +793,14 @@ export const BuilderPage: React.FC = () => {
 
         const updatedInv: InvitationData = {
           ...invitationState,
+          id: savedInv.id,
+          slug: savedInv.slug,
           status: 'pending_review',
           paymentStatus: 'pending_review',
           orderId,
           receiptSentAt: nowSentAt,
-          ownerId: user?.id || invitationState.ownerId,
-          ownerUid: user?.id || invitationState.ownerUid,
+          ownerId: savedInv.ownerId || user?.id || invitationState.ownerId,
+          ownerUid: savedInv.ownerUid || user?.id || invitationState.ownerUid,
         };
         setInvitationState(updatedInv);
         try {
@@ -801,6 +818,11 @@ export const BuilderPage: React.FC = () => {
 
         showToast(t.builder.toasts.receiptSent, 'success');
       } else {
+        if (res.status === 'pending_review') {
+          orderTransitionBaselineRef.current = 'pending_review';
+          setActiveOrderId(orderId);
+          setOrderStatus('pending_review');
+        }
         setUploadError(res.error || t.builder.toasts.receiptSendError);
         showToast(res.error || t.builder.toasts.receiptSendError, 'error');
       }
@@ -825,14 +847,21 @@ export const BuilderPage: React.FC = () => {
 
   const handleSaveDraft = async () => {
     try {
-      if (!queryInvitationId) {
-        localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
-      }
-      await api.saveInvitation({
+      const saved = await api.saveInvitation({
         ...invitationState,
         ownerId: user?.id || invitationState.ownerId,
         ownerUid: user?.id || invitationState.ownerUid,
       });
+      setInvitationState((prev) => ({
+        ...prev,
+        id: saved.id,
+        slug: saved.slug,
+        ownerId: saved.ownerId,
+        ownerUid: saved.ownerUid,
+      }));
+      if (!queryInvitationId) {
+        localStorage.setItem('taklifim_builder_draft', JSON.stringify(saved));
+      }
       showToast(t.builder.toasts.draftSaved, 'success');
     } catch {
       showToast(t.builder.toasts.draftSaveError, 'error');
@@ -2789,11 +2818,34 @@ export const BuilderPage: React.FC = () => {
                         localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
                       }
                     } catch {}
-                    api.saveInvitation({
-                      ...invitationState,
-                      ownerId: user?.id || invitationState.ownerId,
-                      ownerUid: user?.id || invitationState.ownerUid,
-                    }).catch(() => {});
+                    api
+                      .saveInvitation({
+                        ...invitationState,
+                        ownerId: user?.id || invitationState.ownerId,
+                        ownerUid: user?.id || invitationState.ownerUid,
+                      })
+                      .then((saved) => {
+                        if (
+                          saved.id !== invitationState.id ||
+                          saved.slug !== invitationState.slug ||
+                          saved.ownerId !== invitationState.ownerId ||
+                          saved.ownerUid !== invitationState.ownerUid
+                        ) {
+                          setInvitationState((prev) => ({
+                            ...prev,
+                            id: saved.id,
+                            slug: saved.slug,
+                            ownerId: saved.ownerId,
+                            ownerUid: saved.ownerUid,
+                          }));
+                          try {
+                            if (!queryInvitationId) {
+                              localStorage.setItem('taklifim_builder_draft', JSON.stringify(saved));
+                            }
+                          } catch {}
+                        }
+                      })
+                      .catch(() => {});
                   }}
                   rightIcon={<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
                 >

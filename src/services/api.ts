@@ -48,6 +48,17 @@ function getAuthenticatedUid(): string | null {
   return auth?.currentUser?.uid || null;
 }
 
+function isFallbackLocalId(id?: string): boolean {
+  if (!id) return true;
+  return (
+    id === 'anonymous' ||
+    id.startsWith('usr_') ||
+    id.startsWith('phone_') ||
+    id.startsWith('google_') ||
+    id.startsWith('apple_')
+  );
+}
+
 function mergeLocalInvitations(userId: string | undefined, remoteList: InvitationData[]): void {
   const existing = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
   const others = userId
@@ -210,8 +221,8 @@ export const api = {
   subscribe<T = any>(type: EventType, callback: (data: T) => void): () => void {
     const unsubs: (() => void)[] = [];
 
-    // 1. Firebase Realtime Database Listener (Public/allowed nodes only; private user nodes use scoped listeners)
-    const allowGlobalRtdb = type === 'guests' || type === 'templates' || type === 'messages';
+    // 1. Firebase Realtime Database Listener (Only public templates root; guests/invitations/orders use scoped queries)
+    const allowGlobalRtdb = type === 'templates';
     if (allowGlobalRtdb && isFirebaseConfigured() && rtdb) {
       try {
         const dbNode = rtdbRef(rtdb, type);
@@ -345,7 +356,8 @@ export const api = {
   // INVITATIONS (REAL-TIME DATABASE & FIRESTORE)
   // -------------------------------------------------------------
   async getInvitations(userId?: string): Promise<InvitationData[]> {
-    const effectiveUid = userId || getAuthenticatedUid() || undefined;
+    const authUid = getAuthenticatedUid();
+    const effectiveUid = authUid || userId || undefined;
 
     // 1. Try Firebase Realtime Database with user-scoped indexed queries (never read /invitations root)
     if (isFirebaseConfigured() && rtdb && effectiveUid) {
@@ -429,19 +441,25 @@ export const api = {
     onData: (list: InvitationData[]) => void,
     onError?: (err: Error) => void
   ): () => void {
-    if (!uid) {
+    const authUid = getAuthenticatedUid();
+    const effectiveUid = authUid || uid;
+
+    if (!effectiveUid) {
       onData([]);
       return () => {};
     }
 
     const emitLocal = () => {
       const local = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []).filter(
-        (inv) => inv.ownerId === uid || inv.ownerUid === uid
+        (inv) =>
+          inv.ownerId === effectiveUid ||
+          inv.ownerUid === effectiveUid ||
+          (uid && (inv.ownerId === uid || inv.ownerUid === uid))
       );
       onData(local);
     };
 
-    if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser) {
+    if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser || !authUid) {
       emitLocal();
       const unsubHub = realtimeHub.subscribe<InvitationData[]>('invitations', () => emitLocal());
       return unsubHub;
@@ -460,12 +478,12 @@ export const api = {
       const sorted = Array.from(combined.values()).sort((a, b) =>
         String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
       );
-      mergeLocalInvitations(uid, sorted);
+      mergeLocalInvitations(effectiveUid, sorted);
       onData(sorted);
     };
 
-    const qId = rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerId'), equalTo(uid));
-    const qUid = rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerUid'), equalTo(uid));
+    const qId = rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerId'), equalTo(effectiveUid));
+    const qUid = rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerUid'), equalTo(effectiveUid));
 
     const unsubId = rtdbOnValue(
       qId,
@@ -642,16 +660,25 @@ export const api = {
       finalSlug = await this.generateUniqueSlug(groom, bride, data.id);
     }
 
-    const resolvedOwnerId =
-      authUid && (!data.ownerId || data.ownerId === 'anonymous')
+    const resolvedOwnerId = authUid
+      ? isFallbackLocalId(data.ownerId)
         ? authUid
-        : data.ownerId || authUid || 'anonymous';
+        : data.ownerId!
+      : data.ownerId || 'anonymous';
 
-    const preparedData: InvitationData = {
+    const resolvedOwnerUid = authUid
+      ? authUid
+      : data.ownerUid && !isFallbackLocalId(data.ownerUid)
+      ? data.ownerUid
+      : resolvedOwnerId !== 'anonymous' && !isFallbackLocalId(resolvedOwnerId)
+      ? resolvedOwnerId
+      : undefined;
+
+    let preparedData: InvitationData = {
       ...data,
       slug: finalSlug,
       ownerId: resolvedOwnerId,
-      ownerUid: data.ownerUid || (authUid || (resolvedOwnerId !== 'anonymous' ? resolvedOwnerId : undefined)),
+      ownerUid: resolvedOwnerUid,
       updatedAt: now,
       createdAt: data.createdAt || now,
     };
@@ -694,10 +721,96 @@ export const api = {
     }
 
     // Sync to Firebase Realtime Database
-    if (isFirebaseConfigured() && rtdb && auth?.currentUser) {
+    if (isFirebaseConfigured() && rtdb && auth?.currentUser && authUid) {
+      let targetId = preparedData.id;
+      let remoteExists = false;
+      let remoteStatus: string | undefined;
+      let remoteOrderId: string | undefined;
+      let remoteOwnerId: string | undefined;
+
       try {
-        await rtdbUpdate(rtdbRef(rtdb, `invitations/${preparedData.id}`), remotePayload);
-        await rtdbSet(rtdbRef(rtdb, `slugs/${preparedData.slug}`), preparedData.id);
+        const existingSnap = await rtdbGet(rtdbRef(rtdb, `invitations/${targetId}`));
+        if (existingSnap.exists()) {
+          remoteExists = true;
+          const remoteVal = existingSnap.val() as Record<string, any>;
+          remoteStatus = remoteVal?.status;
+          remoteOrderId = remoteVal?.orderId;
+          remoteOwnerId = remoteVal?.ownerId;
+        }
+      } catch (readErr: any) {
+        const msg = String(readErr?.message || readErr?.code || '').toLowerCase();
+        // If an unowned/legacy RTDB record occupies this draft ID, migrate local draft to a fresh owned ID
+        if (
+          msg.includes('permission') &&
+          !data.orderId &&
+          (!data.status || data.status === 'draft' || data.status === 'pending_payment')
+        ) {
+          const oldId = targetId;
+          targetId = `inv-${Date.now()}`;
+          preparedData = {
+            ...preparedData,
+            id: targetId,
+            ownerId: authUid,
+            ownerUid: authUid,
+          };
+          const latestLocal = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
+          const rekeyed = [
+            preparedData,
+            ...latestLocal.filter((inv) => inv.id !== oldId && inv.id !== targetId),
+          ];
+          setStored(STORAGE_KEY_INVITATIONS, rekeyed);
+          realtimeHub.emit('invitations', rekeyed);
+        }
+      }
+
+      // Check slug ownership in RTDB before writing so we never violate slugs/$slug .write rule
+      try {
+        const slugSnap = await rtdbGet(rtdbRef(rtdb, `slugs/${preparedData.slug}`));
+        if (slugSnap.exists() && slugSnap.val() && slugSnap.val() !== targetId) {
+          const { groom, bride } = parseHostNames(
+            preparedData.hostNames,
+            preparedData.partner1Name,
+            preparedData.partner2Name
+          );
+          const freshSlug = await this.generateUniqueSlug(groom, bride, targetId);
+          preparedData = { ...preparedData, slug: freshSlug };
+          remotePayload.slug = freshSlug;
+        }
+      } catch {}
+
+      remotePayload.id = targetId;
+      remotePayload.ownerUid = authUid;
+      remotePayload.ownerId =
+        remoteExists && remoteOwnerId && remoteOwnerId !== 'anonymous' && !isFallbackLocalId(remoteOwnerId)
+          ? remoteOwnerId
+          : authUid;
+
+      const remoteIsServerControlled =
+        remoteStatus === 'paid' ||
+        remoteStatus === 'published' ||
+        remoteStatus === 'rejected' ||
+        remoteStatus === 'pending_review' ||
+        Boolean(remoteOrderId);
+
+      if (isServerControlledStatus || remoteIsServerControlled) {
+        delete remotePayload.status;
+        delete remotePayload.paymentStatus;
+        delete remotePayload.orderId;
+        delete remotePayload.receiptSentAt;
+        delete remotePayload.decidedAt;
+        delete remotePayload.rejectReason;
+      }
+
+      try {
+        await rtdbUpdate(rtdbRef(rtdb, `invitations/${targetId}`), remotePayload);
+        try {
+          const slugSnapAfter = await rtdbGet(rtdbRef(rtdb, `slugs/${preparedData.slug}`));
+          if (!slugSnapAfter.exists() || slugSnapAfter.val() === targetId) {
+            await rtdbSet(rtdbRef(rtdb, `slugs/${preparedData.slug}`), targetId);
+          }
+        } catch (slugErr) {
+          console.warn('RTDB slug write note:', slugErr);
+        }
       } catch (err) {
         console.warn('RTDB saveInvitation error:', err);
       }
@@ -751,30 +864,27 @@ export const api = {
   // -------------------------------------------------------------
   async getGuests(invitationSlug?: string, ownerId?: string): Promise<GuestRSVP[]> {
     let all: GuestRSVP[] = [];
+    const effectiveOwner = ownerId ? (getAuthenticatedUid() || ownerId) : undefined;
 
     // 1. Try Realtime Database using indexed queries when scoped
-    if (isFirebaseConfigured() && rtdb) {
+    if (isFirebaseConfigured() && rtdb && (effectiveOwner || invitationSlug)) {
       try {
         let snap;
-        if (ownerId) {
+        if (effectiveOwner) {
           snap = await rtdbGet(
-            rtdbQuery(rtdbRef(rtdb, 'guests'), orderByChild('invitationOwnerId'), equalTo(ownerId))
+            rtdbQuery(rtdbRef(rtdb, 'guests'), orderByChild('invitationOwnerId'), equalTo(effectiveOwner))
           );
         } else if (invitationSlug) {
           snap = await rtdbGet(
             rtdbQuery(rtdbRef(rtdb, 'guests'), orderByChild('invitationSlug'), equalTo(invitationSlug))
           );
-        } else {
-          snap = await rtdbGet(rtdbRef(rtdb, 'guests'));
         }
-        if (snap.exists()) {
+        if (snap && snap.exists()) {
           const val = snap.val();
           all = Array.isArray(val) ? val.filter(Boolean) : Object.values(val || {});
           return all;
         }
-        if (ownerId || invitationSlug) {
-          return [];
-        }
+        return [];
       } catch {}
     }
 
@@ -795,18 +905,128 @@ export const api = {
       all = all.filter((g) => g.invitationSlug === invitationSlug);
     }
 
-    if (ownerId) {
-      all = all.filter((g) => g.invitationOwnerId === ownerId);
+    if (effectiveOwner) {
+      all = all.filter((g) => g.invitationOwnerId === effectiveOwner);
     }
 
     return all;
   },
 
+  subscribeUserGuests(uid: string, onData: (guests: GuestRSVP[]) => void): () => void {
+    const authUid = getAuthenticatedUid();
+    const effectiveUid = authUid || uid;
+    if (!effectiveUid) {
+      onData([]);
+      return () => {};
+    }
+
+    const emitLocal = () => {
+      const local = getStored<GuestRSVP[]>(STORAGE_KEY_GUESTS, []).filter(
+        (g) => g.invitationOwnerId === effectiveUid || g.invitationOwnerId === uid
+      );
+      onData(local);
+    };
+
+    if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser || !authUid) {
+      emitLocal();
+      return realtimeHub.subscribe<GuestRSVP[]>('guests', () => emitLocal());
+    }
+
+    const q = rtdbQuery(
+      rtdbRef(rtdb, 'guests'),
+      orderByChild('invitationOwnerId'),
+      equalTo(effectiveUid)
+    );
+    const unsubRtdb = rtdbOnValue(
+      q,
+      (snap) => {
+        if (snap.exists()) {
+          const val = snap.val();
+          const list: GuestRSVP[] = Array.isArray(val)
+            ? val.filter(Boolean)
+            : Object.values(val || {});
+          onData(list);
+        } else {
+          onData([]);
+        }
+      },
+      (err) => {
+        console.warn('RTDB subscribeUserGuests note:', err.message);
+      }
+    );
+
+    return () => {
+      try { unsubRtdb(); } catch {}
+    };
+  },
+
+  subscribeInvitationGuests(slug: string, onData: (guests: GuestRSVP[]) => void): () => void {
+    const cleanSlug = slug.toLowerCase().trim();
+    if (!cleanSlug) {
+      onData([]);
+      return () => {};
+    }
+
+    const emitLocal = () => {
+      const local = getStored<GuestRSVP[]>(STORAGE_KEY_GUESTS, []).filter(
+        (g) => g.invitationSlug === cleanSlug
+      );
+      onData(local);
+    };
+
+    if (!isFirebaseConfigured() || !rtdb) {
+      emitLocal();
+      return realtimeHub.subscribe<GuestRSVP[]>('guests', () => emitLocal());
+    }
+
+    const q = rtdbQuery(
+      rtdbRef(rtdb, 'guests'),
+      orderByChild('invitationSlug'),
+      equalTo(cleanSlug)
+    );
+    const unsubRtdb = rtdbOnValue(
+      q,
+      (snap) => {
+        if (snap.exists()) {
+          const val = snap.val();
+          const list: GuestRSVP[] = Array.isArray(val)
+            ? val.filter(Boolean)
+            : Object.values(val || {});
+          onData(list);
+        } else {
+          onData([]);
+        }
+      },
+      (err) => {
+        console.warn('RTDB subscribeInvitationGuests note:', err.message);
+      }
+    );
+    const unsubHub = realtimeHub.subscribe<GuestRSVP[]>('guests', () => emitLocal());
+
+    return () => {
+      try { unsubRtdb(); } catch {}
+      try { unsubHub(); } catch {}
+    };
+  },
+
   async submitRSVP(payload: Omit<GuestRSVP, 'id' | 'submittedAt'>): Promise<GuestRSVP> {
+    const safeCount = Number.isFinite(Number(payload.guestCount))
+      ? Math.max(0, Math.min(20, Math.round(Number(payload.guestCount))))
+      : payload.attending
+      ? 1
+      : 0;
     const newGuest: GuestRSVP = {
       ...payload,
+      invitationSlug: String(payload.invitationSlug || '').toLowerCase().trim().slice(0, 128),
+      invitationOwnerId: payload.invitationOwnerId ? String(payload.invitationOwnerId).slice(0, 128) : undefined,
+      fullName: String(payload.fullName || 'Mehmon').trim().slice(0, 120) || 'Mehmon',
+      phone: String(payload.phone || '').trim().slice(0, 40),
+      attending: Boolean(payload.attending),
+      guestCount: safeCount,
+      mealPreference: payload.mealPreference ? String(payload.mealPreference).trim().slice(0, 100) : undefined,
+      message: String(payload.message || '').trim().slice(0, 1000),
       id: `g-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      submittedAt: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+      submittedAt: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }).slice(0, 64),
     };
 
     // Save locally first
@@ -838,7 +1058,7 @@ export const api = {
     setStored(STORAGE_KEY_GUESTS, updated);
     realtimeHub.emit('guests', updated);
 
-    if (isFirebaseConfigured() && rtdb) {
+    if (isFirebaseConfigured() && rtdb && auth?.currentUser) {
       rtdbRemove(rtdbRef(rtdb, `guests/${id}`)).catch(() => {});
     }
     if (isFirebaseConfigured() && db) {
@@ -851,9 +1071,10 @@ export const api = {
   // ORDERS (USER-SCOPED & SERVER-OWNED)
   // -------------------------------------------------------------
   async getOrders(userId?: string): Promise<OrderItem[]> {
-    const uid = userId || getAuthenticatedUid() || undefined;
+    const authUid = getAuthenticatedUid();
+    const uid = authUid || userId || undefined;
 
-    if (isFirebaseConfigured() && rtdb && uid && auth?.currentUser) {
+    if (isFirebaseConfigured() && rtdb && uid && auth?.currentUser && authUid) {
       const rtdbInstance = rtdb;
       try {
         const indexSnap = await rtdbGet(rtdbRef(rtdbInstance, `userOrders/${uid}`));
@@ -912,18 +1133,21 @@ export const api = {
     onData: (orders: OrderItem[]) => void,
     onError?: (err: Error) => void
   ): () => void {
-    if (!uid) {
+    const authUid = getAuthenticatedUid();
+    const effectiveUid = authUid || uid;
+
+    if (!effectiveUid) {
       onData([]);
       return () => {};
     }
 
-    if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser) {
+    if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser || !authUid) {
       const local = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []).filter(
-        (o) => !o.ownerUid || o.ownerUid === uid
+        (o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid
       );
       onData(local);
       return realtimeHub.subscribe<OrderItem[]>('orders', (all) => {
-        onData((all || []).filter((o) => !o.ownerUid || o.ownerUid === uid));
+        onData((all || []).filter((o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid));
       });
     }
 
@@ -941,7 +1165,7 @@ export const api = {
       onData(sorted);
     };
 
-    const userOrdersRef = rtdbRef(rtdbInstance, `userOrders/${uid}`);
+    const userOrdersRef = rtdbRef(rtdbInstance, `userOrders/${effectiveUid}`);
     const unsubIndex = rtdbOnValue(
       userOrdersRef,
       (snap) => {
@@ -1128,8 +1352,8 @@ export const api = {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (data.success && data.status) {
-        await this.updateOrderStatus(payload.orderId, data.status, { syncRemote: false });
+      if (data.status === 'pending_review') {
+        await this.updateOrderStatus(payload.orderId, 'pending_review', { syncRemote: false });
       }
       return data;
     } catch (err: any) {
@@ -1237,11 +1461,15 @@ export const api = {
   },
 
   async submitContactMessage(payload: Omit<ContactMessage, 'id' | 'createdAt' | 'status'>): Promise<ContactMessage> {
+    const randSuffix = Math.random().toString(36).slice(2, 6);
     const newMessage: ContactMessage = {
-      ...payload,
-      id: `msg-${Date.now()}`,
+      name: String(payload.name || '').trim().slice(0, 120),
+      contact: String(payload.contact || '').trim().slice(0, 150),
+      subject: String(payload.subject || 'Murojaat').trim().slice(0, 200),
+      message: String(payload.message || '').trim().slice(0, 2000),
+      id: `msg-${Date.now()}-${randSuffix}`,
       status: 'new',
-      createdAt: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+      createdAt: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }).slice(0, 64),
     };
 
     const all = getStored<ContactMessage[]>(STORAGE_KEY_MESSAGES, initialMessages);
