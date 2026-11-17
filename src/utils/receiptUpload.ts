@@ -9,6 +9,8 @@ export interface UploadReceiptPayload {
   invitationSlug?: string;
   customerName: string;
   customerPhone: string;
+  templateId?: string;
+  templateSlug?: string;
   templateName?: string;
   planName?: string;
   weddingDate?: string;

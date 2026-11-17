@@ -21,6 +21,7 @@ import {
   generateIdempotencyKey,
   isNetworkOrTimeoutError,
 } from '../utils/receiptUpload';
+import { resolveLegacyOrderTemplate } from '../utils/templateResolver';
 import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { isFirebaseConfigured, storage } from '../services/firebase';
@@ -55,6 +56,8 @@ interface OrderViewState {
   invitationSlug?: string;
   customerName?: string;
   customerPhone?: string;
+  templateId?: string;
+  templateSlug?: string;
   templateName?: string;
   weddingDate?: string;
   venueName?: string;
@@ -112,6 +115,8 @@ export const OrderStatusPage: React.FC = () => {
           invitationSlug: incoming.invitationSlug ?? prev?.invitationSlug,
           customerName: incoming.customerName ?? prev?.customerName,
           customerPhone: incoming.customerPhone ?? prev?.customerPhone,
+          templateId: incoming.templateId ?? prev?.templateId,
+          templateSlug: incoming.templateSlug ?? prev?.templateSlug,
           templateName: incoming.templateName ?? prev?.templateName,
           weddingDate: incoming.weddingDate ?? prev?.weddingDate,
           venueName: incoming.venueName ?? prev?.venueName,
@@ -171,6 +176,8 @@ export const OrderStatusPage: React.FC = () => {
               invitationId: res.invitationId,
               invitationSlug: res.invitationSlug,
               customerName: res.customerName,
+              templateId: res.templateId,
+              templateSlug: res.templateSlug,
               templateName: res.templateName,
               weddingDate: res.weddingDate,
               venueName: res.venueName,
@@ -182,7 +189,7 @@ export const OrderStatusPage: React.FC = () => {
             },
             'api'
           );
-          if (res.invitationId && !res.invitationSlug) {
+          if (res.invitationId && (!res.invitationSlug || !res.templateSlug)) {
             const inv = await api.getInvitationById(res.invitationId);
             if (inv) {
               setOrder((prev) =>
@@ -192,6 +199,8 @@ export const OrderStatusPage: React.FC = () => {
                       invitationSlug: prev.invitationSlug || inv.slug,
                       customerName: prev.customerName || inv.hostNames,
                       customerPhone: prev.customerPhone || inv.socialLinks?.phone,
+                      templateId: prev.templateId || inv.templateId,
+                      templateSlug: prev.templateSlug || inv.templateSlug,
                     }
                   : prev
               );
@@ -213,6 +222,8 @@ export const OrderStatusPage: React.FC = () => {
                 invitationSlug: fallback.invitationSlug,
                 customerName: fallback.customerName,
                 customerPhone: fallback.customerPhone,
+                templateId: fallback.templateId,
+                templateSlug: fallback.templateSlug,
                 templateName: fallback.templateName,
                 weddingDate: fallback.weddingDate,
                 venueName: fallback.venueName,
@@ -263,6 +274,8 @@ export const OrderStatusPage: React.FC = () => {
             invitationSlug: rtdbOrder.invitationSlug,
             customerName: rtdbOrder.customerName,
             customerPhone: rtdbOrder.customerPhone,
+            templateId: rtdbOrder.templateId,
+            templateSlug: rtdbOrder.templateSlug,
             templateName: rtdbOrder.templateName,
             weddingDate: rtdbOrder.weddingDate,
             venueName: rtdbOrder.venueName,
@@ -468,6 +481,12 @@ export const OrderStatusPage: React.FC = () => {
         fileBase64Payload = undefined;
       }
 
+      const legacyTplMeta = resolveLegacyOrderTemplate({
+        templateId: order.templateId,
+        templateSlug: order.templateSlug,
+        templateName: order.templateName,
+      });
+
       const res = await api.uploadReceipt(
         {
           orderId: order.orderId,
@@ -475,7 +494,9 @@ export const OrderStatusPage: React.FC = () => {
           invitationSlug: order.invitationSlug,
           customerName: order.customerName || user?.name || 'Mijoz',
           customerPhone: cleanPhone,
-          templateName: order.templateName,
+          templateId: order.templateId || legacyTplMeta?.templateId,
+          templateSlug: order.templateSlug || legacyTplMeta?.templateSlug,
+          templateName: order.templateName || legacyTplMeta?.templateName,
           weddingDate: order.weddingDate,
           venueName: order.venueName,
           price: order.price || 60000,

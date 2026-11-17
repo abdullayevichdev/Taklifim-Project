@@ -13,6 +13,9 @@ import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
 import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
+import { resolveTemplate } from '../utils/templateResolver';
+import { reportTemplateResolutionError } from '../utils/templateAlert';
+import { TemplateResolutionError } from '../components/TemplateResolutionError';
 import {
   formatPriceUZS,
   normalizeTime24h,
@@ -132,13 +135,9 @@ export const BuilderPage: React.FC = () => {
   const { t, language } = useLanguage();
   const { showToast, isLoggedIn, authReady, hasFirebaseSession, user } = useAuth();
   const paymentCopy = getPaymentCopy(language);
-  const templateSlug = params.templateSlug || 'template-1';
-
-  // Find template
-  const initialTemplate =
-    mockTemplates.find((t) => t.slug === templateSlug) || mockTemplates[0];
 
   const [availableTemplates, setAvailableTemplates] = useState<Template[]>(mockTemplates);
+  const routeTemplateResolution = resolveTemplate(params.templateSlug, availableTemplates);
 
   useEffect(() => {
     async function loadTpls() {
@@ -229,18 +228,28 @@ export const BuilderPage: React.FC = () => {
           if (tailMatch) {
             sessionSlugCodeRef.current = tailMatch[1];
           }
-          if (params.templateSlug && healed.templateSlug !== params.templateSlug) {
-            const matchTpl = mockTemplates.find((t) => t.slug === params.templateSlug);
-            if (matchTpl) {
-              healed.templateId = matchTpl.id;
-              healed.templateSlug = matchTpl.slug;
-              healed.coverImage = matchTpl.previewImage;
-              healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
-              healed.customColors = { ...matchTpl.colorStyle };
-              healed.customFonts = {
-                heading: matchTpl.typography.headingFont,
-                body: matchTpl.typography.bodyFont,
-              };
+          if (params.templateSlug) {
+            const matchResolved = resolveTemplate(params.templateSlug, mockTemplates);
+            if (matchResolved) {
+              const matchTpl = matchResolved.template;
+              if (
+                healed.templateSlug !== matchResolved.templateSlug ||
+                healed.templateId !== matchResolved.templateId
+              ) {
+                healed.templateId = matchResolved.templateId;
+                healed.templateSlug = matchResolved.templateSlug;
+                healed.coverImage = matchTpl.previewImage;
+                healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
+                healed.customColors = { ...matchTpl.colorStyle };
+                healed.customFonts = {
+                  heading: matchTpl.typography.headingFont,
+                  body: matchTpl.typography.bodyFont,
+                };
+              }
+            } else {
+              // Invalid URL template slug must NOT silently inherit a cached or default template
+              healed.templateId = '';
+              healed.templateSlug = params.templateSlug;
             }
           }
           return healed;
@@ -251,12 +260,14 @@ export const BuilderPage: React.FC = () => {
     }
 
     const initialCode = sessionSlugCodeRef.current;
+    const initResolved = resolveTemplate(params.templateSlug, mockTemplates);
+    const seedTemplate = initResolved?.template || mockTemplates[0];
 
     return {
       id: `inv-${Date.now()}`,
       slug: generateInvitationSlug('Asrorbek', 'Madina', initialCode),
-      templateId: initialTemplate.id,
-      templateSlug: initialTemplate.slug,
+      templateId: initResolved ? initResolved.templateId : '',
+      templateSlug: initResolved ? initResolved.templateSlug : params.templateSlug || '',
       language: 'uz',
       status: 'draft',
       createdAt: new Date().toISOString(),
@@ -279,9 +290,9 @@ export const BuilderPage: React.FC = () => {
       invitationMessage:
         'Sizni baxtli oqshomimiz — Nikoh to‘yimiz munosabati bilan yoziladigan dasturxonimizga lutfan taklif etamiz. Tashrifingiz bizga quvonch bag‘ishlaydi!',
       invitationQuote: '«Sizni muqaddas rishta — nikoh to‘yimiz munosabati bilan yoziladigan dasturxonimizga lutfan taklif etamiz.»',
-      coverImage: initialTemplate.previewImage,
+      coverImage: seedTemplate.previewImage,
       galleryImages: [
-        initialTemplate.previewImage,
+        seedTemplate.previewImage,
       ],
       galleryTitle: 'Bizning suratlarimiz',
       galleryPosition: 'after_message',
@@ -315,15 +326,15 @@ export const BuilderPage: React.FC = () => {
       maxCompanions: 2,
       askMealPreference: true,
       customColors: {
-        primary: initialTemplate.colorStyle.primary,
-        secondary: initialTemplate.colorStyle.secondary,
-        accent: initialTemplate.colorStyle.accent,
-        background: initialTemplate.colorStyle.background,
-        text: initialTemplate.colorStyle.text,
+        primary: seedTemplate.colorStyle.primary,
+        secondary: seedTemplate.colorStyle.secondary,
+        accent: seedTemplate.colorStyle.accent,
+        background: seedTemplate.colorStyle.background,
+        text: seedTemplate.colorStyle.text,
       },
       customFonts: {
-        heading: initialTemplate.typography.headingFont,
-        body: initialTemplate.typography.bodyFont,
+        heading: seedTemplate.typography.headingFont,
+        body: seedTemplate.typography.bodyFont,
       },
     };
   });
@@ -520,11 +531,9 @@ export const BuilderPage: React.FC = () => {
     if (queryInvitationId) return;
     if (params.templateSlug && params.templateSlug !== lastSyncedSlugRef.current) {
       lastSyncedSlugRef.current = params.templateSlug;
-      const match = availableTemplates.find(
-        (t) => t.slug === params.templateSlug || t.id === params.templateSlug
-      );
-      if (match) {
-        handleSelectTemplate(match);
+      const matchResolved = resolveTemplate(params.templateSlug, availableTemplates);
+      if (matchResolved) {
+        handleSelectTemplate(matchResolved.template);
       }
     }
   }, [params.templateSlug, availableTemplates, queryInvitationId]);
@@ -736,6 +745,20 @@ export const BuilderPage: React.FC = () => {
       return;
     }
 
+    const resolvedTpl = resolveTemplate(invitationState, availableTemplates);
+    if (!resolvedTpl) {
+      setUploadError(t.templateError.orderBlockedError);
+      showToast(t.templateError.orderBlockedError, 'error');
+      reportTemplateResolutionError({
+        source: 'BuilderPage',
+        templateId: invitationState.templateId,
+        templateSlug: invitationState.templateSlug,
+        invitationId: invitationState.id,
+        invitationSlug: invitationState.slug,
+      });
+      return;
+    }
+
     const idemKey = receiptIdempotencyKey || generateIdempotencyKey();
     if (!receiptIdempotencyKey) {
       setReceiptIdempotencyKey(idemKey);
@@ -748,8 +771,8 @@ export const BuilderPage: React.FC = () => {
     setUploadAttemptMsg('');
 
     try {
-      const currentTemplate = availableTemplates.find((tpl) => tpl.slug === invitationState.templateSlug) || initialTemplate;
-      const finalPrice = currentTemplate?.price || 60000;
+      const currentTemplate = resolvedTpl.template;
+      const finalPrice = currentTemplate.price || 60000;
 
       let orderId = activeOrderId || invitationState.orderId || '';
       if (!orderId) {
@@ -763,6 +786,8 @@ export const BuilderPage: React.FC = () => {
           ownerUid: user?.id,
           invitationId: invitationState.id,
           invitationSlug: invitationState.slug,
+          templateId: resolvedTpl.templateId,
+          templateSlug: resolvedTpl.templateSlug,
           templateName: currentTemplate.name,
           weddingDate: invitationState.eventDate,
           venueName: invitationState.venueName,
@@ -779,6 +804,8 @@ export const BuilderPage: React.FC = () => {
           : invitationState.status;
       const savedInv = await api.saveInvitation({
         ...invitationState,
+        templateId: resolvedTpl.templateId,
+        templateSlug: resolvedTpl.templateSlug,
         status: safeClientStatus,
         ownerId: user?.id || invitationState.ownerId,
         ownerUid: user?.id || invitationState.ownerUid,
@@ -821,6 +848,8 @@ export const BuilderPage: React.FC = () => {
           invitationSlug: savedInv.slug,
           customerName: savedInv.hostNames,
           customerPhone: cleanPhone,
+          templateId: resolvedTpl.templateId,
+          templateSlug: resolvedTpl.templateSlug,
           templateName: currentTemplate.name,
           weddingDate: savedInv.eventDate,
           venueName: savedInv.venueName,
@@ -1145,6 +1174,31 @@ export const BuilderPage: React.FC = () => {
     { num: 11, title: t.builder.steps.checkout },
   ];
 
+  const stateTemplateResolution = resolveTemplate(invitationState, availableTemplates);
+  const isTemplateResolutionError =
+    !isLoadingInvitation &&
+    ((!queryInvitationId && !routeTemplateResolution) || !stateTemplateResolution);
+
+  useEffect(() => {
+    if (isTemplateResolutionError && !isOrderComplete) {
+      reportTemplateResolutionError({
+        source: 'BuilderPage',
+        templateId: invitationState.templateId,
+        templateSlug: params.templateSlug || invitationState.templateSlug,
+        invitationId: invitationState.id,
+        invitationSlug: invitationState.slug,
+      });
+    }
+  }, [
+    isTemplateResolutionError,
+    isOrderComplete,
+    invitationState.templateId,
+    invitationState.templateSlug,
+    invitationState.id,
+    invitationState.slug,
+    params.templateSlug,
+  ]);
+
   if (isOrderComplete) {
     const liveUrl = `/i/${publishedSlug || invitationState.slug}`;
     const fullLiveUrl = typeof window !== 'undefined' ? `${window.location.origin}${liveUrl}` : liveUrl;
@@ -1245,6 +1299,17 @@ export const BuilderPage: React.FC = () => {
           <p className="text-xs font-semibold text-[#4A383F]">{t.builder.loadingDraft}</p>
         </GlassSurface>
       </div>
+    );
+  }
+
+  if (isTemplateResolutionError) {
+    return (
+      <TemplateResolutionError
+        language={language}
+        templateSlug={params.templateSlug || invitationState.templateSlug}
+        templateId={invitationState.templateId}
+        onNavigate={navigate}
+      />
     );
   }
 
@@ -1676,14 +1741,16 @@ export const BuilderPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      const activeTpl = stateTemplateResolution?.template || routeTemplateResolution?.template;
+                      if (!activeTpl) return;
                       setInvitationState((p) => ({
                         ...p,
                         customColors: {
-                          primary: initialTemplate.colorStyle.primary,
-                          secondary: initialTemplate.colorStyle.secondary,
-                          accent: initialTemplate.colorStyle.accent,
-                          background: initialTemplate.colorStyle.background,
-                          text: initialTemplate.colorStyle.text,
+                          primary: activeTpl.colorStyle.primary,
+                          secondary: activeTpl.colorStyle.secondary,
+                          accent: activeTpl.colorStyle.accent,
+                          background: activeTpl.colorStyle.background,
+                          text: activeTpl.colorStyle.text,
                         },
                       }));
                       showToast(t.builder.toasts.colorsReset, 'info');
@@ -2589,8 +2656,9 @@ export const BuilderPage: React.FC = () => {
 
             {/* STEP 11: Plan & Manual Card Payment */}
             {currentStep === 11 && (() => {
-              const currentTemplate = availableTemplates.find((tpl) => tpl.slug === invitationState.templateSlug) || initialTemplate;
-              const templatePrice = currentTemplate?.price || 60000;
+              const currentTemplate = stateTemplateResolution?.template || routeTemplateResolution?.template;
+              if (!currentTemplate) return null;
+              const templatePrice = currentTemplate.price || 60000;
               const canSubmitReceipt =
                 !isUploadingReceipt &&
                 !isPreparingFile &&

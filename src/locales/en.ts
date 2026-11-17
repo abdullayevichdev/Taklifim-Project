@@ -33,9 +33,9 @@ export const en: typeof uz = {
 
   hero: {
     badge: 'Elegant digital invitations for weddings and celebrations',
-    script: 'Happy moments, a sacred union...',
-    title: 'A distinctive invitation for every moment.',
-    subtitle: 'Create exquisite, interactive invitations for weddings, engagements, birthdays, and celebrations that leave your guests spellbound.',
+    script: 'Every beautiful moment',
+    title: 'begins with an invitation',
+    subtitle: 'Choose a template, enter your event details, and share a refined, multilingual invitation with your guests.',
     createBtn: 'Create Invitation',
     exploreBtn: 'Explore Templates',
     viewDemo: 'Live Demo',
@@ -68,9 +68,9 @@ export const en: typeof uz = {
   },
 
   services: {
-    script: 'Signature Formats',
-    title: 'Our Services',
-    subtitle: 'Exquisite digital solutions designed for your celebrations',
+    script: '',
+    title: 'Invite your loved ones in a special way',
+    subtitle: 'A modern, interactive invitation bringing together event details, venue location, date, and your photos in one place.',
     webLabel: 'Web Invitation',
     webTitle: 'Interactive Web Invitations',
     webDesc: 'Personalized links with photo galleries, atmospheric background music, interactive map locations, and guest RSVP tracking.',
@@ -935,6 +935,17 @@ export const en: typeof uz = {
     rsvpSuccessToast: 'Attendance confirmed! Thank you!',
     genericErrorToast: 'An error occurred',
     wishSuccessToast: 'Thank you for your warm wishes!',
+  },
+
+  templateError: {
+    title: 'Template Not Found',
+    description:
+      'The selected invitation template could not be found or is invalid. Please choose another template or contact support.',
+    browseTemplatesBtn: 'Browse Templates',
+    backHomeBtn: 'Back to Home',
+    orderBlockedError:
+      'Template identifier is missing. Please re-select a template before placing an order.',
+    missingCodeLabel: 'Template code',
   },
 
   shared: {

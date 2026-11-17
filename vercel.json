@@ -16,6 +16,9 @@
     "api/telegram/webhook.ts": {
       "maxDuration": 20
     },
+    "api/telegram/template-alert.ts": {
+      "maxDuration": 10
+    },
     "api/payment/status/[orderId].ts": {
       "maxDuration": 10
     }

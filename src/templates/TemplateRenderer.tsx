@@ -2,6 +2,9 @@ import React from 'react';
 import { InvitationData, Language, GuestRSVP } from '../types';
 import { mockTemplates } from '../data/mockTemplates';
 import { TemplateRenderProps } from './types';
+import { resolveTemplate } from '../utils/templateResolver';
+import { reportTemplateResolutionError } from '../utils/templateAlert';
+import { TemplateResolutionError } from '../components/TemplateResolutionError';
 
 // Individual template designs
 import { Template01_AureliaRoyal } from './designs/Template01_AureliaRoyal';
@@ -37,7 +40,6 @@ export interface TemplateRendererProps {
 }
 
 const TEMPLATE_COMPONENTS: Record<string, React.FC<TemplateRenderProps>> = {
-  // Slug mappings
   'template-1': Template01_AureliaRoyal,
   'template-2': Template02_WhiteSerenade,
   'template-3': Template03_VelvetSharqona,
@@ -58,28 +60,6 @@ const TEMPLATE_COMPONENTS: Record<string, React.FC<TemplateRenderProps>> = {
   'template-18': Template18_RoyalRuby,
   'template-19': Template19_ModernNoir,
   'template-20': Template20_SweetButterfly,
-
-  // ID mappings (tpl-1, tpl-2, etc.)
-  'tpl-1': Template01_AureliaRoyal,
-  'tpl-2': Template02_WhiteSerenade,
-  'tpl-3': Template03_VelvetSharqona,
-  'tpl-4': Template04_GoldenSymphony,
-  'tpl-5': Template05_EmeraldGrace,
-  'tpl-6': Template06_PastelRomance,
-  'tpl-7': Template07_BlushElegance,
-  'tpl-8': Template08_FloralHarmony,
-  'tpl-9': Template09_CrystalPure,
-  'tpl-10': Template10_MidnightSapphire,
-  'tpl-11': Template11_PearlMinimal,
-  'tpl-12': Template12_VintageCharm,
-  'tpl-13': Template13_RoseGoldLuxe,
-  'tpl-14': Template14_BotanicalGarden,
-  'tpl-15': Template15_CelestialDream,
-  'tpl-16': Template16_SunlitTerracotta,
-  'tpl-17': Template17_IvoryBlossom,
-  'tpl-18': Template18_RoyalRuby,
-  'tpl-19': Template19_ModernNoir,
-  'tpl-20': Template20_SweetButterfly,
 };
 
 export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
@@ -92,20 +72,41 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
   interactiveMap,
   musicPlayer,
 }) => {
-  // 1. Resolve template definition
-  const templateDef =
-    mockTemplates.find(
-      (t) => t.slug === invitation.templateSlug || t.id === invitation.templateId
-    ) || mockTemplates[0];
+  // 1. Resolve canonical template via shared resolver (strict — no silent fallback)
+  const resolved = resolveTemplate(invitation, mockTemplates);
+  const Component = resolved ? TEMPLATE_COMPONENTS[resolved.templateSlug] : undefined;
+  const isUnresolved = !resolved || !Component;
 
-  // 2. Resolve template component
-  const key = invitation.templateSlug || invitation.templateId || templateDef.slug;
-  if (!TEMPLATE_COMPONENTS[key] && !TEMPLATE_COMPONENTS[templateDef.slug]) {
-    console.error(
-      `[TemplateRenderer] templateId "${invitation.templateId}" yoki templateSlug "${invitation.templateSlug}" shablonlar ro'yxatida topilmadi! Default shablonga o'tildi.`
+  React.useEffect(() => {
+    if (isUnresolved) {
+      reportTemplateResolutionError({
+        source: 'TemplateRenderer',
+        templateId: invitation.templateId,
+        templateSlug: invitation.templateSlug,
+        invitationId: invitation.id,
+        invitationSlug: invitation.slug,
+      });
+    }
+  }, [
+    isUnresolved,
+    invitation.templateId,
+    invitation.templateSlug,
+    invitation.id,
+    invitation.slug,
+  ]);
+
+  if (!resolved || !Component) {
+    return (
+      <TemplateResolutionError
+        language={language}
+        templateSlug={invitation.templateSlug}
+        templateId={invitation.templateId}
+        compact={isPreview}
+      />
     );
   }
-  const Component = TEMPLATE_COMPONENTS[key] || TEMPLATE_COMPONENTS[templateDef.slug] || Template01_AureliaRoyal;
+
+  const templateDef = resolved.template;
 
   // 3. Colors and Typography
   const isDarkTheme =

@@ -690,6 +690,8 @@ function makeInMemoryDeps(overrides: Partial<UploadReceiptDeps> = {}) {
   invitations.set('inv-1', {
     id: 'inv-1',
     slug: 'ali-madina-1234',
+    templateId: 'tpl-1',
+    templateSlug: 'template-1',
     ownerId: 'uid-alice',
     ownerUid: 'uid-alice',
     status: 'pending_payment',
@@ -729,6 +731,8 @@ function makeInMemoryDeps(overrides: Partial<UploadReceiptDeps> = {}) {
         ownerUid: p.verifiedUid,
         invitationId: p.invitationId,
         invitationSlug: p.invitationSlug,
+        templateId: p.templateId,
+        templateSlug: p.templateSlug,
         customerName: p.customerName,
         customerPhone: p.customerPhone,
         price: p.price,
@@ -768,6 +772,8 @@ function makeInMemoryDeps(overrides: Partial<UploadReceiptDeps> = {}) {
         ownerUid: p.verifiedUid,
         invitationId: p.invitationId,
         invitationSlug: p.invitationSlug,
+        templateId: p.templateId,
+        templateSlug: p.templateSlug,
         customerName: p.customerName,
         customerPhone: p.customerPhone,
         price: p.price,
@@ -859,6 +865,8 @@ test('upload-receipt: recovers cleanly when Telegram succeeds but Firebase commi
     orderId: 'ORD-500001',
     invitationId: 'inv-1',
     invitationSlug: 'ali-madina-1234',
+    templateId: 'tpl-1',
+    templateSlug: 'template-1',
     customerName: 'Ali & Madina',
     customerPhone: '+998901234567',
     templateName: 'Aurelia',
@@ -923,6 +931,8 @@ test('upload-receipt: blocks cross-user access (403), paid orders (400), handles
     orderId: 'ORD-777001',
     invitationId: 'inv-1',
     invitationSlug: 'ali-madina-1234',
+    templateId: 'tpl-1',
+    templateSlug: 'template-1',
     customerName: 'Ali & Madina',
     customerPhone: '+998901234567',
     templateName: 'Aurelia',
@@ -1121,6 +1131,8 @@ test('upload-receipt: client UUID idempotencyKey prevents duplicate Telegram sen
     orderId: 'ORD-IDEM-UUID-1',
     invitationId: 'inv-1',
     invitationSlug: 'ali-madina-1234',
+    templateId: 'tpl-1',
+    templateSlug: 'template-1',
     customerName: 'Ali & Madina',
     customerPhone: '+998901234567',
     templateName: 'Aurelia',
@@ -1160,5 +1172,77 @@ test('upload-receipt: client UUID idempotencyKey prevents duplicate Telegram sen
   assert.equal(freshReupload.body.success, true);
   assert.equal(ctx.getTgCount(), 2);
 });
+
+test('upload-receipt: inherits templateSlug from invitations/{id} when omitted, and aborts (400) without Telegram if missing everywhere', async () => {
+  const ctx = makeInMemoryDeps();
+
+  ctx.invitations.set('inv-14', {
+    id: 'inv-14',
+    slug: 'botanical-couple-1414',
+    templateId: 'tpl-14',
+    templateSlug: 'template-14',
+    ownerId: 'uid-alice',
+    ownerUid: 'uid-alice',
+    status: 'pending_payment',
+  });
+
+  ctx.invitations.set('inv-no-tpl', {
+    id: 'inv-no-tpl',
+    slug: 'broken-couple-0000',
+    ownerId: 'uid-alice',
+    ownerUid: 'uid-alice',
+    status: 'pending_payment',
+  });
+
+  // 1. Omitted in request -> reads template-14 from invitations/inv-14 (never defaults to template-1)
+  const inheritedRes = await processUploadReceipt(
+    {
+      verifiedUid: 'uid-alice',
+      orderId: 'ORD-INHERIT-14',
+      invitationId: 'inv-14',
+      invitationSlug: 'botanical-couple-1414',
+      customerName: 'Botanical Pair',
+      customerPhone: '+998901234567',
+      templateName: 'Botanical Garden',
+      weddingDate: '2026-10-12',
+      venueName: 'Yakkasaroy',
+      price: 60000,
+      isPdf: false,
+      fileBuffer: Buffer.from('receipt-inherit-14'),
+    },
+    ctx.deps
+  );
+
+  assert.equal(inheritedRes.statusCode, 200);
+  assert.equal(inheritedRes.body.success, true);
+  assert.equal(ctx.orders.get('ORD-INHERIT-14')?.templateSlug, 'template-14');
+  assert.equal(ctx.orders.get('ORD-INHERIT-14')?.templateId, 'tpl-14');
+  assert.equal(ctx.getTgCount(), 1);
+
+  // 2. Omitted in request AND missing in existingOrder AND missing in invitations/inv-no-tpl -> 400 error, 0 Telegram calls
+  const missingRes = await processUploadReceipt(
+    {
+      verifiedUid: 'uid-alice',
+      orderId: 'ORD-NO-TPL',
+      invitationId: 'inv-no-tpl',
+      invitationSlug: 'broken-couple-0000',
+      customerName: 'Missing Tpl Pair',
+      customerPhone: '+998901234567',
+      templateName: 'Unknown',
+      weddingDate: '2026-10-12',
+      venueName: 'Yakkasaroy',
+      price: 60000,
+      isPdf: false,
+      fileBuffer: Buffer.from('receipt-no-tpl'),
+    },
+    ctx.deps
+  );
+
+  assert.equal(missingRes.statusCode, 400);
+  assert.equal(missingRes.body.success, false);
+  assert.equal(ctx.orders.has('ORD-NO-TPL'), false);
+  assert.equal(ctx.getTgCount(), 1);
+});
+
 
 

@@ -13,6 +13,9 @@ import { CustomDropdown } from '../components/CustomDropdown';
 import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
+import { resolveTemplate } from '../utils/templateResolver';
+import { reportTemplateResolutionError } from '../utils/templateAlert';
+import { TemplateResolutionError } from '../components/TemplateResolutionError';
 import { Language, GuestRSVP, InvitationData } from '../types';
 import { translations, translateCategory } from '../locales';
 import confetti from 'canvas-confetti';
@@ -261,6 +264,25 @@ export const InvitationGuestPage: React.FC = () => {
   // Load invitation data from API / mock
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const resolvedTemplate = invitation ? resolveTemplate(invitation, mockTemplates) : null;
+
+  useEffect(() => {
+    if (
+      !loading &&
+      invitation &&
+      (invitation.status === 'paid' || invitation.status === 'published') &&
+      !resolvedTemplate
+    ) {
+      reportTemplateResolutionError({
+        source: 'InvitationGuestPage',
+        templateId: invitation.templateId,
+        templateSlug: invitation.templateSlug,
+        invitationId: invitation.id,
+        invitationSlug: invitation.slug,
+      });
+    }
+  }, [loading, invitation, resolvedTemplate]);
 
   // Independent invitation language setting
   const [invLang, setInvLang] = useState<Language>('uz');
@@ -695,11 +717,18 @@ export const InvitationGuestPage: React.FC = () => {
     );
   }
 
-  // Resolve chosen template configuration
-  const templateDef =
-    mockTemplates.find(
-      (t) => t.slug === invitation.templateSlug || t.id === invitation.templateId
-    ) || mockTemplates[0];
+  // Resolve chosen template configuration strictly (no silent mockTemplates[0] fallback)
+  if (!resolvedTemplate) {
+    return (
+      <TemplateResolutionError
+        language={invLang}
+        templateSlug={invitation.templateSlug}
+        templateId={invitation.templateId}
+        onNavigate={navigate}
+      />
+    );
+  }
+  const templateDef = resolvedTemplate.template;
 
   const isDarkTheme =
     templateDef.slug === 'template-19' ||

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, Leaf, Feather, Gem, Compass, Flower2 } from 'lucide-react';
 import { Language } from '../types';
+import { normalizeTemplateSlug } from '../utils/templateResolver';
 
 interface TemplateThemeDecorationProps {
   templateSlug?: string;
@@ -17,6 +18,8 @@ export const TemplateThemeDecoration: React.FC<TemplateThemeDecorationProps> = (
   accentColor = '#C9A96E',
   language = 'uz',
 }) => {
+  const canonicalSlug = normalizeTemplateSlug(templateSlug) || templateSlug;
+
   // Helper for bilingual badge title
   const getBadge = (uz: string, ru: string, en: string) => {
     if (language === 'ru') return ru;
@@ -24,7 +27,7 @@ export const TemplateThemeDecoration: React.FC<TemplateThemeDecorationProps> = (
     return uz;
   };
 
-  switch (templateSlug) {
+  switch (canonicalSlug) {
     // 1. Aurelia Royal
     case 'template-1':
     case 'aurelia':

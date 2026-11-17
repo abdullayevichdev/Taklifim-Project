@@ -12,10 +12,11 @@ import {
   getAuthorizedOrderForUser,
   verifyBearerToken,
 } from './api/_lib/firebaseAdmin.js';
-import { handleTelegramUpdate } from './api/_lib/telegram.js';
+import { handleTelegramUpdate, sendTemplateErrorAlertToTelegram } from './api/_lib/telegram.js';
 import { getTelegramConfig } from './api/_lib/env.js';
 import { cleanAndValidateUzPhone } from './api/_lib/phone.js';
 import { processUploadReceipt } from './api/_lib/uploadReceiptService.js';
+import { checkRateLimit } from './api/_lib/rateLimit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,6 +48,8 @@ async function startServer() {
         orderId,
         invitationId,
         invitationSlug,
+        templateId,
+        templateSlug,
         customerName,
         customerPhone,
         templateName,
@@ -105,6 +108,8 @@ async function startServer() {
         orderId: String(orderId),
         invitationId: invitationId ? String(invitationId) : undefined,
         invitationSlug: invitationSlug ? String(invitationSlug) : undefined,
+        templateId: templateId ? String(templateId) : undefined,
+        templateSlug: templateSlug ? String(templateSlug) : undefined,
         customerName: customerName ? String(customerName) : '',
         customerPhone: cleanPhone,
         templateName: templateName ? String(templateName) : '',
@@ -165,6 +170,8 @@ async function startServer() {
         status: order.status,
         invitationId: order.invitationId,
         invitationSlug: order.invitationSlug,
+        templateId: order.templateId,
+        templateSlug: order.templateSlug,
         customerName: order.customerName,
         templateName: order.templateName,
         weddingDate: order.weddingDate,
@@ -198,6 +205,38 @@ async function startServer() {
     } catch (err: any) {
       console.error('Telegram webhook handler error:', err);
       return res.status(500).json({ error: err.message || 'Webhook error' });
+    }
+  });
+
+  app.post('/api/telegram/template-alert', async (req: Request, res: Response) => {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const source = String(body.source || '').trim().slice(0, 60);
+      if (!source) {
+        return res.status(400).json({ ok: false, error: 'Missing source' });
+      }
+      const templateId = String(body.templateId || '').trim().slice(0, 100);
+      const templateSlug = String(body.templateSlug || '').trim().slice(0, 100);
+      const invitationId = String(body.invitationId || '').trim().slice(0, 100);
+      const invitationSlug = String(body.invitationSlug || '').trim().slice(0, 100);
+      const routePath = String(body.routePath || '').trim().slice(0, 180);
+
+      const rateKey = `tpl_alert:${req.ip || 'local'}:${source}:${templateSlug}:${templateId}:${invitationId}`;
+      if (!checkRateLimit(rateKey, 60_000)) {
+        return res.status(200).json({ ok: true, deduplicated: true });
+      }
+
+      const result = await sendTemplateErrorAlertToTelegram({
+        source,
+        templateId,
+        templateSlug,
+        invitationId,
+        invitationSlug,
+        routePath,
+      });
+      return res.status(200).json(result);
+    } catch {
+      return res.status(200).json({ ok: false });
     }
   });
 

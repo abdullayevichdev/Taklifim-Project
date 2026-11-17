@@ -11,12 +11,15 @@ import {
 } from './firebaseAdmin.js';
 import { sendReceiptToTelegram } from './telegram.js';
 import { checkRateLimit } from './rateLimit.js';
+import { resolveServerOrderTemplate } from '../../src/utils/templateResolver.js';
 
 export interface UploadReceiptCommand {
   verifiedUid: string;
   orderId: string;
   invitationId?: string;
   invitationSlug?: string;
+  templateId?: string;
+  templateSlug?: string;
   customerName: string;
   customerPhone: string;
   templateName: string;
@@ -257,7 +260,26 @@ export async function processUploadReceipt(
         };
       }
 
-      // 2b. Partial-failure recovery check: Telegram already sent on a previous failed DB commit
+      // 2b. Resolve canonical templateSlug & templateId from request -> existingOrder -> existingInv.
+      // Abort with explicit error if unresolved — never fall back to 'template-1'.
+      const resolvedTemplate = resolveServerOrderTemplate({
+        templateSlug: cmd.templateSlug,
+        templateId: cmd.templateId,
+        existingOrder,
+        existingInv,
+      });
+      if (!resolvedTemplate) {
+        return {
+          statusCode: 400,
+          body: {
+            success: false,
+            error:
+              "Shablon identifikatori (templateSlug) topilmadi. Iltimos, shablonni qayta tanlab urinib ko'ring.",
+          },
+        };
+      }
+
+      // 2c. Partial-failure recovery check: Telegram already sent on a previous failed DB commit
       const alreadyDispatchedViaDb =
         Boolean(attemptRecord?.telegramSent && !attemptRecord.committed) ||
         Boolean(
@@ -299,7 +321,7 @@ export async function processUploadReceipt(
         : existingOrder?.customerName || 'Mijoz';
       const safeTemplateName = cmd.templateName
         ? String(cmd.templateName)
-        : existingOrder?.templateName || 'Standart Shablon';
+        : existingOrder?.templateName || resolvedTemplate.templateName;
       const safeWeddingDate = cmd.weddingDate
         ? String(cmd.weddingDate)
         : existingOrder?.weddingDate || '-';
@@ -319,6 +341,8 @@ export async function processUploadReceipt(
             orderId: cmd.orderId,
             invitationId: cmd.invitationId,
             invitationSlug: cmd.invitationSlug,
+            templateId: resolvedTemplate.templateId,
+            templateSlug: resolvedTemplate.templateSlug,
             customerName: safeCustomerName,
             customerPhone: cmd.customerPhone,
             templateName: safeTemplateName,
@@ -381,6 +405,8 @@ export async function processUploadReceipt(
           orderId: cmd.orderId,
           invitationId: cmd.invitationId,
           invitationSlug: cmd.invitationSlug,
+          templateId: resolvedTemplate.templateId,
+          templateSlug: resolvedTemplate.templateSlug,
           customerName: safeCustomerName,
           customerPhone: cmd.customerPhone,
           templateName: safeTemplateName,

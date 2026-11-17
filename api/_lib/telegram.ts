@@ -279,3 +279,49 @@ export async function sendReceiptToTelegram(params: {
 
   return { ok: true, messageId: tgData.result?.message_id };
 }
+
+export async function sendTemplateErrorAlertToTelegram(params: {
+  source: string;
+  templateId?: string;
+  templateSlug?: string;
+  invitationId?: string;
+  invitationSlug?: string;
+  routePath?: string;
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const { botToken, adminChatId } = getTelegramConfig();
+
+  if (
+    !botToken ||
+    botToken === 'MOCK_BOT_TOKEN' ||
+    !adminChatId ||
+    adminChatId === 'MOCK_ADMIN_CHAT_ID'
+  ) {
+    return { ok: true, skipped: true };
+  }
+
+  const timestamp = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+  const text =
+    `⚠️ <b>SHABLON TOPILMADI (Template Error)</b>\n\n` +
+    `📍 <b>Manba:</b> ${escapeTelegramHtml(params.source.slice(0, 60))}\n` +
+    `🎨 <b>templateSlug:</b> <code>${escapeTelegramHtml((params.templateSlug || '—').slice(0, 100))}</code>\n` +
+    `🆔 <b>templateId:</b> <code>${escapeTelegramHtml((params.templateId || '—').slice(0, 100))}</code>\n` +
+    `📨 <b>invitationId:</b> <code>${escapeTelegramHtml((params.invitationId || '—').slice(0, 100))}</code>\n` +
+    `🔗 <b>invitationSlug:</b> <code>${escapeTelegramHtml((params.invitationSlug || '—').slice(0, 100))}</code>\n` +
+    `🌐 <b>Sahifa:</b> <code>${escapeTelegramHtml((params.routePath || '—').slice(0, 180))}</code>\n` +
+    `⏱ <b>Vaqt:</b> ${escapeTelegramHtml(timestamp)}`;
+
+  try {
+    const tgData = await tgApi('sendMessage', {
+      chat_id: adminChatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    });
+    if (!tgData?.ok) {
+      return { ok: false, error: tgData?.description || 'Telegram alert failed' };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Telegram alert exception' };
+  }
+}

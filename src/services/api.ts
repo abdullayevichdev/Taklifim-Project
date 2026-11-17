@@ -11,6 +11,12 @@ import {
   type UploadReceiptPayload,
   type UploadReceiptResult,
 } from '../utils/receiptUpload';
+import {
+  normalizeInvitationTemplateOnRead,
+  enrichOrderWithLegacyTemplate,
+  resolveCanonicalTemplateMeta,
+  resolveTemplate,
+} from '../utils/templateResolver';
 import { mockTemplates } from '../data/mockTemplates';
 import { mockGuests } from '../data/mockGuests';
 import { mockOrders } from '../data/mockOrders';
@@ -341,7 +347,7 @@ export const api = {
 
   async getTemplateBySlug(slug: string): Promise<Template | null> {
     const list = await this.getTemplates();
-    return list.find((t) => t.slug === slug) || null;
+    return resolveTemplate(slug, list)?.template || null;
   },
 
   async addTemplate(template: Template): Promise<Template> {
@@ -404,7 +410,7 @@ export const api = {
                 ? val.filter(Boolean)
                 : Object.values(val || {});
               entries.forEach((inv) => {
-                if (inv?.id) merged.set(inv.id, inv);
+                if (inv?.id) merged.set(inv.id, normalizeInvitationTemplateOnRead(inv));
               });
             }
           });
@@ -426,7 +432,14 @@ export const api = {
           const snap = await safeFirestore(getDocs(q as any), 1500);
           if (snap) {
             const list: InvitationData[] = [];
-            snap.forEach((d) => list.push({ id: d.id, ...(d.data() as Record<string, any>) } as InvitationData));
+            snap.forEach((d) =>
+              list.push(
+                normalizeInvitationTemplateOnRead({
+                  id: d.id,
+                  ...(d.data() as Record<string, any>),
+                } as InvitationData)
+              )
+            );
             mergeLocalInvitations(authUid, list);
             return list;
           }
@@ -436,16 +449,20 @@ export const api = {
       }
 
       const cached = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
-      return cached.filter((inv) => inv.ownerId === authUid || inv.ownerUid === authUid);
+      return cached
+        .filter((inv) => inv.ownerId === authUid || inv.ownerUid === authUid)
+        .map((inv) => normalizeInvitationTemplateOnRead(inv));
     }
 
     // Offline / non-Firebase demo fallback
     const effectiveUid = userId || undefined;
     const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
     if (effectiveUid) {
-      return list.filter((inv) => inv.ownerId === effectiveUid || inv.ownerUid === effectiveUid);
+      return list
+        .filter((inv) => inv.ownerId === effectiveUid || inv.ownerUid === effectiveUid)
+        .map((inv) => normalizeInvitationTemplateOnRead(inv));
     }
-    return list;
+    return list.map((inv) => normalizeInvitationTemplateOnRead(inv));
   },
 
   async getInvitationById(id: string): Promise<InvitationData | null> {
@@ -457,7 +474,7 @@ export const api = {
       try {
         const snap = await rtdbGet(rtdbRef(rtdb, `invitations/${id}`));
         if (snap.exists()) {
-          const found = snap.val() as InvitationData;
+          const found = normalizeInvitationTemplateOnRead(snap.val() as InvitationData);
           const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
           setStored(STORAGE_KEY_INVITATIONS, [found, ...list.filter((i) => i.id !== found.id)]);
           return found;
@@ -468,7 +485,8 @@ export const api = {
     }
 
     const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
-    return list.find((inv) => inv.id === id) || null;
+    const found = list.find((inv) => inv.id === id) || null;
+    return found ? normalizeInvitationTemplateOnRead(found) : null;
   },
 
   subscribeUserInvitations(
@@ -485,12 +503,14 @@ export const api = {
     }
 
     const emitLocal = () => {
-      const local = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []).filter(
-        (inv) =>
-          inv.ownerId === effectiveUid ||
-          inv.ownerUid === effectiveUid ||
-          (uid && (inv.ownerId === uid || inv.ownerUid === uid))
-      );
+      const local = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, [])
+        .filter(
+          (inv) =>
+            inv.ownerId === effectiveUid ||
+            inv.ownerUid === effectiveUid ||
+            (uid && (inv.ownerId === uid || inv.ownerUid === uid))
+        )
+        .map((inv) => normalizeInvitationTemplateOnRead(inv));
       onData(local);
     };
 
@@ -528,7 +548,7 @@ export const api = {
           const val = snap.val();
           const list: InvitationData[] = Array.isArray(val) ? val.filter(Boolean) : Object.values(val || {});
           list.forEach((inv) => {
-            if (inv?.id) byOwnerId.set(inv.id, inv);
+            if (inv?.id) byOwnerId.set(inv.id, normalizeInvitationTemplateOnRead(inv));
           });
         }
         hasOwnerIdData = true;
@@ -548,7 +568,7 @@ export const api = {
           const val = snap.val();
           const list: InvitationData[] = Array.isArray(val) ? val.filter(Boolean) : Object.values(val || {});
           list.forEach((inv) => {
-            if (inv?.id) byOwnerUid.set(inv.id, inv);
+            if (inv?.id) byOwnerUid.set(inv.id, normalizeInvitationTemplateOnRead(inv));
           });
         }
         hasOwnerUidData = true;
@@ -616,7 +636,7 @@ export const api = {
             try {
               const invSnap = await rtdbGet(rtdbRef(rtdb, `invitations/${invId}`));
               if (invSnap.exists()) {
-                const found = invSnap.val() as InvitationData;
+                const found = normalizeInvitationTemplateOnRead(invSnap.val() as InvitationData);
                 const updated = [found, ...list.filter((i) => i.id !== found.id)];
                 setStored(STORAGE_KEY_INVITATIONS, updated);
                 return found;
@@ -626,8 +646,8 @@ export const api = {
               return {
                 id: String(invId),
                 slug: cleanSlug,
-                templateId: 'template-1',
-                templateSlug: 'template-1',
+                templateId: '',
+                templateSlug: '',
                 language: 'uz',
                 status: 'pending_review',
                 paymentStatus: 'pending_review',
@@ -661,7 +681,7 @@ export const api = {
     // 2. Local cache fallback (offline / demo)
     const localMatch = list.find((inv) => inv.slug === cleanSlug || inv.id === cleanSlug);
     if (localMatch) {
-      return localMatch;
+      return normalizeInvitationTemplateOnRead(localMatch);
     }
 
     // 3. Firestore lookup (when enabled)
@@ -672,7 +692,10 @@ export const api = {
         const snap = await safeFirestore(getDocs(q as any), 8000);
         if (snap && !snap.empty) {
           const d = snap.docs[0];
-          const found = { id: d.id, ...(d.data() as Record<string, any>) } as InvitationData;
+          const found = normalizeInvitationTemplateOnRead({
+            id: d.id,
+            ...(d.data() as Record<string, any>),
+          } as InvitationData);
           const updated = [found, ...list.filter((i) => i.id !== found.id)];
           setStored(STORAGE_KEY_INVITATIONS, updated);
           return found;
@@ -709,8 +732,15 @@ export const api = {
       ? resolvedOwnerId
       : undefined;
 
+    const canonicalTplMeta = resolveCanonicalTemplateMeta({
+      templateSlug: data.templateSlug,
+      templateId: data.templateId,
+    });
+
     let preparedData: InvitationData = {
       ...data,
+      templateId: canonicalTplMeta ? canonicalTplMeta.templateId : data.templateId,
+      templateSlug: canonicalTplMeta ? canonicalTplMeta.templateSlug : data.templateSlug,
       slug: finalSlug,
       ownerId: resolvedOwnerId,
       ownerUid: resolvedOwnerUid,
@@ -1132,7 +1162,7 @@ export const api = {
             try {
               const snap = await rtdbGet(rtdbRef(rtdbInstance, `orders/${orderId}`));
               if (snap.exists()) {
-                return snap.val() as OrderItem;
+                return enrichOrderWithLegacyTemplate(snap.val() as OrderItem);
               }
             } catch {}
             return null;
@@ -1153,9 +1183,11 @@ export const api = {
 
     const stored = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []);
     if (uid) {
-      return stored.filter((o) => !o.ownerUid || o.ownerUid === uid);
+      return stored
+        .filter((o) => !o.ownerUid || o.ownerUid === uid)
+        .map((o) => enrichOrderWithLegacyTemplate(o));
     }
-    return stored.length > 0 ? stored : mockOrders;
+    return (stored.length > 0 ? stored : mockOrders).map((o) => enrichOrderWithLegacyTemplate(o));
   },
 
   async getOrderById(orderId: string): Promise<OrderItem | null> {
@@ -1165,12 +1197,13 @@ export const api = {
       try {
         const snap = await rtdbGet(rtdbRef(rtdb, `orders/${orderId}`));
         if (snap.exists()) {
-          return snap.val() as OrderItem;
+          return enrichOrderWithLegacyTemplate(snap.val() as OrderItem);
         }
       } catch {}
     }
     const stored = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []);
-    return stored.find((o) => o.id === orderId) || null;
+    const found = stored.find((o) => o.id === orderId) || null;
+    return found ? enrichOrderWithLegacyTemplate(found) : null;
   },
 
   subscribeUserOrders(
@@ -1187,12 +1220,16 @@ export const api = {
     }
 
     if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser || !authUid) {
-      const local = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []).filter(
-        (o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid
-      );
+      const local = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, [])
+        .filter((o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid)
+        .map((o) => enrichOrderWithLegacyTemplate(o));
       onData(local);
       return realtimeHub.subscribe<OrderItem[]>('orders', (all) => {
-        onData((all || []).filter((o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid));
+        onData(
+          (all || [])
+            .filter((o) => !o.ownerUid || o.ownerUid === effectiveUid || o.ownerUid === uid)
+            .map((o) => enrichOrderWithLegacyTemplate(o))
+        );
       });
     }
 
@@ -1247,7 +1284,7 @@ export const api = {
               ordRef,
               (ordSnap) => {
                 if (ordSnap.exists()) {
-                  const ord = ordSnap.val() as OrderItem;
+                  const ord = enrichOrderWithLegacyTemplate(ordSnap.val() as OrderItem);
                   orderMap.set(orderId, {
                     ...ord,
                     id: ord.id || orderId,
@@ -1290,10 +1327,10 @@ export const api = {
 
     if (!isFirebaseConfigured() || !rtdb || !auth?.currentUser) {
       const local = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []).find((o) => o.id === orderId) || null;
-      onData(local);
+      onData(local ? enrichOrderWithLegacyTemplate(local) : null);
       return realtimeHub.subscribe<OrderItem[]>('orders', (all) => {
         const found = (all || []).find((o) => o.id === orderId) || null;
-        if (found) onData(found);
+        if (found) onData(enrichOrderWithLegacyTemplate(found));
       });
     }
 
@@ -1302,7 +1339,7 @@ export const api = {
       ordRef,
       (snap) => {
         if (snap.exists()) {
-          const val = snap.val() as OrderItem;
+          const val = enrichOrderWithLegacyTemplate(snap.val() as OrderItem);
           onData({ ...val, id: val.id || orderId });
         } else {
           onData(null);
@@ -1322,6 +1359,10 @@ export const api = {
   async createOrder(payload: Partial<OrderItem>): Promise<OrderItem> {
     const randomCode = Math.floor(100000 + Math.random() * 900000);
     const orderId = payload.id || `ORD-${randomCode}`;
+    const canonicalTpl = resolveCanonicalTemplateMeta({
+      templateSlug: payload.templateSlug,
+      templateId: payload.templateId,
+    });
     const newOrder: OrderItem = {
       id: orderId,
       orderNumber: payload.orderNumber || `TK-${randomCode}`,
@@ -1338,7 +1379,9 @@ export const api = {
       notes: payload.notes || '',
       invitationId: payload.invitationId,
       invitationSlug: payload.invitationSlug,
-      templateName: payload.templateName,
+      templateId: canonicalTpl ? canonicalTpl.templateId : payload.templateId,
+      templateSlug: canonicalTpl ? canonicalTpl.templateSlug : payload.templateSlug,
+      templateName: payload.templateName || canonicalTpl?.templateName,
       weddingDate: payload.weddingDate,
       venueName: payload.venueName,
       submittedAt: new Date().toISOString(),
@@ -1376,6 +1419,8 @@ export const api = {
     invitationId?: string;
     invitationSlug?: string;
     customerName?: string;
+    templateId?: string;
+    templateSlug?: string;
     templateName?: string;
     weddingDate?: string;
     venueName?: string;
@@ -1404,20 +1449,29 @@ export const api = {
       if (data?.success && data?.status) {
         await this.updateOrderStatus(orderId, data.status, { syncRemote: false });
       }
-      return data;
+      return data ? enrichOrderWithLegacyTemplate(data) : data;
     } catch {
       const all = getStored<OrderItem[]>(STORAGE_KEY_ORDERS, []);
       const match = all.find((o) => o.id === orderId);
       if (match) {
+        const enriched = enrichOrderWithLegacyTemplate(match);
         return {
           success: true,
           orderId,
-          status: match.status,
-          invitationId: match.invitationId,
-          invitationSlug: match.invitationSlug,
-          receiptSentAt: match.receiptSentAt || match.submittedAt,
-          decidedAt: match.decidedAt,
-          rejectReason: match.rejectReason,
+          status: enriched.status,
+          invitationId: enriched.invitationId,
+          invitationSlug: enriched.invitationSlug,
+          customerName: enriched.customerName,
+          templateId: enriched.templateId,
+          templateSlug: enriched.templateSlug,
+          templateName: enriched.templateName,
+          weddingDate: enriched.weddingDate,
+          venueName: enriched.venueName,
+          price: enriched.price,
+          receiptSentAt: enriched.receiptSentAt || enriched.submittedAt,
+          decidedAt: enriched.decidedAt,
+          rejectReason: enriched.rejectReason,
+          updatedAt: enriched.updatedAt,
         };
       }
       return { success: false, error: "Server bilan bog'lanib bo'lmadi" };

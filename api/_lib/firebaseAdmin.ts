@@ -2,6 +2,10 @@ import { cert, getApps, getApp, initializeApp, type App } from 'firebase-admin/a
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 import { cleanEnvString, cleanPrivateKey, getFirebaseDatabaseUrl } from './env.js';
+import {
+  enrichOrderWithLegacyTemplate,
+  resolveServerOrderTemplate,
+} from '../../src/utils/templateResolver.js';
 
 export type OrderStatus =
   | 'draft'
@@ -17,6 +21,8 @@ export interface ServerOrder {
   ownerUid?: string;
   invitationId?: string;
   invitationSlug?: string;
+  templateId?: string;
+  templateSlug?: string;
   customerName: string;
   customerPhone: string;
   templateName?: string;
@@ -221,11 +227,11 @@ export async function getOrder(orderId: string): Promise<ServerOrder | null> {
   const snap = await getRtdb().ref(`orders/${orderId}`).get();
   if (!snap.exists()) return null;
   const data = snap.val() as ServerOrder;
-  return {
+  return enrichOrderWithLegacyTemplate({
     ...data,
     id: data.id || orderId,
     orderId: data.orderId || data.id || orderId,
-  };
+  });
 }
 
 export async function getInvitationRecord(
@@ -332,6 +338,8 @@ export async function seedPreflightOrderRecord(params: {
   orderId: string;
   invitationId?: string;
   invitationSlug?: string;
+  templateId?: string;
+  templateSlug?: string;
   customerName: string;
   customerPhone: string;
   templateName: string;
@@ -352,6 +360,16 @@ export async function seedPreflightOrderRecord(params: {
     .trim()
     .replace(/[^a-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+  const resolvedTemplate = resolveServerOrderTemplate({
+    templateSlug: params.templateSlug,
+    templateId: params.templateId,
+    existingOrder: params.existingOrder,
+    existingInv: params.existingInv,
+  });
+  if (!resolvedTemplate) {
+    throw new Error('TEMPLATE_NOT_RESOLVED: Shablon identifikatori (templateSlug) topilmadi.');
+  }
 
   const preservedStatus: OrderStatus =
     params.existingOrder?.status === 'rejected'
@@ -378,9 +396,11 @@ export async function seedPreflightOrderRecord(params: {
       ownerUid: params.verifiedUid,
       invitationId: finalInvId || undefined,
       invitationSlug: cleanSlug || undefined,
+      templateId: resolvedTemplate.templateId,
+      templateSlug: resolvedTemplate.templateSlug,
       customerName: params.customerName || params.existingOrder?.customerName || 'Mijoz',
       customerPhone: params.customerPhone,
-      templateName: params.templateName || params.existingOrder?.templateName || 'Standart Shablon',
+      templateName: params.templateName || params.existingOrder?.templateName || resolvedTemplate.templateName,
       planName: params.planName || params.existingOrder?.planName,
       weddingDate: params.weddingDate || params.existingOrder?.weddingDate || '-',
       venueName: params.venueName || params.existingOrder?.venueName || '-',
@@ -402,10 +422,14 @@ export async function seedPreflightOrderRecord(params: {
       updates[`invitations/${finalInvId}/eventType`] = 'To‘y va Nikoh Oqshomi';
       updates[`invitations/${finalInvId}/eventDate`] = params.weddingDate || '';
       updates[`invitations/${finalInvId}/venueName`] = params.venueName || '';
-      updates[`invitations/${finalInvId}/templateSlug`] = 'template-1';
+      updates[`invitations/${finalInvId}/templateId`] = resolvedTemplate.templateId;
+      updates[`invitations/${finalInvId}/templateSlug`] = resolvedTemplate.templateSlug;
       updates[`invitations/${finalInvId}/status`] = preservedStatus;
       updates[`invitations/${finalInvId}/paymentStatus`] = preservedStatus;
       updates[`invitations/${finalInvId}/createdAt`] = params.nowIso;
+    } else if (!params.existingInv.templateSlug) {
+      updates[`invitations/${finalInvId}/templateId`] = resolvedTemplate.templateId;
+      updates[`invitations/${finalInvId}/templateSlug`] = resolvedTemplate.templateSlug;
     }
     updates[`invitations/${finalInvId}/orderId`] = safeOrderId;
     updates[`invitations/${finalInvId}/ownerUid`] = params.verifiedUid;
@@ -462,6 +486,8 @@ export async function commitOrderPendingReview(params: {
   orderId: string;
   invitationId?: string;
   invitationSlug?: string;
+  templateId?: string;
+  templateSlug?: string;
   customerName: string;
   customerPhone: string;
   templateName: string;
@@ -491,6 +517,20 @@ export async function commitOrderPendingReview(params: {
 
   const { existingOrder: existing, existingInv } = preCheck;
 
+  const resolvedTemplate = resolveServerOrderTemplate({
+    templateSlug: params.templateSlug,
+    templateId: params.templateId,
+    existingOrder: existing,
+    existingInv,
+  });
+  if (!resolvedTemplate) {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "Shablon identifikatori (templateSlug) topilmadi. Buyurtma to'xtatildi.",
+    };
+  }
+
   const finalInvId = sanitizeRtdbKeySegment(safeInvIdParam || existing?.invitationId);
   const rawSlug = params.invitationSlug || existing?.invitationSlug || existingInv?.slug || '';
   const cleanSlug = String(rawSlug)
@@ -517,9 +557,11 @@ export async function commitOrderPendingReview(params: {
     ownerUid: params.verifiedUid,
     invitationId: finalInvId || undefined,
     invitationSlug: cleanSlug || undefined,
+    templateId: resolvedTemplate.templateId,
+    templateSlug: resolvedTemplate.templateSlug,
     customerName: params.customerName || existing?.customerName || 'Mijoz',
     customerPhone: params.customerPhone,
-    templateName: params.templateName || existing?.templateName || 'Standart Shablon',
+    templateName: params.templateName || existing?.templateName || resolvedTemplate.templateName,
     planName: params.planName || existing?.planName,
     weddingDate: params.weddingDate || existing?.weddingDate || '-',
     venueName: params.venueName || existing?.venueName || '-',
@@ -570,8 +612,12 @@ export async function commitOrderPendingReview(params: {
       updates[`invitations/${finalInvId}/eventType`] = 'To‘y va Nikoh Oqshomi';
       updates[`invitations/${finalInvId}/eventDate`] = params.weddingDate || '';
       updates[`invitations/${finalInvId}/venueName`] = params.venueName || '';
-      updates[`invitations/${finalInvId}/templateSlug`] = 'template-1';
+      updates[`invitations/${finalInvId}/templateId`] = resolvedTemplate.templateId;
+      updates[`invitations/${finalInvId}/templateSlug`] = resolvedTemplate.templateSlug;
       updates[`invitations/${finalInvId}/createdAt`] = params.nowIso;
+    } else if (!existingInv.templateSlug) {
+      updates[`invitations/${finalInvId}/templateId`] = resolvedTemplate.templateId;
+      updates[`invitations/${finalInvId}/templateSlug`] = resolvedTemplate.templateSlug;
     }
 
     updates[`invitations/${finalInvId}/status`] = 'pending_review';

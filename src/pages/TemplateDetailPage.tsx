@@ -4,6 +4,7 @@ import { useLanguage, translateCategory } from '../locales';
 import { mockTemplates } from '../data/mockTemplates';
 import { api } from '../services/api';
 import { formatPriceUZS } from '../utils/logic';
+import { resolveTemplate } from '../utils/templateResolver';
 import { Template } from '../types';
 import {
   GlassSurface,
@@ -55,7 +56,7 @@ export const TemplateDetailPage: React.FC = () => {
     [t]
   );
 
-  const template = allTemplates.find((tpl) => tpl.slug === slug);
+  const template = resolveTemplate(slug, allTemplates)?.template;
 
   if (!template) {
     return (

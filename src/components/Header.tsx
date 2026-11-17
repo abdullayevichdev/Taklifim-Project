@@ -10,6 +10,7 @@ import {
   Users,
   LogOut,
   LogIn,
+  Phone,
 } from 'lucide-react';
 import { Language } from '../types';
 import { FlagIcon } from './FlagIcon';
@@ -233,7 +234,7 @@ export const Header: React.FC = () => {
         }}
       />
 
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 xl:gap-3">
+      <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-2 xl:gap-3">
         {/* Brand Logo Pill — always visible, never clipped */}
         <Link
           to="/"
@@ -266,6 +267,27 @@ export const Header: React.FC = () => {
             </div>
 
             <div className="pointer-events-auto flex items-center gap-1.5 xl:gap-2 shrink-0">
+              {/* Liquid Glass VIP Contact Pill */}
+              <a
+                href="tel:+998933223580"
+                aria-label="+998 933223580 — Avazxanov Abdulhay"
+                className={`hidden min-[1160px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+                  isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
+                }`}
+              >
+                <span className="w-6 h-6 xl:w-7 xl:h-7 rounded-full bg-gradient-to-br from-[#F5C9D8]/90 via-white to-[#B9DFFA]/85 flex items-center justify-center border border-white shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_3px_8px_rgba(198,72,115,0.18)] transition-transform duration-250 group-hover:-translate-y-0.5">
+                  <Phone className="w-3 h-3 xl:w-3.5 xl:h-3.5 text-[#B23864]" aria-hidden="true" />
+                </span>
+                <span className="flex flex-col leading-none text-left pr-0.5">
+                  <span className="text-[11px] xl:text-[11.5px] font-extrabold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
+                    +998 933223580
+                  </span>
+                  <span className="text-[9px] xl:text-[9.5px] font-semibold tracking-[0.015em] text-[#8A3152] whitespace-nowrap mt-0.5">
+                    Avazxanov Abdulhay
+                  </span>
+                </span>
+              </a>
+
               <CustomDropdown<Language>
                 value={language}
                 onChange={(lang) => setLanguage(lang)}
@@ -343,6 +365,24 @@ export const Header: React.FC = () => {
 
         {/* Mobile Compact Header Controls (NO duplicated hamburger drawer — handled by GlassBottomNav) */}
         <div className="pointer-events-auto flex items-center gap-1.5 lg:hidden shrink-0">
+          <a
+            href="tel:+998933223580"
+            aria-label="+998 933223580 — Avazxanov Abdulhay"
+            className="hidden sm:inline-flex items-center gap-2 shrink-0 min-h-[42px] px-3 py-1 rounded-full lg-contact-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]"
+          >
+            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-[#F5C9D8]/90 via-white to-[#B9DFFA]/85 flex items-center justify-center border border-white shrink-0 shadow-xs">
+              <Phone className="w-3 h-3 text-[#B23864]" aria-hidden="true" />
+            </span>
+            <span className="flex flex-col leading-none text-left pr-0.5">
+              <span className="text-[11px] font-extrabold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
+                +998 933223580
+              </span>
+              <span className="text-[9px] font-semibold tracking-[0.015em] text-[#8A3152] whitespace-nowrap mt-0.5">
+                Avazxanov Abdulhay
+              </span>
+            </span>
+          </a>
+
           <CustomDropdown<Language>
             value={language}
             onChange={(lang) => setLanguage(lang)}

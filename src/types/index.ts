@@ -175,6 +175,8 @@ export interface OrderItem {
   notes?: string;
   invitationId?: string;
   invitationSlug?: string;
+  templateId?: string;
+  templateSlug?: string;
   templateName?: string;
   weddingDate?: string;
   venueName?: string;

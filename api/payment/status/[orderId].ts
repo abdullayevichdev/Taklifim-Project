@@ -36,6 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: order.status,
       invitationId: order.invitationId,
       invitationSlug: order.invitationSlug,
+      templateId: order.templateId,
+      templateSlug: order.templateSlug,
       customerName: order.customerName,
       templateName: order.templateName,
       weddingDate: order.weddingDate,

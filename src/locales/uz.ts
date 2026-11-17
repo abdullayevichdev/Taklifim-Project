@@ -33,9 +33,9 @@ export const uz = {
   // Asosiy ekran (Hero)
   hero: {
     badge: 'To‘y va tantanalar uchun nafis raqamli taklifnomalar',
-    script: 'Baxtli lahzalar, muqaddas rishta...',
-    title: 'Har bir lahzaga o‘zgacha taklif.',
-    subtitle: 'To‘y, fotixa to‘yi, beshik to‘y, yubiley va tantanalaringiz uchun mehmonlaringizni lol qoldiradigan interaktiv taklifnoma yarating.',
+    script: 'Har bir go‘zal lahza',
+    title: 'taklifnomadan boshlanadi',
+    subtitle: 'Shablon tanlang, ma’lumotlarni kiriting va chiroyli, ko‘p tilli taklifnomangizni mehmonlaringizga ulashing.',
     createBtn: 'Taklifnoma yaratish',
     exploreBtn: 'Shablonlarni ko‘rish',
     viewDemo: 'Jonli namuna',
@@ -69,9 +69,9 @@ export const uz = {
 
   // Xizmatlar
   services: {
-    script: 'Eng zamonaviy imkoniyatlar',
-    title: 'Bizning Xizmat Turlarimiz',
-    subtitle: 'Eng zamonaviy imkoniyatlar bilan mehmonlaringizni taklif qiling',
+    script: '',
+    title: 'Yaqinlaringizni o‘zgacha tarzda taklif qiling',
+    subtitle: 'Tadbir tafsilotlari, manzil, sana va suratlaringizni bir joyda jamlagan zamonaviy va interaktiv taklifnoma.',
     webLabel: 'Veb Sahifa Taklifnomasi',
     webTitle: 'Interaktiv Veb Taklifnomalar',
     webDesc: 'Har bir mehmoningiz smartfonida shaxsiy havola bilan ochiladigan, fotoalbom, musiqa, xarita va RSVP tashrif tasdig‘iga ega sahifa.',
@@ -953,6 +953,17 @@ export const uz = {
     rsvpSuccessToast: 'Tashrifingiz muvaffaqiyatli tasdiqlandi! Rahmat!',
     genericErrorToast: 'Xatolik yuz berdi',
     wishSuccessToast: 'Ezgu tilagingiz uchun rahmat!',
+  },
+
+  templateError: {
+    title: 'Shablon topilmadi',
+    description:
+      'Tanlangan taklifnoma shabloni topilmadi yoki noto‘g‘ri ko‘rsatilgan. Iltimos, boshqa shablon tanlang yoki qo‘llab-quvvatlash xizmatiga murojaat qiling.',
+    browseTemplatesBtn: 'Shablonlar katalogi',
+    backHomeBtn: 'Bosh sahifaga qaytish',
+    orderBlockedError:
+      'Shablon identifikatori topilmadi. Buyurtma berishdan avval shablonni qayta tanlang.',
+    missingCodeLabel: 'Shablon kodi',
   },
 
   // Umumiy taklifnoma komponentlari
