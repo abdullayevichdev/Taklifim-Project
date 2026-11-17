@@ -12,6 +12,7 @@ import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
+import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
 import {
   formatPriceUZS,
   normalizeTime24h,
@@ -129,7 +130,7 @@ function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | n
 export const BuilderPage: React.FC = () => {
   const { params, navigate } = useRouter();
   const { t, language } = useLanguage();
-  const { showToast, isLoggedIn, user } = useAuth();
+  const { showToast, isLoggedIn, authReady, hasFirebaseSession, user } = useAuth();
   const paymentCopy = getPaymentCopy(language);
   const templateSlug = params.templateSlug || 'template-1';
 
@@ -332,8 +333,9 @@ export const BuilderPage: React.FC = () => {
   const isSlugLocked =
     invitationState.status !== 'draft' || Boolean(activeOrderId) || isOrderComplete;
 
-  // Hydrate existing invitation / order status from Firebase on load or F5 reload
+  // Hydrate existing invitation / order status from Firebase on load or F5 reload (wait for authReady first)
   useEffect(() => {
+    if (!authReady) return;
     let active = true;
 
     async function hydrateFromServer() {
@@ -434,12 +436,12 @@ export const BuilderPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [queryInvitationId]);
+  }, [authReady, queryInvitationId]);
 
-  // Load user's known slugs once for uniqueness checks during auto-slug updates
+  // Load user's known slugs once for uniqueness checks during auto-slug updates (only when Firebase session is active)
   useEffect(() => {
     let active = true;
-    if (!user?.id) return;
+    if (!authReady || !user?.id || !hasFirebaseSession) return;
     api
       .getInvitations(user.id)
       .then((list) => {
@@ -456,7 +458,7 @@ export const BuilderPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [invitationState.id, user?.id]);
+  }, [authReady, hasFirebaseSession, invitationState.id, user?.id]);
 
   // Debounced automatic slug regeneration from hostNames while draft & not manually edited
   useEffect(() => {
@@ -574,7 +576,7 @@ export const BuilderPage: React.FC = () => {
 
   // Real-time RTDB subscription + visibility-aware 5s polling while order is pending_review
   useEffect(() => {
-    if (!activeOrderId || orderStatus !== 'pending_review') return;
+    if (!authReady || !activeOrderId || orderStatus !== 'pending_review') return;
 
     const unsubRtdb = api.subscribeOrder(activeOrderId, (ord: OrderItem | null) => {
       if (!ord?.status) return;
@@ -630,7 +632,7 @@ export const BuilderPage: React.FC = () => {
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [activeOrderId, orderStatus, handleResolvedOrderUpdate]);
+  }, [authReady, hasFirebaseSession, activeOrderId, orderStatus, handleResolvedOrderUpdate]);
 
   // Copy Card Number to clipboard
   const handleCopyCardNumber = () => {
@@ -694,9 +696,23 @@ export const BuilderPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (hasFirebaseSession) {
+      setUploadError('');
+    }
+  }, [hasFirebaseSession]);
+
   // Upload receipt and send to Telegram admin (server atomically commits order & pending_review)
   const handleSubmitReceiptUpload = async () => {
     if (receiptSubmitLockRef.current || isUploadingReceipt) return;
+
+    if (!hasFirebaseSession) {
+      setUploadError(
+        t.auth?.errors?.receiptAuthRequiredDesc ||
+          'Chek yuborish uchun Google, Apple ID yoki Email orqali hisobingizga kirilgan bo‘lishi kerak.'
+      );
+      return;
+    }
 
     const isPdf =
       preparedFileType === 'application/pdf' ||
@@ -726,10 +742,6 @@ export const BuilderPage: React.FC = () => {
     }
 
     receiptSubmitLockRef.current = true;
-    setIsUploadingReceipt(true);
-    setUploadError('');
-    setUploadIsNetworkError(false);
-
     setIsUploadingReceipt(true);
     setUploadError('');
     setUploadIsNetworkError(false);
@@ -2728,6 +2740,18 @@ export const BuilderPage: React.FC = () => {
                               {orderRejectReason || t.builder.receiptRejectedBody}
                             </div>
                           </div>
+                        )}
+
+                        {authReady && !hasFirebaseSession && (
+                          <ReceiptAuthPrompt
+                            onBeforeEmailNavigate={() => {
+                              try {
+                                if (!queryInvitationId) {
+                                  localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
+                                }
+                              } catch {}
+                            }}
+                          />
                         )}
 
                         <div className="space-y-2 min-w-0">

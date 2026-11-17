@@ -52,7 +52,7 @@ import {
 
 export const CustomerDashboard: React.FC = () => {
   const { path, navigate } = useRouter();
-  const { user, updateUserProfile, showToast } = useAuth();
+  const { user, authReady, hasFirebaseSession, updateUserProfile, showToast } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
   // Active sub-tab based on URL path
@@ -103,7 +103,8 @@ export const CustomerDashboard: React.FC = () => {
   }, [user]);
 
   const loadData = useCallback(async () => {
-    if (!user?.id) {
+    if (!authReady) return;
+    if (!user?.id || !hasFirebaseSession) {
       setLoading(false);
       return;
     }
@@ -123,14 +124,15 @@ export const CustomerDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [authReady, user?.id, hasFirebaseSession]);
 
   useEffect(() => {
+    if (!authReady) return;
     statusBaselineReadyRef.current = false;
     prevStatusesRef.current.clear();
     loadData();
 
-    if (!user?.id) return;
+    if (!user?.id || !hasFirebaseSession) return;
 
     const unsubInv = api.subscribeUserInvitations(
       user.id,
@@ -165,7 +167,7 @@ export const CustomerDashboard: React.FC = () => {
       unsubGuests();
       unsubOrders();
     };
-  }, [user?.id, loadData]);
+  }, [authReady, user?.id, hasFirebaseSession, loadData]);
 
   // Backfill legacy orders that have inv.orderId but are not yet indexed under userOrders/{uid}
   useEffect(() => {

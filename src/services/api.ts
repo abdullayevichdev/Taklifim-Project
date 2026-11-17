@@ -38,14 +38,34 @@ import {
   equalTo,
 } from 'firebase/database';
 
+async function ensureFirebaseAuthReady(): Promise<string | null> {
+  if (!isFirebaseConfigured() || !auth) return null;
+  try {
+    if (typeof auth.authStateReady === 'function') {
+      await auth.authStateReady();
+    }
+  } catch {
+    // ignore
+  }
+  return auth.currentUser?.uid || null;
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  await ensureFirebaseAuthReady();
   const currentUser = auth?.currentUser;
   if (!currentUser) return {};
   try {
     const idToken = await currentUser.getIdToken();
-    return idToken ? { Authorization: `Bearer ${idToken}` } : {};
+    if (idToken) return { Authorization: `Bearer ${idToken}` };
+    const refreshed = await currentUser.getIdToken(true);
+    return refreshed ? { Authorization: `Bearer ${refreshed}` } : {};
   } catch {
-    return {};
+    try {
+      const refreshed = await currentUser.getIdToken(true);
+      return refreshed ? { Authorization: `Bearer ${refreshed}` } : {};
+    } catch {
+      return {};
+    }
   }
 }
 
@@ -361,58 +381,66 @@ export const api = {
   // INVITATIONS (REAL-TIME DATABASE & FIRESTORE)
   // -------------------------------------------------------------
   async getInvitations(userId?: string): Promise<InvitationData[]> {
-    const authUid = getAuthenticatedUid();
-    const effectiveUid = authUid || userId || undefined;
+    const authUid = await ensureFirebaseAuthReady();
 
-    // 1. Try Firebase Realtime Database with user-scoped indexed queries (never read /invitations root)
-    if (isFirebaseConfigured() && rtdb && effectiveUid) {
-      try {
-        const [snapById, snapByUid] = await Promise.all([
-          rtdbGet(rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerId'), equalTo(effectiveUid))),
-          rtdbGet(rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerUid'), equalTo(effectiveUid))),
-        ]);
-
-        const merged = new Map<string, InvitationData>();
-        [snapById, snapByUid].forEach((snap) => {
-          if (snap.exists()) {
-            const val = snap.val();
-            const entries: InvitationData[] = Array.isArray(val)
-              ? val.filter(Boolean)
-              : Object.values(val || {});
-            entries.forEach((inv) => {
-              if (inv?.id) merged.set(inv.id, inv);
-            });
-          }
-        });
-
-        const sorted = Array.from(merged.values()).sort((a, b) =>
-          String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
-        );
-        mergeLocalInvitations(effectiveUid, sorted);
-        return sorted;
-      } catch (err) {
-        console.warn('RTDB getInvitations note:', err);
+    // Never run protected /invitations queries when Firebase is configured without a verified Firebase Auth user
+    if (isFirebaseConfigured() && auth) {
+      if (!auth.currentUser || !authUid) {
+        return [];
       }
-    }
 
-    // 2. Try Firestore
-    if (isFirebaseConfigured() && db && effectiveUid) {
-      try {
-        const col = collection(db, 'invitations');
-        const q = query(col, where('ownerId', '==', effectiveUid));
-        const snap = await safeFirestore(getDocs(q as any), 1500);
-        if (snap) {
-          const list: InvitationData[] = [];
-          snap.forEach((d) => list.push({ id: d.id, ...(d.data() as Record<string, any>) } as InvitationData));
-          mergeLocalInvitations(effectiveUid, list);
-          return list;
+      if (rtdb) {
+        try {
+          const [snapById, snapByUid] = await Promise.all([
+            rtdbGet(rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerId'), equalTo(authUid))),
+            rtdbGet(rtdbQuery(rtdbRef(rtdb, 'invitations'), orderByChild('ownerUid'), equalTo(authUid))),
+          ]);
+
+          const merged = new Map<string, InvitationData>();
+          [snapById, snapByUid].forEach((snap) => {
+            if (snap.exists()) {
+              const val = snap.val();
+              const entries: InvitationData[] = Array.isArray(val)
+                ? val.filter(Boolean)
+                : Object.values(val || {});
+              entries.forEach((inv) => {
+                if (inv?.id) merged.set(inv.id, inv);
+              });
+            }
+          });
+
+          const sorted = Array.from(merged.values()).sort((a, b) =>
+            String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+          );
+          mergeLocalInvitations(authUid, sorted);
+          return sorted;
+        } catch (err) {
+          console.warn('RTDB getInvitations note:', err);
         }
-      } catch (err) {
-        console.warn('Firestore getInvitations error:', err);
       }
+
+      if (db) {
+        try {
+          const col = collection(db, 'invitations');
+          const q = query(col, where('ownerId', '==', authUid));
+          const snap = await safeFirestore(getDocs(q as any), 1500);
+          if (snap) {
+            const list: InvitationData[] = [];
+            snap.forEach((d) => list.push({ id: d.id, ...(d.data() as Record<string, any>) } as InvitationData));
+            mergeLocalInvitations(authUid, list);
+            return list;
+          }
+        } catch (err) {
+          console.warn('Firestore getInvitations error:', err);
+        }
+      }
+
+      const cached = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
+      return cached.filter((inv) => inv.ownerId === authUid || inv.ownerUid === authUid);
     }
 
-    // 3. Local storage fallback (for offline or unauthenticated demo mode)
+    // Offline / non-Firebase demo fallback
+    const effectiveUid = userId || undefined;
     const list = getStored<InvitationData[]>(STORAGE_KEY_INVITATIONS, []);
     if (effectiveUid) {
       return list.filter((inv) => inv.ownerId === effectiveUid || inv.ownerUid === effectiveUid);
@@ -423,7 +451,9 @@ export const api = {
   async getInvitationById(id: string): Promise<InvitationData | null> {
     if (!id) return null;
 
-    if (isFirebaseConfigured() && rtdb) {
+    await ensureFirebaseAuthReady();
+
+    if (isFirebaseConfigured() && rtdb && (!auth || auth.currentUser)) {
       try {
         const snap = await rtdbGet(rtdbRef(rtdb, `invitations/${id}`));
         if (snap.exists()) {
@@ -869,7 +899,12 @@ export const api = {
   // -------------------------------------------------------------
   async getGuests(invitationSlug?: string, ownerId?: string): Promise<GuestRSVP[]> {
     let all: GuestRSVP[] = [];
-    const effectiveOwner = ownerId ? (getAuthenticatedUid() || ownerId) : undefined;
+    const authUid = ownerId ? await ensureFirebaseAuthReady() : null;
+    const effectiveOwner = ownerId ? authUid || undefined : undefined;
+
+    if (ownerId && isFirebaseConfigured() && auth && (!auth.currentUser || !effectiveOwner)) {
+      return [];
+    }
 
     // 1. Try Realtime Database using indexed queries when scoped
     if (isFirebaseConfigured() && rtdb && (effectiveOwner || invitationSlug)) {
@@ -1076,8 +1111,12 @@ export const api = {
   // ORDERS (USER-SCOPED & SERVER-OWNED)
   // -------------------------------------------------------------
   async getOrders(userId?: string): Promise<OrderItem[]> {
-    const authUid = getAuthenticatedUid();
+    const authUid = await ensureFirebaseAuthReady();
     const uid = authUid || userId || undefined;
+
+    if (isFirebaseConfigured() && auth && (!auth.currentUser || !authUid)) {
+      return [];
+    }
 
     if (isFirebaseConfigured() && rtdb && uid && auth?.currentUser && authUid) {
       const rtdbInstance = rtdb;
@@ -1121,6 +1160,7 @@ export const api = {
 
   async getOrderById(orderId: string): Promise<OrderItem | null> {
     if (!orderId) return null;
+    await ensureFirebaseAuthReady();
     if (isFirebaseConfigured() && rtdb && auth?.currentUser) {
       try {
         const snap = await rtdbGet(rtdbRef(rtdb, `orders/${orderId}`));

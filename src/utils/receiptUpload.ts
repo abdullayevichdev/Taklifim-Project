@@ -138,10 +138,11 @@ export async function uploadReceiptWithRetry(
       success: false,
       orderId: payload.orderId,
       status: 'pending_payment',
+      statusCode: 401,
       isNetworkError: false,
       idempotencyKey,
       error:
-        "Chek yuborish uchun Google yoki Email orqali hisobingizga kirilgan bo'lishi kerak.",
+        "Chek yuborish uchun Google, Apple ID yoki Email orqali hisobingizga kirilgan bo'lishi kerak.",
     };
   }
 

@@ -26,6 +26,7 @@ import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { isFirebaseConfigured, storage } from '../services/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ShareModal } from '../components/ShareModal';
+import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
 import { PhoneInput } from '../components/PhoneInput';
 import { GlassSurface, GlassButton } from '../components/glass';
 import confetti from 'canvas-confetti';
@@ -68,7 +69,7 @@ const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/taklifim_support';
 
 export const OrderStatusPage: React.FC = () => {
   const { params, navigate } = useRouter();
-  const { user, showToast } = useAuth();
+  const { user, authReady, hasFirebaseSession, showToast } = useAuth();
   const { language, t } = useLanguage();
   const paymentCopy = getPaymentCopy(language);
   const orderId = params.orderId || '';
@@ -235,13 +236,18 @@ export const OrderStatusPage: React.FC = () => {
     [orderId, user?.id, applyResolvedStatus]
   );
 
-  // Initial load + Real-time RTDB subscription
+  // Initial load + Real-time RTDB subscription (wait for Firebase authReady first)
   useEffect(() => {
+    if (!authReady) return;
     lastStatusRef.current = null;
     setLoading(true);
     setErrorCode('none');
 
     fetchOrderFromApi(false);
+
+    if (!hasFirebaseSession) {
+      return;
+    }
 
     const unsubRtdb = api.subscribeOrder(
       orderId,
@@ -280,7 +286,7 @@ export const OrderStatusPage: React.FC = () => {
     return () => {
       unsubRtdb();
     };
-  }, [orderId, user?.id, fetchOrderFromApi, applyResolvedStatus]);
+  }, [authReady, hasFirebaseSession, orderId, user?.id, fetchOrderFromApi, applyResolvedStatus]);
 
   // 5s background polling ONLY when pending_review & document is visible; instant refresh on visibilitychange
   useEffect(() => {
@@ -396,8 +402,22 @@ export const OrderStatusPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (hasFirebaseSession) {
+      setUploadError('');
+    }
+  }, [hasFirebaseSession]);
+
   const handleReuploadSubmit = async () => {
     if (!order || receiptSubmitLockRef.current || isUploadingReceipt) return;
+
+    if (!hasFirebaseSession) {
+      setUploadError(
+        t.auth?.errors?.receiptAuthRequiredDesc ||
+          'Chek yuborish uchun Google, Apple ID yoki Email orqali hisobingizga kirilgan bo‘lishi kerak.'
+      );
+      return;
+    }
 
     const isPdf =
       preparedFileType === 'application/pdf' ||
@@ -553,6 +573,11 @@ export const OrderStatusPage: React.FC = () => {
                 : t.orderStatusPage.notFoundDesc}
             </p>
           </div>
+          {errorCode === 'unauthorized' && authReady && !hasFirebaseSession && (
+            <div className="text-left">
+              <ReceiptAuthPrompt />
+            </div>
+          )}
           <GlassButton
             tone="tinted"
             size="md"
@@ -830,6 +855,8 @@ export const OrderStatusPage: React.FC = () => {
               <h2 className="font-playfair text-lg font-bold text-[#1E1418]">
                 {t.orderStatusPage.reuploadHeading}
               </h2>
+
+              {authReady && !hasFirebaseSession && <ReceiptAuthPrompt />}
 
               {!existingPhoneValid && (
                 <div className="space-y-1.5">

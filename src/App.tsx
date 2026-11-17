@@ -69,17 +69,20 @@ const RouteLoadingFallback: React.FC = () => (
 
 // Protected Route — faqat login bo'lgan foydalanuvchilar uchun
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isLoggedIn } = useAuth();
-  const { navigate } = useRouter();
+  const { isLoggedIn, authReady } = useAuth();
+  const { path, navigate } = useRouter();
   const { t } = useLanguage();
 
   React.useEffect(() => {
-    if (!isLoggedIn) {
-      navigate('/login');
+    if (authReady && !isLoggedIn) {
+      const target = path && path.startsWith('/') && !path.startsWith('/login')
+        ? `/login?redirect=${encodeURIComponent(path)}`
+        : '/login';
+      navigate(target);
     }
-  }, [isLoggedIn]);
+  }, [authReady, isLoggedIn, path, navigate]);
 
-  if (!isLoggedIn) {
+  if (!authReady || !isLoggedIn) {
     return (
       <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">

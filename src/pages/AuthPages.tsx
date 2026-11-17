@@ -69,23 +69,41 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
   const {
     user,
     isLoggedIn,
+    authReady,
+    hasFirebaseSession,
     loginWithGoogle,
     loginWithApple,
     sendPhoneOtp,
     verifyPhoneOtp,
     loginWithEmail,
     registerWithEmail,
+    sendPasswordReset,
     showToast,
   } = useAuth();
 
+  const redirectTarget = useMemo(() => {
+    try {
+      const search = path.includes('?')
+        ? path.slice(path.indexOf('?'))
+        : typeof window !== 'undefined'
+        ? window.location.search
+        : '';
+      const raw = new URLSearchParams(search).get('redirect') || '';
+      if (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/login') && !raw.startsWith('/register')) {
+        return raw;
+      }
+    } catch {}
+    return '/my-invitations';
+  }, [path]);
+
   useEffect(() => {
-    if (isLoggedIn && user) {
+    if (authReady && isLoggedIn && user && hasFirebaseSession) {
       const timer = setTimeout(() => {
-        navigate('/my-invitations');
+        navigate(redirectTarget);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isLoggedIn, user, navigate]);
+  }, [authReady, isLoggedIn, user, hasFirebaseSession, navigate, redirectTarget]);
 
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => {
     if (path.includes('/register')) return 'register';
@@ -147,9 +165,11 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     setFormError(null);
     setIsSubmitting(true);
     try {
-      const success = await loginWithGoogle();
-      if (success) {
-        navigate('/my-invitations');
+      const res = await loginWithGoogle();
+      if (res.success) {
+        navigate(redirectTarget);
+      } else if (res.message) {
+        setFormError(res.message);
       }
     } finally {
       setIsSubmitting(false);
@@ -162,9 +182,11 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     setFormError(null);
     setIsSubmitting(true);
     try {
-      const success = await loginWithApple();
-      if (success) {
-        navigate('/my-invitations');
+      const res = await loginWithApple();
+      if (res.success) {
+        navigate(redirectTarget);
+      } else if (res.message) {
+        setFormError(res.message);
       }
     } finally {
       setIsSubmitting(false);
@@ -215,7 +237,7 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     const res = await verifyPhoneOtp(phone, otpCode.trim(), name);
     setIsSubmitting(false);
     if (res.success) {
-      navigate('/my-invitations');
+      navigate(redirectTarget);
     } else if (res.message) {
       setFormError(res.message);
     }
@@ -232,8 +254,14 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
         reportError(t.auth.errEmailInvalid);
         return;
       }
-      setRecoverySent(true);
-      showToast(t.auth.toastResetSent, 'info');
+      setIsSubmitting(true);
+      const resetRes = await sendPasswordReset(email);
+      setIsSubmitting(false);
+      if (resetRes.success) {
+        setRecoverySent(true);
+      } else if (resetRes.message) {
+        setFormError(resetRes.message);
+      }
       return;
     }
 
@@ -246,7 +274,7 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
       const res = await loginWithEmail(email, password);
       setIsSubmitting(false);
       if (res.success) {
-        navigate('/my-invitations');
+        navigate(redirectTarget);
       } else if (res.message) {
         setFormError(res.message);
       }
@@ -284,14 +312,14 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
     });
     setIsSubmitting(false);
     if (res.success) {
-      navigate('/my-invitations');
+      navigate(redirectTarget);
     } else if (res.message) {
       setFormError(res.message);
     }
   };
 
-  // If already logged in, show instant confirmation glass card and navigate
-  if (isLoggedIn && user) {
+  // If already logged in with an active Firebase session, show instant confirmation glass card and navigate
+  if (authReady && isLoggedIn && user && hasFirebaseSession) {
     return (
       <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center px-3.5 sm:px-4 relative">
         <GlassSurface
@@ -315,7 +343,7 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
             <GlassButton
               tone="tinted"
               size="lg"
-              onClick={() => navigate('/my-invitations')}
+              onClick={() => navigate(redirectTarget)}
               rightIcon={<ArrowRight className="w-4 h-4 shrink-0" />}
               className="w-full justify-center"
             >
@@ -389,7 +417,9 @@ export const AuthPages: React.FC<{ initialMode?: 'login' | 'register' | 'forgot'
             onChange={(val) => {
               setFormError(null);
               setMode(val);
-              navigate(val === 'register' ? '/register' : '/login');
+              const qIdx = path.indexOf('?');
+              const search = qIdx >= 0 ? path.slice(qIdx) : typeof window !== 'undefined' ? window.location.search : '';
+              navigate(`${val === 'register' ? '/register' : '/login'}${search}`);
             }}
             ariaLabel={`${t.auth.loginTab} / ${t.auth.registerTab}`}
             className="taklifim-auth-seg"

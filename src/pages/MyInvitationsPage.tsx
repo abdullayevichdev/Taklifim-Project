@@ -49,7 +49,7 @@ const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/taklifim_support';
 
 export const MyInvitationsPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user, showToast } = useAuth();
+  const { user, authReady, hasFirebaseSession, showToast } = useAuth();
   const { language, t } = useLanguage();
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
@@ -73,7 +73,8 @@ export const MyInvitationsPage: React.FC = () => {
   const highlightTimersRef = useRef<Map<string, number>>(new Map());
 
   const loadInitialData = useCallback(async () => {
-    if (!user?.id) {
+    if (!authReady) return;
+    if (!user?.id || !hasFirebaseSession) {
       setLoading(false);
       return;
     }
@@ -94,14 +95,15 @@ export const MyInvitationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [authReady, user?.id, hasFirebaseSession]);
 
   useEffect(() => {
+    if (!authReady) return;
     statusBaselineReadyRef.current = false;
     prevStatusesRef.current.clear();
     loadInitialData();
 
-    if (!user?.id) return;
+    if (!user?.id || !hasFirebaseSession) return;
 
     const unsubInvitations = api.subscribeUserInvitations(
       user.id,
@@ -143,7 +145,7 @@ export const MyInvitationsPage: React.FC = () => {
       unsubOrders();
       unsubGuests();
     };
-  }, [user?.id, loadInitialData]);
+  }, [authReady, user?.id, hasFirebaseSession, loadInitialData]);
 
   // Backfill legacy orders that have inv.orderId but are not yet indexed under userOrders/{uid}
   useEffect(() => {

@@ -10,9 +10,13 @@ import {
   OAuthProvider,
   signInWithPopup,
   sendEmailVerification,
+  sendPasswordResetEmail,
+  updateProfile,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref as rtdbRef, set as rtdbSet, get as rtdbGet } from 'firebase/database';
+import { ref as rtdbRef, set as rtdbSet, update as rtdbUpdate, get as rtdbGet } from 'firebase/database';
 import { getStoredLanguage, translations } from '../locales';
 
 const getAuthT = () => translations[getStoredLanguage()]?.auth || translations.uz.auth;
@@ -35,22 +39,30 @@ export interface UserProfile {
   deviceFingerprint?: string;
 }
 
+export interface AuthActionResult {
+  success: boolean;
+  message?: string;
+}
+
 interface AuthContextType {
   // User authentication
   isLoggedIn: boolean;
+  authReady: boolean;
+  hasFirebaseSession: boolean;
   user: UserProfile | null;
   login: (emailOrPhone: string, password?: string) => Promise<boolean>;
   register: (data: { name: string; email: string; phone: string; password?: string }) => Promise<boolean>;
   logout: () => Promise<void>;
 
   // Professional real-time auth methods
-  loginWithGoogle: () => Promise<boolean>;
-  loginWithApple: () => Promise<boolean>;
+  loginWithGoogle: () => Promise<AuthActionResult>;
+  loginWithApple: () => Promise<AuthActionResult>;
   sendPhoneOtp: (phone: string) => Promise<{ success: boolean; message: string; otpCode?: string }>;
-  verifyPhoneOtp: (phone: string, otp: string, name?: string) => Promise<{ success: boolean; message?: string }>;
-  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  registerWithEmail: (data: { name: string; email: string; phone?: string; password: string }) => Promise<{ success: boolean; message?: string }>;
-  registerSimple: (data: { name: string; phone: string; password: string }) => Promise<{ success: boolean; message?: string }>;
+  verifyPhoneOtp: (phone: string, otp: string, name?: string) => Promise<AuthActionResult>;
+  loginWithEmail: (email: string, password: string) => Promise<AuthActionResult>;
+  registerWithEmail: (data: { name: string; email: string; phone?: string; password: string }) => Promise<AuthActionResult>;
+  sendPasswordReset: (email: string) => Promise<AuthActionResult>;
+  registerSimple: (data: { name: string; phone: string; password: string }) => Promise<AuthActionResult>;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 
   // 1-martalik bepul tarif tekshiruvi (IP/Device/Account nazorati)
@@ -67,6 +79,16 @@ interface AuthContextType {
   toasts: ToastMessage[];
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   removeToast: (id: string) => void;
+}
+
+function isLegacyFakeId(id?: string): boolean {
+  if (!id) return true;
+  return (
+    id === 'anonymous' ||
+    id.startsWith('google_') ||
+    id.startsWith('apple_') ||
+    id.startsWith('usr_')
+  );
 }
 
 // Device fingerprint generator
@@ -109,23 +131,45 @@ function translateAuthError(errCode: string): string {
       return errT.popupBlocked;
     case 'auth/network-request-failed':
       return errT.networkFailed;
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+      return errT.providerNotEnabled || errT.generic;
+    case 'auth/unauthorized-domain':
+      return errT.unauthorizedDomain || errT.generic;
+    case 'auth/account-exists-with-different-credential':
+      return errT.accountExistsDifferentCredential || errT.generic;
     default:
       return errT.generic;
   }
 }
 
+function inferProviderFromFirebaseUser(
+  fbUser: FirebaseUser,
+  existingProvider?: UserProfile['authProvider']
+): UserProfile['authProvider'] {
+  const providerIds = (fbUser.providerData || []).map((p) => p?.providerId).filter(Boolean);
+  if (providerIds.includes('google.com')) return 'google';
+  if (providerIds.includes('apple.com')) return 'apple';
+  if (providerIds.includes('phone')) return 'phone';
+  if (providerIds.includes('password')) return 'email';
+  return existingProvider || 'email';
+}
+
 const AuthContext = createContext<AuthContextType>({
   isLoggedIn: false,
+  authReady: false,
+  hasFirebaseSession: false,
   user: null,
   login: async () => false,
   register: async () => false,
   logout: async () => {},
-  loginWithGoogle: async () => false,
-  loginWithApple: async () => false,
+  loginWithGoogle: async () => ({ success: false }),
+  loginWithApple: async () => ({ success: false }),
   sendPhoneOtp: async () => ({ success: false, message: '' }),
   verifyPhoneOtp: async () => ({ success: false }),
   loginWithEmail: async () => ({ success: false }),
   registerWithEmail: async () => ({ success: false }),
+  sendPasswordReset: async () => ({ success: false }),
   registerSimple: async () => ({ success: false }),
   updateUserProfile: async () => {},
   canUseFreePlan: () => true,
@@ -145,7 +189,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem('taklifim_active_user');
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(saved) as UserProfile;
+        if (isFirebaseConfigured() && isLegacyFakeId(parsed?.id)) {
+          localStorage.removeItem('taklifim_active_user');
+          return null;
+        }
         if (parsed.phone === '+998 90 123 45 67') {
           parsed.phone = '';
           localStorage.setItem('taklifim_active_user', JSON.stringify(parsed));
@@ -158,57 +206,142 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  const [authReady, setAuthReady] = useState<boolean>(() => !isFirebaseConfigured() || !auth);
+  const [hasFirebaseSession, setHasFirebaseSession] = useState<boolean>(() => Boolean(auth?.currentUser));
+
   const isLoggedIn = !!user;
+
+  // Helper to persist user to Realtime Database + Firestore + LocalStorage
+  const persistUser = async (resolvedUser: UserProfile) => {
+    const cleanUser = Object.fromEntries(
+      Object.entries(resolvedUser).filter(([, value]) => value !== undefined)
+    ) as UserProfile;
+
+    setUser(cleanUser);
+    try {
+      localStorage.setItem('taklifim_active_user', JSON.stringify(cleanUser));
+    } catch {}
+
+    if (isFirebaseConfigured() && rtdb && cleanUser.id && auth?.currentUser?.uid === cleanUser.id) {
+      try {
+        await rtdbUpdate(rtdbRef(rtdb, `users/${cleanUser.id}`), cleanUser);
+      } catch (err) {
+        console.warn('RTDB persistUser error:', err);
+      }
+    }
+
+    if (isFirebaseConfigured() && db && cleanUser.id && auth?.currentUser?.uid === cleanUser.id) {
+      try {
+        await setDoc(doc(db, 'users', cleanUser.id), cleanUser, { merge: true });
+      } catch (err) {
+        console.warn('Firestore persistUser error:', err);
+      }
+    }
+  };
+
+  // Merge FirebaseUser with any existing RTDB/Firestore user profile without overwriting user-edited fields
+  const syncFirebaseUserProfile = async (
+    fbUser: FirebaseUser,
+    preferredProvider?: UserProfile['authProvider'],
+    explicitFields?: { name?: string; phone?: string }
+  ): Promise<UserProfile> => {
+    let profileData: Partial<UserProfile> = {};
+
+    if (rtdb) {
+      try {
+        const snap = await rtdbGet(rtdbRef(rtdb, `users/${fbUser.uid}`));
+        if (snap.exists()) {
+          profileData = snap.val() as UserProfile;
+        }
+      } catch {}
+    }
+
+    if (!profileData.name && db) {
+      try {
+        const snap = await getDoc(doc(db, 'users', fbUser.uid));
+        if (snap.exists()) {
+          profileData = snap.data() as UserProfile;
+        }
+      } catch {}
+    }
+
+    const rawPhone = explicitFields?.phone || profileData.phone || fbUser.phoneNumber || '';
+    const cleanPhone = rawPhone === '+998 90 123 45 67' ? '' : rawPhone;
+    const provider = inferProviderFromFirebaseUser(
+      fbUser,
+      preferredProvider || (profileData.authProvider as UserProfile['authProvider'])
+    );
+    const defaultName =
+      provider === 'apple' ? getAuthT().appleUserDefault : getAuthT().alreadyLoggedUser;
+
+    const resolvedUser: UserProfile = {
+      id: fbUser.uid,
+      name:
+        explicitFields?.name?.trim() ||
+        profileData.name ||
+        fbUser.displayName ||
+        fbUser.email?.split('@')[0] ||
+        defaultName,
+      email: fbUser.email || profileData.email || '',
+      phone: cleanPhone,
+      photoURL: fbUser.photoURL || profileData.photoURL,
+      authProvider: provider,
+      freePlanUsed:
+        profileData.freePlanUsed ?? (localStorage.getItem('taklifim_free_plan_used') === 'true'),
+      createdAt:
+        profileData.createdAt || fbUser.metadata?.creationTime || new Date().toISOString(),
+      deviceFingerprint: profileData.deviceFingerprint || getDeviceFingerprint(),
+    };
+
+    const needsRemoteSync =
+      !profileData.id ||
+      profileData.email !== resolvedUser.email ||
+      (!profileData.photoURL && Boolean(resolvedUser.photoURL)) ||
+      (Boolean(explicitFields?.name) && profileData.name !== resolvedUser.name) ||
+      (Boolean(explicitFields?.phone) && profileData.phone !== resolvedUser.phone);
+
+    if (needsRemoteSync) {
+      await persistUser(resolvedUser);
+    } else {
+      setUser(resolvedUser);
+      try {
+        localStorage.setItem('taklifim_active_user', JSON.stringify(resolvedUser));
+      } catch {}
+    }
+
+    return resolvedUser;
+  };
 
   // Real-time synchronization with Firebase Auth and Database
   useEffect(() => {
     if (isFirebaseConfigured() && auth) {
+      setPersistence(auth, browserLocalPersistence).catch(() => {});
+
       const unsub = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
-          let profileData: Partial<UserProfile> = {};
-
-          // 1. Try Realtime Database first for speed
-          if (rtdb) {
-            try {
-              const snap = await rtdbGet(rtdbRef(rtdb, `users/${fbUser.uid}`));
-              if (snap.exists()) {
-                profileData = snap.val() as UserProfile;
-              }
-            } catch {}
-          }
-
-          // 2. Try Firestore if not in RTDB
-          if (!profileData.name && db) {
-            try {
-              const snap = await getDoc(doc(db, 'users', fbUser.uid));
-              if (snap.exists()) {
-                profileData = snap.data() as UserProfile;
-              }
-            } catch {}
-          }
-
-          const rawPhone = profileData.phone || fbUser.phoneNumber || '';
-          const cleanPhone = rawPhone === '+998 90 123 45 67' ? '' : rawPhone;
-
-          const resolvedUser: UserProfile = {
-            id: fbUser.uid,
-            name: profileData.name || fbUser.displayName || getAuthT().alreadyLoggedUser,
-            email: fbUser.email || profileData.email || '',
-            phone: cleanPhone,
-            photoURL: fbUser.photoURL || profileData.photoURL,
-            authProvider: (profileData.authProvider as any) || (fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email'),
-            freePlanUsed: profileData.freePlanUsed ?? (localStorage.getItem('taklifim_free_plan_used') === 'true'),
-            createdAt: profileData.createdAt || new Date().toISOString(),
-            deviceFingerprint: getDeviceFingerprint(),
-          };
-
-          setUser(resolvedUser);
+          setHasFirebaseSession(true);
           try {
-            localStorage.setItem('taklifim_active_user', JSON.stringify(resolvedUser));
-          } catch {}
+            await syncFirebaseUserProfile(fbUser);
+          } finally {
+            setAuthReady(true);
+          }
+        } else {
+          setHasFirebaseSession(false);
+          setUser((prev) => {
+            if (prev && prev.authProvider === 'phone' && prev.id.startsWith('phone_')) {
+              return prev;
+            }
+            try {
+              localStorage.removeItem('taklifim_active_user');
+            } catch {}
+            return null;
+          });
+          setAuthReady(true);
         }
       });
       return () => unsub();
+    } else {
+      setAuthReady(true);
     }
   }, []);
 
@@ -231,143 +364,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('taklifim_active_user', JSON.stringify(updated));
       } catch {}
 
-      if (isFirebaseConfigured() && rtdb && user.id) {
+      if (isFirebaseConfigured() && rtdb && user.id && auth?.currentUser?.uid === user.id) {
         rtdbSet(rtdbRef(rtdb, `users/${user.id}/freePlanUsed`), true).catch(() => {});
       }
-      if (isFirebaseConfigured() && db && user.id) {
+      if (isFirebaseConfigured() && db && user.id && auth?.currentUser?.uid === user.id) {
         setDoc(doc(db, 'users', user.id), { freePlanUsed: true }, { merge: true }).catch(() => {});
       }
     }
   };
 
-  // Helper to persist user to Realtime Database + Firestore + LocalStorage
-  const persistUser = async (resolvedUser: UserProfile) => {
-    setUser(resolvedUser);
-    try {
-      localStorage.setItem('taklifim_active_user', JSON.stringify(resolvedUser));
-    } catch {}
-
-    if (isFirebaseConfigured() && rtdb && resolvedUser.id && auth?.currentUser?.uid === resolvedUser.id) {
-      try {
-        await rtdbSet(rtdbRef(rtdb, `users/${resolvedUser.id}`), resolvedUser);
-      } catch (err) {
-        console.warn('RTDB persistUser error:', err);
-      }
+  // 1. GOOGLE ORQALI HAQIQIY KIRISH
+  const loginWithGoogle = async (): Promise<AuthActionResult> => {
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
 
-    if (isFirebaseConfigured() && db && resolvedUser.id) {
-      try {
-        await setDoc(doc(db, 'users', resolvedUser.id), resolvedUser, { merge: true });
-      } catch (err) {
-        console.warn('Firestore persistUser error:', err);
-      }
-    }
-  };
-
-  // 1. GOOGLE ORQALI HAQIQIY VA XATOSIZ KIRISH
-  const loginWithGoogle = async (): Promise<boolean> => {
     try {
-      let googleUser: any = null;
-      if (isFirebaseConfigured() && auth) {
-        try {
-          const provider = new GoogleAuthProvider();
-          provider.setCustomParameters({ prompt: 'select_account' });
-          const res = await signInWithPopup(auth, provider);
-          googleUser = res.user;
-        } catch (popupErr: any) {
-          console.warn('Firebase Google Auth popup notice:', popupErr);
-          // If popup is closed or handshake blocked by iframe sandbox, we still complete authentication seamlessly
-        }
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const res = await signInWithPopup(auth, provider);
+      const googleUser = res.user;
+
+      if (!googleUser?.uid) {
+        const msg = getAuthT().errors.generic;
+        showToast(msg, 'error');
+        return { success: false, message: msg };
       }
 
-      const fp = getDeviceFingerprint();
-      const resolvedUser: UserProfile = {
-        id: googleUser?.uid || `google_${Date.now()}`,
-        name: googleUser?.displayName || getAuthT().alreadyLoggedUser,
-        email: googleUser?.email || 'user@taklifim.uz',
-        phone: googleUser?.phoneNumber || '',
-        photoURL: googleUser?.photoURL || undefined,
-        authProvider: 'google',
-        freePlanUsed: !canUseFreePlan(),
-        createdAt: new Date().toISOString(),
-        deviceFingerprint: fp,
-      };
-
-      await persistUser(resolvedUser);
+      setHasFirebaseSession(true);
+      const resolvedUser = await syncFirebaseUserProfile(googleUser, 'google');
       showToast(`${getAuthT().toastGoogleWelcomePrefix} ${resolvedUser.name}!`, 'success');
-      return true;
+      return { success: true };
     } catch (err: any) {
-      console.error('Google login error:', err);
-      const fp = getDeviceFingerprint();
-      const fallbackUser: UserProfile = {
-        id: `google_${Date.now()}`,
-        name: getAuthT().alreadyLoggedUser,
-        email: 'user@taklifim.uz',
-        phone: '',
-        photoURL: undefined,
-        authProvider: 'google',
-        freePlanUsed: !canUseFreePlan(),
-        createdAt: new Date().toISOString(),
-        deviceFingerprint: fp,
-      };
-      await persistUser(fallbackUser);
-      showToast(`${getAuthT().toastGoogleWelcomePrefix} ${fallbackUser.name}!`, 'success');
-      return true;
+      console.warn('Firebase Google Auth error:', err?.code || err?.message);
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
   };
 
-  // 2. APPLE ID ORQALI XATOSIZ KIRISH
-  const loginWithApple = async (): Promise<boolean> => {
+  // 2. APPLE ID ORQALI HAQIQIY KIRISH
+  const loginWithApple = async (): Promise<AuthActionResult> => {
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+
     try {
-      let appleUser: any = null;
-      if (isFirebaseConfigured() && auth) {
-        try {
-          const provider = new OAuthProvider('apple.com');
-          provider.addScope('email');
-          provider.addScope('name');
-          const res = await signInWithPopup(auth, provider);
-          appleUser = res.user;
-        } catch (popupErr: any) {
-          console.warn('Firebase Apple Auth notice:', popupErr);
-        }
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      const res = await signInWithPopup(auth, provider);
+      const appleUser = res.user;
+
+      if (!appleUser?.uid) {
+        const msg = getAuthT().errors.generic;
+        showToast(msg, 'error');
+        return { success: false, message: msg };
       }
 
-      const fp = getDeviceFingerprint();
-      const resolvedUser: UserProfile = {
-        id: appleUser?.uid || `apple_${Date.now()}`,
-        name: appleUser?.displayName || getAuthT().appleUserDefault,
-        email: appleUser?.email || `apple_user_${Date.now().toString().slice(-6)}@apple.com`,
-        phone: appleUser?.phoneNumber || '',
-        photoURL: appleUser?.photoURL || undefined,
-        authProvider: 'apple',
-        freePlanUsed: !canUseFreePlan(),
-        createdAt: new Date().toISOString(),
-        deviceFingerprint: fp,
-      };
-
-      await persistUser(resolvedUser);
+      setHasFirebaseSession(true);
+      await syncFirebaseUserProfile(appleUser, 'apple');
       showToast(getAuthT().toastAppleSuccess, 'success');
-      return true;
+      return { success: true };
     } catch (err: any) {
-      console.error('Apple login error:', err);
-      const fp = getDeviceFingerprint();
-      const fallbackUser: UserProfile = {
-        id: `apple_${Date.now()}`,
-        name: getAuthT().appleUserDefault,
-        email: `apple_user_${Date.now().toString().slice(-6)}@apple.com`,
-        phone: '',
-        authProvider: 'apple',
-        freePlanUsed: !canUseFreePlan(),
-        createdAt: new Date().toISOString(),
-        deviceFingerprint: fp,
-      };
-      await persistUser(fallbackUser);
-      showToast(getAuthT().toastAppleSuccess, 'success');
-      return true;
+      console.warn('Firebase Apple Auth error:', err?.code || err?.message);
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
   };
 
-  // 3. TELEFON RAQAMI VA SMS OTP ORQALI KIRISH
+  // 3. TELEFON RAQAMI VA SMS OTP ORQALI KIRISH (lokal fallback, Firebase token bermaydi)
   const sendPhoneOtp = async (phone: string): Promise<{ success: boolean; message: string; otpCode?: string }> => {
     const cleanPhone = phone.replace(/[^\d+]/g, '');
     if (!cleanPhone || cleanPhone.length < 9) {
@@ -391,7 +464,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone: string,
     otp: string,
     name?: string
-  ): Promise<{ success: boolean; message?: string }> => {
+  ): Promise<AuthActionResult> => {
     const cleanPhone = phone.replace(/[^\d+]/g, '');
     const savedOtp = sessionStorage.getItem(`taklifim_otp_${cleanPhone}`);
 
@@ -423,119 +496,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string;
     phone?: string;
     password: string;
-  }): Promise<{ success: boolean; message?: string }> => {
+  }): Promise<AuthActionResult> => {
     const email = data.email.trim();
-    const fp = getDeviceFingerprint();
-    const isFreeUsed = !canUseFreePlan();
+    const cleanName = data.name.trim();
 
-    if (isFirebaseConfigured() && auth) {
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, data.password);
-        const fbUser = cred.user;
-
-        try {
-          await sendEmailVerification(fbUser);
-        } catch {}
-
-        const newUser: UserProfile = {
-          id: fbUser.uid,
-          name: data.name.trim(),
-          email: fbUser.email || email,
-          phone: data.phone?.trim() || '',
-          authProvider: 'email',
-          freePlanUsed: isFreeUsed,
-          createdAt: new Date().toISOString(),
-          deviceFingerprint: fp,
-        };
-
-        await persistUser(newUser);
-        showToast(getAuthT().toastRegisterSuccess, 'success');
-        return { success: true };
-      } catch (err: any) {
-        if (err.code === 'auth/configuration-not-found' || err.message?.includes('configuration-not-found')) {
-          const localUid = `usr_${Date.now()}`;
-          const newUser: UserProfile = {
-            id: localUid,
-            name: data.name.trim(),
-            email,
-            phone: data.phone?.trim() || '',
-            authProvider: 'email',
-            freePlanUsed: isFreeUsed,
-            createdAt: new Date().toISOString(),
-            deviceFingerprint: fp,
-          };
-          await persistUser(newUser);
-          showToast(getAuthT().toastRegisterSuccess, 'success');
-          return { success: true };
-        }
-
-        const msg = translateAuthError(err.code || '');
-        showToast(msg, 'error');
-        return { success: false, message: msg };
-      }
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
 
-    const newUser: UserProfile = {
-      id: `usr_${Date.now()}`,
-      name: data.name.trim(),
-      email,
-      phone: data.phone?.trim() || '',
-      authProvider: 'email',
-      freePlanUsed: isFreeUsed,
-      createdAt: new Date().toISOString(),
-      deviceFingerprint: fp,
-    };
-    await persistUser(newUser);
-    showToast(getAuthT().toastRegisterSuccess, 'success');
-    return { success: true };
+    try {
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      const cred = await createUserWithEmailAndPassword(auth, email, data.password);
+      const fbUser = cred.user;
+
+      await updateProfile(fbUser, { displayName: cleanName }).catch(() => {});
+      sendEmailVerification(fbUser).catch(() => {});
+
+      setHasFirebaseSession(true);
+      await syncFirebaseUserProfile(fbUser, 'email', {
+        name: cleanName,
+        phone: data.phone?.trim() || '',
+      });
+      showToast(getAuthT().toastRegisterSuccess, 'success');
+      return { success: true };
+    } catch (err: any) {
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
   };
 
   // 4B. EMAIL VA PAROL ORQALI KIRISH
-  const loginWithEmail = async (emailOrPhone: string, password: string): Promise<{ success: boolean; message?: string }> => {
+  const loginWithEmail = async (emailOrPhone: string, password: string): Promise<AuthActionResult> => {
     const email = emailOrPhone.includes('@')
       ? emailOrPhone.trim()
       : `${emailOrPhone.replace(/\D/g, '')}@taklifim.uz`;
 
-    if (isFirebaseConfigured() && auth && password) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        showToast(getAuthT().toastLoginSuccess, 'success');
-        return { success: true };
-      } catch (err: any) {
-        if (err.code === 'auth/configuration-not-found' || err.message?.includes('configuration-not-found')) {
-          const registeredRaw = localStorage.getItem('taklifim_registered_users');
-          const registeredList: UserProfile[] = registeredRaw ? JSON.parse(registeredRaw) : [];
-          const found = registeredList.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-          if (found) {
-            await persistUser(found);
-            showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${found.name}!`, 'success');
-            return { success: true };
-          }
-
-          const newUser: UserProfile = {
-            id: `usr_${Date.now()}`,
-            name: email.split('@')[0],
-            email,
-            phone: '',
-            authProvider: 'email',
-            freePlanUsed: !canUseFreePlan(),
-            createdAt: new Date().toISOString(),
-            deviceFingerprint: getDeviceFingerprint(),
-          };
-          await persistUser(newUser);
-          showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${newUser.name}!`, 'success');
-          return { success: true };
-        }
-
-        const msg = translateAuthError(err.code || '');
-        showToast(msg, 'error');
-        return { success: false, message: msg };
-      }
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
 
-    const ok = await login(emailOrPhone, password);
-    return { success: ok };
+    if (!password) {
+      const msg = getAuthT().errEmailOrPassMissing;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+
+    try {
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      setHasFirebaseSession(true);
+      await syncFirebaseUserProfile(cred.user, 'email');
+      showToast(getAuthT().toastLoginSuccess, 'success');
+      return { success: true };
+    } catch (err: any) {
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+  };
+
+  // 4C. PAROLNI TIKLASH
+  const sendPasswordReset = async (emailInput: string): Promise<AuthActionResult> => {
+    const email = emailInput.trim();
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast(getAuthT().toastResetSent, 'info');
+      return { success: true };
+    } catch (err: any) {
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
   };
 
   // 5. ODDIY RO'YXATDAN O'TISH
@@ -543,100 +585,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     name: string;
     phone: string;
     password: string;
-  }): Promise<{ success: boolean; message?: string }> => {
+  }): Promise<AuthActionResult> => {
     const cleanDigits = data.phone.replace(/\D/g, '');
     const virtualEmail = `${cleanDigits}@taklifim.uz`;
-    const fp = getDeviceFingerprint();
-    const isFreeUsed = !canUseFreePlan();
 
-    let fbUid: string | null = null;
-    if (isFirebaseConfigured() && auth && data.password) {
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, virtualEmail, data.password);
-        fbUid = cred.user.uid;
-      } catch (err: any) {
-        if (err.code === 'auth/email-already-in-use') {
-          try {
-            const cred = await signInWithEmailAndPassword(auth, virtualEmail, data.password);
-            fbUid = cred.user.uid;
-          } catch {}
-        }
-      }
+    if (!isFirebaseConfigured() || !auth) {
+      const msg = getAuthT().errors.providerNotEnabled || getAuthT().errors.generic;
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
 
-    const newUser: UserProfile = {
-      id: fbUid || `usr_phone_${cleanDigits || Date.now()}`,
-      name: data.name.trim(),
-      email: data.phone,
-      phone: data.phone.trim(),
-      authProvider: 'simple',
-      freePlanUsed: isFreeUsed,
-      createdAt: new Date().toISOString(),
-      deviceFingerprint: fp,
-    };
-
-    await persistUser(newUser);
-
     try {
-      const registeredRaw = localStorage.getItem('taklifim_registered_users');
-      const registeredList: UserProfile[] = registeredRaw ? JSON.parse(registeredRaw) : [];
-      registeredList.push(newUser);
-      localStorage.setItem('taklifim_registered_users', JSON.stringify(registeredList));
-    } catch {}
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      let fbUser: FirebaseUser;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, virtualEmail, data.password);
+        fbUser = cred.user;
+      } catch (err: any) {
+        if (err?.code === 'auth/email-already-in-use') {
+          const cred = await signInWithEmailAndPassword(auth, virtualEmail, data.password);
+          fbUser = cred.user;
+        } else {
+          throw err;
+        }
+      }
 
-    showToast(getAuthT().toastRegisterSuccess, 'success');
-    return { success: true };
+      await updateProfile(fbUser, { displayName: data.name.trim() }).catch(() => {});
+      setHasFirebaseSession(true);
+      await syncFirebaseUserProfile(fbUser, 'simple', {
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+      });
+      showToast(getAuthT().toastRegisterSuccess, 'success');
+      return { success: true };
+    } catch (err: any) {
+      const msg = translateAuthError(err?.code || '');
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
   };
 
   // Standart login
   const login = async (emailOrPhone: string, password?: string): Promise<boolean> => {
-    const email = emailOrPhone.includes('@') ? emailOrPhone.trim() : `${emailOrPhone.replace(/\D/g, '')}@taklifim.uz`;
-
-    if (isFirebaseConfigured() && auth && password) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        showToast(getAuthT().toastLoginSuccess, 'success');
-        return true;
-      } catch (err: any) {
-        console.warn('Firebase login attempt fallback to local auth:', err.message);
-      }
-    }
-
-    try {
-      const registeredRaw = localStorage.getItem('taklifim_registered_users');
-      const registeredList: UserProfile[] = registeredRaw ? JSON.parse(registeredRaw) : [];
-      const found = registeredList.find((u) => u.email.toLowerCase() === email.toLowerCase() || u.phone.includes(emailOrPhone));
-
-      if (found) {
-        await persistUser(found);
-        showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${found.name}!`, 'success');
-        return true;
-      }
-    } catch {}
-
-    const newUser: UserProfile = {
-      id: `usr_${Date.now()}`,
-      name: emailOrPhone.split('@')[0] || getAuthT().alreadyLoggedUser,
-      email: emailOrPhone.includes('@') ? emailOrPhone : 'user@taklifim.uz',
-      phone: !emailOrPhone.includes('@') ? emailOrPhone : '',
-      authProvider: 'simple',
-      freePlanUsed: !canUseFreePlan(),
-      createdAt: new Date().toISOString(),
-      deviceFingerprint: getDeviceFingerprint(),
-    };
-
-    await persistUser(newUser);
-    showToast(`${getAuthT().alreadyLoggedWelcomePrefix} ${newUser.name}!`, 'success');
-    return true;
+    if (!password) return false;
+    const res = await loginWithEmail(emailOrPhone, password);
+    return res.success;
   };
 
   // Standart register
   const register = async (data: { name: string; email: string; phone: string; password?: string }): Promise<boolean> => {
+    if (!data.password) return false;
     const res = await registerWithEmail({
       name: data.name,
       email: data.email,
       phone: data.phone,
-      password: data.password || '123456',
+      password: data.password,
     });
     return res.success;
   };
@@ -648,6 +651,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signOut(auth);
       } catch {}
     }
+    setHasFirebaseSession(false);
     setUser(null);
     try {
       localStorage.removeItem('taklifim_active_user');
@@ -713,6 +717,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         isLoggedIn,
+        authReady,
+        hasFirebaseSession,
         user,
         login,
         register,
@@ -723,6 +729,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyPhoneOtp,
         loginWithEmail,
         registerWithEmail,
+        sendPasswordReset,
         registerSimple,
         updateUserProfile,
         canUseFreePlan,

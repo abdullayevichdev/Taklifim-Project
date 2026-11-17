@@ -386,5 +386,22 @@ test('uploadReceiptWithRetry uses 45s timeout, 2s/5s backoff retries, same UUID 
   assert.equal(nonRetryable.success, false);
   assert.equal(nonRetryable.isNetworkError, false);
   assert.equal(badReqCalls, 1);
+
+  // 4. Missing Firebase Auth token stops immediately with statusCode 401 without calling fetch
+  let unauthFetchCalls = 0;
+  const unauthRes = await uploadReceiptWithRetry(
+    basePayload,
+    async () => ({}),
+    {
+      fetchFn: (async () => {
+        unauthFetchCalls += 1;
+        return {} as any;
+      }) as typeof fetch,
+    }
+  );
+  assert.equal(unauthRes.success, false);
+  assert.equal(unauthRes.statusCode, 401);
+  assert.equal(unauthFetchCalls, 0);
+  assert.match(unauthRes.error || '', /Google|Apple|Email/i);
 });
 
