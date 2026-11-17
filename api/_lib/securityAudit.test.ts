@@ -1111,3 +1111,54 @@ test('POST /api/telegram/webhook validates method (405), secret token (403), and
   }
 });
 
+test('upload-receipt: client UUID idempotencyKey prevents duplicate Telegram sends across retries and guards stale UUIDs after rejection', async () => {
+  const ctx = makeInMemoryDeps();
+  const uuid1 = '550e8400-e29b-41d4-a716-446655440001';
+  const uuid2 = '550e8400-e29b-41d4-a716-446655440002';
+
+  const cmd1 = {
+    verifiedUid: 'uid-alice',
+    orderId: 'ORD-IDEM-UUID-1',
+    invitationId: 'inv-1',
+    invitationSlug: 'ali-madina-1234',
+    customerName: 'Ali & Madina',
+    customerPhone: '+998901234567',
+    templateName: 'Aurelia',
+    weddingDate: '2026-10-10',
+    venueName: 'Versal',
+    price: 60000,
+    isPdf: false,
+    fileBuffer: Buffer.from('receipt-bytes-uuid'),
+    idempotencyKey: uuid1,
+  };
+
+  const first = await processUploadReceipt(cmd1, ctx.deps);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.success, true);
+  assert.equal(ctx.getTgCount(), 1);
+
+  // Duplicate retry with same UUID returns previous result (200 deduplicated), still 1 Telegram message
+  const duplicate = await processUploadReceipt(cmd1, ctx.deps);
+  assert.equal(duplicate.statusCode, 200);
+  assert.equal(duplicate.body.success, true);
+  assert.equal(duplicate.body.deduplicated, true);
+  assert.equal(ctx.getTgCount(), 1);
+
+  // Simulate admin rejection
+  const ord = ctx.orders.get('ORD-IDEM-UUID-1')!;
+  ctx.orders.set('ORD-IDEM-UUID-1', { ...ord, status: 'rejected', decidedAt: '2026-11-16T09:00:00.000Z' });
+
+  // Stale retry of uuid1 after rejection is blocked (409), no duplicate Telegram
+  const staleRetry = await processUploadReceipt(cmd1, ctx.deps);
+  assert.equal(staleRetry.statusCode, 409);
+  assert.equal(staleRetry.body.deduplicated, true);
+  assert.equal(ctx.getTgCount(), 1);
+
+  // Fresh re-upload with new UUID uuid2 succeeds normally
+  const freshReupload = await processUploadReceipt({ ...cmd1, idempotencyKey: uuid2 }, ctx.deps);
+  assert.equal(freshReupload.statusCode, 200);
+  assert.equal(freshReupload.body.success, true);
+  assert.equal(ctx.getTgCount(), 2);
+});
+
+

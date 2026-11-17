@@ -6,6 +6,11 @@ import {
   ContactMessage,
 } from '../types';
 import { generateInvitationSlug, parseHostNames } from '../utils/slug';
+import {
+  uploadReceiptWithRetry,
+  type UploadReceiptPayload,
+  type UploadReceiptResult,
+} from '../utils/receiptUpload';
 import { mockTemplates } from '../data/mockTemplates';
 import { mockGuests } from '../data/mockGuests';
 import { mockOrders } from '../data/mockOrders';
@@ -1308,62 +1313,19 @@ export const api = {
     return newOrder;
   },
 
-  async uploadReceipt(payload: {
-    orderId: string;
-    invitationId?: string;
-    invitationSlug?: string;
-    customerName: string;
-    customerPhone: string;
-    templateName?: string;
-    planName?: string;
-    weddingDate?: string;
-    venueName?: string;
-    price: number;
-    fileName: string;
-    fileType: string;
-    fileBase64?: string;
-    fileUrl?: string;
-  }): Promise<{
-    success: boolean;
-    orderId: string;
-    status: OrderItem['status'];
-    receiptSentAt?: string;
-    message?: string;
-    error?: string;
-  }> {
-    try {
-      const authHeaders = await getAuthHeaders();
-      if (!authHeaders.Authorization) {
-        return {
-          success: false,
-          orderId: payload.orderId,
-          status: 'pending_payment',
-          error:
-            "Chek yuborish uchun Google yoki Email orqali hisobingizga kirilgan bo'lishi kerak.",
-        };
-      }
+  async uploadReceipt(
+    payload: UploadReceiptPayload,
+    options?: { onAttempt?: (attempt: number, maxAttempts: number) => void }
+  ): Promise<UploadReceiptResult> {
+    const result = await uploadReceiptWithRetry(payload, getAuthHeaders, {
+      onAttempt: options?.onAttempt,
+    });
 
-      const res = await fetch('/api/payment/upload-receipt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (data.status === 'pending_review') {
-        await this.updateOrderStatus(payload.orderId, 'pending_review', { syncRemote: false });
-      }
-      return data;
-    } catch (err: any) {
-      return {
-        success: false,
-        orderId: payload.orderId,
-        status: 'pending_payment',
-        error: err.message || "Chek yuborishda xatolik yuz berdi. Qayta urinib ko'ring.",
-      };
+    if (result.success && result.status === 'pending_review') {
+      await this.updateOrderStatus(payload.orderId, 'pending_review', { syncRemote: false });
     }
+
+    return result;
   },
 
   async getOrderStatus(orderId: string): Promise<{

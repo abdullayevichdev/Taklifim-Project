@@ -6,7 +6,7 @@ import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
 /** PDF via base64 must stay under ~3.2MB raw to fit Vercel body; larger PDFs use fileUrl (Storage). */
-const MAX_PDF_BASE64_CHARS = Math.ceil(3.2 * 1024 * 1024 * 1.37);
+const MAX_PDF_BASE64_CHARS = Math.ceil(3.0 * 1024 * 1024 * 1.37);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

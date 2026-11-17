@@ -25,7 +25,7 @@ dotenv.config();
 const PORT = Number(process.env.PORT) || 3000;
 
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
-const MAX_PDF_BASE64_CHARS = Math.ceil(3.2 * 1024 * 1024 * 1.37);
+const MAX_PDF_BASE64_CHARS = Math.ceil(3.0 * 1024 * 1024 * 1.37);
 
 async function startServer() {
   const app = express();
@@ -79,7 +79,7 @@ async function startServer() {
           return res.status(400).json({
             success: false,
             error:
-              "PDF hajmi so'rov limitidan oshib ketdi. Iltimos 4 MB dan kichik PDF yuklang.",
+              "PDF hajmi so'rov limitidan oshib ketdi. Iltimos 3 MB dan kichik PDF yuklang.",
           });
         }
         if (!isPdf && fileBase64.length > MAX_IMAGE_BASE64_CHARS) {

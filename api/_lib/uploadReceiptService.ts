@@ -186,7 +186,15 @@ export async function processUploadReceipt(
 
       let attemptRecord: ReceiptAttemptRecord | null = null;
       try {
-        attemptRecord = await deps.getReceiptAttempt(attemptKey);
+        const rawAttempt = await deps.getReceiptAttempt(attemptKey);
+        if (rawAttempt && rawAttempt.updatedAt) {
+          const ageMs = Date.now() - new Date(rawAttempt.updatedAt).getTime();
+          if (ageMs <= 24 * 60 * 60 * 1000) {
+            attemptRecord = rawAttempt;
+          }
+        } else if (rawAttempt) {
+          attemptRecord = rawAttempt;
+        }
       } catch {
         attemptRecord = null;
       }
@@ -227,6 +235,24 @@ export async function processUploadReceipt(
             status: 'pending_review',
             error:
               "Chekingiz allaqachon admin tekshiruvida. Javob chiqqach qayta yuborishingiz mumkin.",
+          },
+        };
+      }
+
+      if (
+        cmd.idempotencyKey &&
+        attemptRecord?.committed === true &&
+        attemptRecord.ownerUid === cmd.verifiedUid &&
+        attemptRecord.orderId === cmd.orderId
+      ) {
+        return {
+          statusCode: 409,
+          body: {
+            success: false,
+            deduplicated: true,
+            orderId: existingOrder?.orderId || existingOrder?.id || cmd.orderId,
+            status: existingOrder?.status || 'rejected',
+            error: "Ushbu so'rov allaqachon qayta ishlangan.",
           },
         };
       }

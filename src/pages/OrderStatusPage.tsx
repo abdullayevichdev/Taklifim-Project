@@ -17,6 +17,10 @@ import {
   validatePdfFile,
   MAX_PDF_BYTES,
 } from '../utils/receiptCompress';
+import {
+  generateIdempotencyKey,
+  isNetworkOrTimeoutError,
+} from '../utils/receiptUpload';
 import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { isFirebaseConfigured, storage } from '../services/firebase';
@@ -85,8 +89,12 @@ export const OrderStatusPage: React.FC = () => {
   const [isPreparingFile, setIsPreparingFile] = useState<boolean>(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
+  const [uploadIsNetworkError, setUploadIsNetworkError] = useState<boolean>(false);
+  const [uploadAttemptMsg, setUploadAttemptMsg] = useState<string>('');
+  const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<string>('');
   const [contactPhone, setContactPhone] = useState<string>(user?.phone || '');
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
+  const receiptSubmitLockRef = useRef<boolean>(false);
 
   // Track status transitions only after initial resolution (no toast on F5 load)
   const lastStatusRef = useRef<string | null>(null);
@@ -341,10 +349,13 @@ export const OrderStatusPage: React.FC = () => {
   };
 
   const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploadingReceipt || receiptSubmitLockRef.current) return;
     setUploadError('');
+    setUploadIsNetworkError(false);
     setFileBase64('');
     setPreparedFileType('');
     setPreparedFileName('');
+    setReceiptIdempotencyKey('');
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -365,6 +376,7 @@ export const OrderStatusPage: React.FC = () => {
       setSelectedFile(file);
       setPreparedFileType('application/pdf');
       setPreparedFileName(file.name);
+      setReceiptIdempotencyKey(generateIdempotencyKey());
       return;
     }
 
@@ -375,6 +387,7 @@ export const OrderStatusPage: React.FC = () => {
       setFileBase64(compressed.base64);
       setPreparedFileType(compressed.fileType);
       setPreparedFileName(compressed.fileName);
+      setReceiptIdempotencyKey(generateIdempotencyKey());
     } catch (err: any) {
       setSelectedFile(null);
       setUploadError(err.message || t.builder.toasts.receiptReadError);
@@ -384,7 +397,7 @@ export const OrderStatusPage: React.FC = () => {
   };
 
   const handleReuploadSubmit = async () => {
-    if (!order) return;
+    if (!order || receiptSubmitLockRef.current || isUploadingReceipt) return;
 
     const isPdf =
       preparedFileType === 'application/pdf' ||
@@ -409,8 +422,16 @@ export const OrderStatusPage: React.FC = () => {
       return;
     }
 
+    const idemKey = receiptIdempotencyKey || generateIdempotencyKey();
+    if (!receiptIdempotencyKey) {
+      setReceiptIdempotencyKey(idemKey);
+    }
+
+    receiptSubmitLockRef.current = true;
     setIsUploadingReceipt(true);
     setUploadError('');
+    setUploadIsNetworkError(false);
+    setUploadAttemptMsg('');
 
     try {
       let fileUrl: string | undefined;
@@ -427,27 +448,42 @@ export const OrderStatusPage: React.FC = () => {
         fileBase64Payload = undefined;
       }
 
-      const res = await api.uploadReceipt({
-        orderId: order.orderId,
-        invitationId: order.invitationId,
-        invitationSlug: order.invitationSlug,
-        customerName: order.customerName || user?.name || 'Mijoz',
-        customerPhone: cleanPhone,
-        templateName: order.templateName,
-        weddingDate: order.weddingDate,
-        venueName: order.venueName,
-        price: order.price || 60000,
-        fileName: preparedFileName || selectedFile.name,
-        fileType: preparedFileType || selectedFile.type,
-        fileBase64: fileBase64Payload,
-        fileUrl,
-      });
+      const res = await api.uploadReceipt(
+        {
+          orderId: order.orderId,
+          invitationId: order.invitationId,
+          invitationSlug: order.invitationSlug,
+          customerName: order.customerName || user?.name || 'Mijoz',
+          customerPhone: cleanPhone,
+          templateName: order.templateName,
+          weddingDate: order.weddingDate,
+          venueName: order.venueName,
+          price: order.price || 60000,
+          fileName: preparedFileName || selectedFile.name,
+          fileType: preparedFileType || selectedFile.type,
+          fileBase64: fileBase64Payload,
+          fileUrl,
+          idempotencyKey: idemKey,
+        },
+        {
+          onAttempt: (attempt, max) => {
+            if (attempt > 1) {
+              const templateStr = (t.builder as any).uploadingAttemptLabel || 'Qayta urinilmoqda ({attempt}/{max})...';
+              setUploadAttemptMsg(templateStr.replace('{attempt}', String(attempt)).replace('{max}', String(max)));
+            } else {
+              setUploadAttemptMsg('');
+            }
+          },
+        }
+      );
 
-      if (res.success) {
+      if (res.success === true) {
         setSelectedFile(null);
         setFileBase64('');
         setPreparedFileType('');
         setPreparedFileName('');
+        setReceiptIdempotencyKey('');
+        setUploadIsNetworkError(false);
         lastStatusRef.current = 'pending_review';
         setOrder((prev) =>
           prev
@@ -462,13 +498,29 @@ export const OrderStatusPage: React.FC = () => {
         );
         showToast(t.builder.toasts.receiptSent, 'success');
       } else {
-        setUploadError(res.error || t.builder.toasts.receiptSendError);
-        showToast(res.error || t.builder.toasts.receiptSendError, 'error');
+        if (res.isNetworkError) {
+          setUploadIsNetworkError(true);
+          setUploadError(t.builder.uploadNetworkError);
+          showToast(t.builder.uploadNetworkError, 'error');
+        } else {
+          setUploadIsNetworkError(false);
+          setUploadError(res.error || t.builder.toasts.receiptSendError);
+          showToast(res.error || t.builder.toasts.receiptSendError, 'error');
+        }
       }
     } catch (err: any) {
-      setUploadError(`${t.builder.toasts.serverErrorPrefix} ${err.message}`);
-      showToast(t.builder.toasts.receiptSendError, 'error');
+      const classified = isNetworkOrTimeoutError(err);
+      if (classified.isNetwork) {
+        setUploadIsNetworkError(true);
+        setUploadError(t.builder.uploadNetworkError);
+        showToast(t.builder.uploadNetworkError, 'error');
+      } else {
+        setUploadIsNetworkError(false);
+        setUploadError(`${t.builder.toasts.serverErrorPrefix} ${err.message}`);
+        showToast(t.builder.toasts.receiptSendError, 'error');
+      }
     } finally {
+      receiptSubmitLockRef.current = false;
       setIsUploadingReceipt(false);
     }
   };
@@ -852,10 +904,45 @@ export const OrderStatusPage: React.FC = () => {
                 )}
               </div>
 
+              {isUploadingReceipt && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 space-y-2"
+                >
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
+                    <span>{uploadAttemptMsg || t.builder.uploadingProgressLabel}</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-amber-200/70 overflow-hidden">
+                    <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#C64873] to-[#E27B9B] animate-pulse" />
+                  </div>
+                </div>
+              )}
+
               {uploadError && (
-                <div role="alert" className="text-xs text-rose-700 font-semibold flex items-center gap-1.5 bg-rose-50/90 p-3 rounded-xl border border-rose-200">
-                  <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  <span>{uploadError}</span>
+                <div
+                  role="alert"
+                  className="text-xs text-rose-700 font-semibold flex flex-col gap-2.5 bg-rose-50/90 p-3.5 rounded-xl border border-rose-200"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span className="leading-relaxed">
+                      {uploadIsNetworkError ? t.builder.uploadNetworkError : uploadError}
+                    </span>
+                  </div>
+                  {selectedFile && !isUploadingReceipt && (
+                    <GlassButton
+                      type="button"
+                      tone="tinted"
+                      size="sm"
+                      onClick={handleReuploadSubmit}
+                      leftIcon={<RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
+                      className="self-start"
+                    >
+                      {t.builder.retryUploadBtn}
+                    </GlassButton>
+                  )}
                 </div>
               )}
 
@@ -864,13 +951,13 @@ export const OrderStatusPage: React.FC = () => {
                 tone="tinted"
                 size="lg"
                 loading={isUploadingReceipt}
-                disabled={!canSubmitReceipt}
+                disabled={!canSubmitReceipt || isUploadingReceipt}
                 onClick={handleReuploadSubmit}
                 leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
                 className="w-full"
               >
                 {isUploadingReceipt
-                  ? t.builder.submittingReceiptAdminBtn
+                  ? t.builder.uploadingProgressLabel
                   : t.myInvitations.reuploadReceiptBtn}
               </GlassButton>
             </div>

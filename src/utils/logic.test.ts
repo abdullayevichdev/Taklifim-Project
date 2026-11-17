@@ -215,6 +215,20 @@ test('resolveInvitationPaymentStatus prioritizes live order and paid states over
   );
 });
 
+import {
+  calculateScaledImageDimensions,
+  compressImageForUpload,
+  validatePdfFile,
+  MAX_PDF_BYTES,
+  TARGET_IMAGE_BYTES,
+} from './receiptCompress';
+import {
+  uploadReceiptWithRetry,
+  generateIdempotencyKey,
+  RECEIPT_UPLOAD_TIMEOUT_MS,
+  RECEIPT_RETRY_DELAYS_MS,
+} from './receiptUpload';
+
 test('formatRelativeTimeLocalized and isReviewOverdue handle uz/ru/en and 2-hour thresholds', () => {
   const nowMs = Date.parse('2026-09-01T12:00:00.000Z');
   assert.equal(formatRelativeTimeLocalized('2026-09-01T11:59:30.000Z', 'uz', nowMs), 'Hozirgina');
@@ -226,3 +240,151 @@ test('formatRelativeTimeLocalized and isReviewOverdue handle uz/ru/en and 2-hour
   assert.equal(isReviewOverdue('2026-09-01T09:59:00.000Z', 2, nowMs), true);
   assert.equal(isReviewOverdue(undefined, 2, nowMs), false);
 });
+
+test('receipt compression dimensions cap width at 1600px, preserve PDF 4MB limit, and fall back to original file on error', async () => {
+  assert.equal(TARGET_IMAGE_BYTES, 800 * 1024);
+  assert.equal(MAX_PDF_BYTES, 3 * 1024 * 1024);
+
+  const scaled = calculateScaledImageDimensions(3200, 2400, 1600);
+  assert.deepEqual(scaled, { width: 1600, height: 1200 });
+
+  const unscaled = calculateScaledImageDimensions(1080, 1920, 1600);
+  assert.deepEqual(unscaled, { width: 1080, height: 1920 });
+
+  const smallPdf = new File([new Uint8Array(1024)], 'chek.pdf', { type: 'application/pdf' });
+  assert.equal(validatePdfFile(smallPdf, 'uz'), null);
+
+  const bigPdf = { size: MAX_PDF_BYTES + 1 } as File;
+  assert.ok(validatePdfFile(bigPdf, 'uz'));
+
+  // Fallback when canvas compression throws
+  const fakeFile = {
+    name: 'payment.png',
+    type: 'image/png',
+    size: 420000,
+  } as File;
+
+  const fallbackRes = await compressImageForUpload(fakeFile, TARGET_IMAGE_BYTES, 'uz', {
+    loadImage: async () => {
+      throw new Error('Canvas decode error');
+    },
+    readOriginalDataUrl: async () => 'data:image/png;base64,ORIGINALBYTES',
+  });
+
+  assert.equal(fallbackRes.usedFallback, true);
+  assert.equal(fallbackRes.base64, 'data:image/png;base64,ORIGINALBYTES');
+  assert.equal(fallbackRes.fileName, 'payment.png');
+  assert.equal(fallbackRes.fileType, 'image/png');
+});
+
+test('uploadReceiptWithRetry uses 45s timeout, 2s/5s backoff retries, same UUID idempotencyKey, and never retries 4xx', async () => {
+  assert.equal(RECEIPT_UPLOAD_TIMEOUT_MS, 45_000);
+  assert.deepEqual([...RECEIPT_RETRY_DELAYS_MS], [2000, 5000]);
+
+  const uuid = generateIdempotencyKey();
+  assert.match(uuid, /^[0-9a-f-]{32,36}$/i);
+
+  const basePayload = {
+    orderId: 'ORD-RETRY-1',
+    customerName: 'Ali',
+    customerPhone: '+998901234567',
+    price: 60000,
+    fileName: 'chek.jpg',
+    fileType: 'image/jpeg',
+    fileBase64: 'data:image/jpeg;base64,ABC',
+  };
+
+  // 1. Retries twice with [2000, 5000] delays on network errors and succeeds on 3rd try with SAME idempotencyKey
+  const seenKeys: string[] = [];
+  const recordedDelays: number[] = [];
+  let callCount = 0;
+
+  const recovered = await uploadReceiptWithRetry(
+    basePayload,
+    async () => ({ Authorization: 'Bearer fake-token' }),
+    {
+      sleepFn: async (ms) => {
+        recordedDelays.push(ms);
+      },
+      fetchFn: (async (_url: any, init: any) => {
+        callCount += 1;
+        const parsed = JSON.parse(init.body);
+        seenKeys.push(parsed.idempotencyKey);
+        assert.equal(init.headers['X-Idempotency-Key'], parsed.idempotencyKey);
+        assert.ok(init.signal instanceof AbortSignal);
+
+        if (callCount <= 2) {
+          throw new TypeError('Failed to fetch');
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            orderId: 'ORD-RETRY-1',
+            status: 'pending_review',
+            receiptSentAt: '2026-11-16T00:00:00.000Z',
+          }),
+        } as any;
+      }) as typeof fetch,
+    }
+  );
+
+  assert.equal(recovered.success, true);
+  assert.equal(recovered.status, 'pending_review');
+  assert.equal(callCount, 3);
+  assert.deepEqual(recordedDelays, [2000, 5000]);
+  assert.equal(new Set(seenKeys).size, 1);
+
+  // 2. All 3 attempts time out via AbortController -> returns isNetworkError: true
+  const abortDelays: number[] = [];
+  const timedOut = await uploadReceiptWithRetry(
+    { ...basePayload, idempotencyKey: uuid },
+    async () => ({ Authorization: 'Bearer fake-token' }),
+    {
+      timeoutMs: 15,
+      sleepFn: async (ms) => {
+        abortDelays.push(ms);
+      },
+      fetchFn: ((_url: any, init: any) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => {
+            const abortErr = new Error('The operation was aborted');
+            abortErr.name = 'AbortError';
+            reject(abortErr);
+          });
+        })) as typeof fetch,
+    }
+  );
+
+  assert.equal(timedOut.success, false);
+  assert.equal(timedOut.isNetworkError, true);
+  assert.equal(timedOut.isTimeout, true);
+  assert.equal(timedOut.idempotencyKey, uuid);
+  assert.deepEqual(abortDelays, [2000, 5000]);
+
+  // 3. Non-retryable 400 error stops immediately (no retries)
+  let badReqCalls = 0;
+  const nonRetryable = await uploadReceiptWithRetry(
+    basePayload,
+    async () => ({ Authorization: 'Bearer fake-token' }),
+    {
+      sleepFn: async () => {
+        throw new Error('Should not sleep on 400');
+      },
+      fetchFn: (async () => {
+        badReqCalls += 1;
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ success: false, error: 'Bad phone' }),
+        } as any;
+      }) as typeof fetch,
+    }
+  );
+
+  assert.equal(nonRetryable.success, false);
+  assert.equal(nonRetryable.isNetworkError, false);
+  assert.equal(badReqCalls, 1);
+});
+

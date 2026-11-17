@@ -1,11 +1,31 @@
 import { Language } from '../types';
 import { translations, uz } from '../locales';
 
-const MAX_IMAGE_BYTES = Math.floor(1.5 * 1024 * 1024);
-export const MAX_PDF_BYTES = 4 * 1024 * 1024;
+export const TARGET_IMAGE_BYTES = 800 * 1024;
+export const MAX_SERVER_IMAGE_BYTES = Math.floor(1.5 * 1024 * 1024);
+export const MAX_IMAGE_WIDTH = 1600;
+export const DEFAULT_IMAGE_QUALITY = 0.8;
+export const MAX_PDF_BYTES = 3 * 1024 * 1024;
 
 function getValidationCopy(language: Language = 'uz') {
   return translations[language]?.validation || uz.validation;
+}
+
+export function calculateScaledImageDimensions(
+  naturalWidth: number,
+  naturalHeight: number,
+  maxWidth = MAX_IMAGE_WIDTH
+): { width: number; height: number } {
+  const safeW = Math.max(1, Math.round(naturalWidth || 1));
+  const safeH = Math.max(1, Math.round(naturalHeight || 1));
+  if (safeW <= maxWidth) {
+    return { width: safeW, height: safeH };
+  }
+  const scale = maxWidth / safeW;
+  return {
+    width: maxWidth,
+    height: Math.max(1, Math.round(safeH * scale)),
+  };
 }
 
 function loadImage(file: File, language: Language = 'uz'): Promise<HTMLImageElement> {
@@ -44,7 +64,7 @@ function canvasToBlob(
   });
 }
 
-function blobToDataUrl(blob: Blob, language: Language = 'uz'): Promise<string> {
+export function blobToDataUrl(blob: Blob, language: Language = 'uz'): Promise<string> {
   const v = getValidationCopy(language);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -54,35 +74,51 @@ function blobToDataUrl(blob: Blob, language: Language = 'uz'): Promise<string> {
   });
 }
 
-/**
- * Compress an image in the browser until it is under 1.5 MB (JPEG).
- */
-export async function compressImageForUpload(
+export interface CompressedReceiptImage {
+  base64: string;
+  fileType: string;
+  fileName: string;
+  byteSize: number;
+  usedFallback?: boolean;
+}
+
+export interface CompressImageDeps {
+  loadImage?: (file: File, language: Language) => Promise<HTMLImageElement>;
+  compressWithCanvas?: (
+    img: HTMLImageElement,
+    file: File,
+    maxBytes: number,
+    language: Language
+  ) => Promise<CompressedReceiptImage>;
+  readOriginalDataUrl?: (file: File, language: Language) => Promise<string>;
+}
+
+async function defaultCompressWithCanvas(
+  img: HTMLImageElement,
   file: File,
-  maxBytes = MAX_IMAGE_BYTES,
-  language: Language = 'uz'
-): Promise<{ base64: string; fileType: string; fileName: string; byteSize: number }> {
+  maxBytes: number,
+  language: Language
+): Promise<CompressedReceiptImage> {
   const v = getValidationCopy(language);
-  if (file.size <= maxBytes && file.type === 'image/jpeg') {
+  const naturalW = img.naturalWidth || img.width;
+  const naturalH = img.naturalHeight || img.height;
+
+  // Skip re-encoding if original JPEG/WebP is already <= 1600px wide and under target bytes
+  if (
+    file.size < maxBytes &&
+    naturalW <= MAX_IMAGE_WIDTH &&
+    (file.type === 'image/jpeg' || file.type === 'image/webp')
+  ) {
     const base64 = await blobToDataUrl(file, language);
     return {
       base64,
-      fileType: 'image/jpeg',
-      fileName: file.name.replace(/\.\w+$/, '.jpg'),
+      fileType: file.type,
+      fileName: file.name || (file.type === 'image/webp' ? 'receipt.webp' : 'receipt.jpg'),
       byteSize: file.size,
     };
   }
 
-  const img = await loadImage(file, language);
-  let width = img.naturalWidth || img.width;
-  let height = img.naturalHeight || img.height;
-  const maxDim = 2000;
-  if (width > maxDim || height > maxDim) {
-    const scale = Math.min(maxDim / width, maxDim / height);
-    width = Math.round(width * scale);
-    height = Math.round(height * scale);
-  }
-
+  let { width, height } = calculateScaledImageDimensions(naturalW, naturalH, MAX_IMAGE_WIDTH);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -90,33 +126,69 @@ export async function compressImageForUpload(
   if (!ctx) throw new Error(v.receiptCanvasUnavailable);
   ctx.drawImage(img, 0, 0, width, height);
 
-  let quality = 0.85;
-  let blob = await canvasToBlob(canvas, 'image/jpeg', quality, language);
+  // Prefer WebP when input is WebP and browser encodes it smaller/valid; otherwise JPEG 0.8
+  const targetMime = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  let quality = DEFAULT_IMAGE_QUALITY;
+  let blob = await canvasToBlob(canvas, targetMime, quality, language);
+  const activeMime = blob.type === 'image/webp' || blob.type === 'image/jpeg' ? blob.type : 'image/jpeg';
 
-  while (blob.size > maxBytes && quality > 0.4) {
-    quality -= 0.1;
-    blob = await canvasToBlob(canvas, 'image/jpeg', quality, language);
+  while (blob.size >= maxBytes && quality > 0.45) {
+    quality = Math.max(0.4, Number((quality - 0.1).toFixed(2)));
+    blob = await canvasToBlob(canvas, activeMime, quality, language);
   }
 
-  while (blob.size > maxBytes && (canvas.width > 640 || canvas.height > 640)) {
-    canvas.width = Math.round(canvas.width * 0.75);
-    canvas.height = Math.round(canvas.height * 0.75);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    blob = await canvasToBlob(canvas, 'image/jpeg', Math.max(quality, 0.5), language);
+  while (blob.size >= maxBytes && (canvas.width > 640 || canvas.height > 640)) {
+    width = Math.max(480, Math.round(canvas.width * 0.75));
+    height = Math.max(480, Math.round(canvas.height * 0.75));
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(img, 0, 0, width, height);
+    blob = await canvasToBlob(canvas, activeMime, Math.max(quality, 0.5), language);
   }
 
-  if (blob.size > maxBytes) {
+  if (blob.size > MAX_SERVER_IMAGE_BYTES) {
     throw new Error(v.receiptTooLargeAfterCompress);
   }
 
+  const ext = activeMime === 'image/webp' ? '.webp' : '.jpg';
   const base64 = await blobToDataUrl(blob, language);
-  const safeName = file.name.replace(/\.\w+$/, '.jpg') || 'receipt.jpg';
+  const safeName = file.name.replace(/\.\w+$/, ext) || `receipt${ext}`;
   return {
     base64,
-    fileType: 'image/jpeg',
+    fileType: activeMime,
     fileName: safeName,
     byteSize: blob.size,
   };
+}
+
+/**
+ * Compress an image in the browser (max width 1600px, quality 0.8, target < 800 KB).
+ * If browser canvas compression fails for any reason, falls back cleanly to sending the original file.
+ */
+export async function compressImageForUpload(
+  file: File,
+  maxBytes = TARGET_IMAGE_BYTES,
+  language: Language = 'uz',
+  deps?: CompressImageDeps
+): Promise<CompressedReceiptImage> {
+  const readOrig = deps?.readOriginalDataUrl || blobToDataUrl;
+
+  try {
+    const imgLoader = deps?.loadImage || loadImage;
+    const img = await imgLoader(file, language);
+    const runner = deps?.compressWithCanvas || defaultCompressWithCanvas;
+    return await runner(img, file, maxBytes, language);
+  } catch {
+    // Fallback: send original file as-is if compression fails
+    const base64 = await readOrig(file, language);
+    return {
+      base64,
+      fileType: file.type || 'image/jpeg',
+      fileName: file.name || 'receipt.jpg',
+      byteSize: file.size,
+      usedFallback: true,
+    };
+  }
 }
 
 export function validatePdfFile(file: File, language: Language = 'uz'): string | null {

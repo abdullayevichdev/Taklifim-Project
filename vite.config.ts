@@ -6,6 +6,9 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || ''),
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname || __dirname, '.'),
