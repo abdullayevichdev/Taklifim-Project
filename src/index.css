@@ -1,0 +1,1215 @@
+@import "./fonts/cormorant-garamond.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-mono: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+}
+
+:root {
+  --font-ui: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-primary: var(--font-ui);
+
+  /* Taklifim Brand Palette */
+  --color-cream: #FDF9F5;
+  --color-soft-pink: #F5C9D8;
+  --color-deep-pink: #E27B9B;
+  --color-rose-ink: #9E3E60;
+  --color-peach: #FCE1D2;
+  --color-lavender: #E6D9FA;
+  --color-sky-blue: #B9DFFA;
+  --color-deep-sky: #4A9BD4;
+  --color-text-dark: #1E1418;
+  --color-text-muted: #4A383F;
+
+  /* liquidglass.dev Design Tokens (unlayered so specificity 0,1,0 always wins over components.js :where(:root)) */
+  --lg-accent: #C64873;
+  --lg-on: #34C759;
+  --lg-surface: rgba(255, 255, 255, 0.86);
+  --lg-track: rgba(242, 168, 194, 0.36);
+  --lg-track-off: rgba(180, 162, 170, 0.56);
+  --lg-text: #1E1418;
+  --lg-text-muted: #4A383F;
+  --lg-on-glass: #1E1418;
+  --lg-tint: rgba(255, 255, 255, 0.56);
+  --lg-tint-strong: rgba(255, 255, 255, 0.84);
+  --lg-indicator: rgba(255, 255, 255, 0.88);
+  --lg-shadow-1: 0 4px 16px -4px rgba(30, 20, 24, 0.1), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --lg-shadow-2: 0 16px 40px -10px rgba(198, 72, 115, 0.18), 0 1px 2px rgba(255, 255, 255, 0.95) inset;
+  --lg-radius-sm: 10px;
+  --lg-radius: 16px;
+  --lg-radius-lg: 22px;
+  --lg-radius-xl: 28px;
+  --lg-fallback: blur(18px) saturate(1.65);
+  --lg-focus: #C64873;
+  --lg-toast-top: 20px;
+
+  /* Dynamic Fixed Chrome Spacing Tokens (updated live via ResizeObserver) */
+  --header-h: 64px;
+  --header-visible-h: 64px;
+  --header-sticky-top: calc(var(--header-visible-h, 64px) + 8px);
+  --bottom-nav-h: 76px;
+
+  /* Taklifim Custom Glass Tokens */
+  --glass-blur-subtle: 12px;
+  --glass-blur-base: 18px;
+  --glass-blur-elevated: 24px;
+  --glass-border-light: rgba(255, 255, 255, 0.94);
+  --glass-border-strong: rgba(255, 255, 255, 0.98);
+  --glass-specular-rim: inset 0 1.5px 0 rgba(255, 255, 255, 0.98), inset 0 0 0 1px rgba(255, 255, 255, 0.65), inset 0 0 20px rgba(255, 255, 255, 0.35);
+}
+
+@layer base {
+  *, *::before, *::after {
+    font-family: var(--font-ui);
+  }
+
+  html {
+    background-color: #FCEEF4;
+    color: #1E1418;
+    font-family: var(--font-ui);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-color: #FCEEF4;
+    color: #1E1418;
+    font-family: var(--font-ui);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    line-height: 1.55;
+    letter-spacing: 0;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-ui);
+    letter-spacing: -0.015em;
+    font-weight: 700;
+    font-feature-settings: "lnum" 1;
+    font-variant-numeric: lining-nums;
+  }
+
+  p, span, div, label, a {
+    font-family: var(--font-ui);
+  }
+
+  input, textarea, select, button, optgroup {
+    font-family: inherit;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  input::placeholder, textarea::placeholder {
+    font-family: inherit;
+    opacity: 0.78;
+  }
+
+  /* Unified Cormorant Garamond Typography Utilities */
+  .font-playfair,
+  .font-cinzel,
+  .font-jakarta,
+  .font-sans,
+  .font-serif {
+    font-family: var(--font-ui) !important;
+  }
+
+  .font-script,
+  .font-alex,
+  .font-great-vibes {
+    font-family: var(--font-ui) !important;
+    font-style: italic;
+  }
+
+  .font-mono {
+    font-family: var(--font-ui) !important;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+}
+
+/* Cormorant Garamond has a compact x-height (~0.386em); lift .text-xs/.text-sm cleanly so all UI copy remains >=14px–16px without altering Tailwind rem spacing */
+@layer utilities {
+  .text-xs {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+
+  .text-sm {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .uppercase:not([class*="tracking-"]) {
+    letter-spacing: 0.08em;
+  }
+}
+
+/* ============================================================================
+ * Taklifim Liquid Glass Backdrop Mesh
+ * Noticeably saturated pastel rose/peach/sky/lavender gradient placed directly
+ * on `#taklifim-backdrop` so data-lg-backdrop clones real color across engines.
+ * ============================================================================ */
+.taklifim-glass-backdrop {
+  background-color: #FAE8F0;
+  background-image:
+    radial-gradient(62% 48% at 8% 10%, rgba(242, 138, 178, 0.78) 0%, rgba(242, 138, 178, 0.24) 50%, rgba(242, 138, 178, 0) 76%),
+    radial-gradient(58% 48% at 92% 14%, rgba(118, 194, 248, 0.76) 0%, rgba(118, 194, 248, 0.24) 52%, rgba(118, 194, 248, 0) 78%),
+    radial-gradient(60% 48% at 22% 48%, rgba(252, 186, 144, 0.66) 0%, rgba(252, 186, 144, 0.2) 52%, rgba(252, 186, 144, 0) 76%),
+    radial-gradient(58% 46% at 80% 52%, rgba(190, 158, 248, 0.68) 0%, rgba(190, 158, 248, 0.22) 52%, rgba(190, 158, 248, 0) 76%),
+    radial-gradient(58% 50% at 82% 86%, rgba(132, 202, 250, 0.68) 0%, rgba(132, 202, 250, 0.2) 52%, rgba(132, 202, 250, 0) 76%),
+    radial-gradient(56% 50% at 16% 88%, rgba(244, 152, 188, 0.74) 0%, rgba(244, 152, 188, 0.22) 52%, rgba(244, 152, 188, 0) 76%),
+    linear-gradient(135deg, #FCEAF2 0%, #FDEEE4 48%, #EBF4FE 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+/* Vibrant section-level gradient mesh behind dense template grids */
+.taklifim-section-mesh {
+  position: relative;
+}
+
+.taklifim-section-mesh::before {
+  content: '';
+  position: absolute;
+  inset: -28px -16px;
+  border-radius: 40px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(48% 42% at 10% 18%, rgba(242, 144, 182, 0.42) 0%, rgba(242, 144, 182, 0.08) 58%, transparent 80%),
+    radial-gradient(46% 42% at 90% 16%, rgba(124, 198, 250, 0.42) 0%, rgba(124, 198, 250, 0.08) 58%, transparent 80%),
+    radial-gradient(48% 40% at 52% 48%, rgba(252, 194, 152, 0.4) 0%, rgba(252, 194, 152, 0.06) 60%, transparent 82%),
+    radial-gradient(46% 42% at 22% 84%, rgba(196, 166, 248, 0.42) 0%, rgba(196, 166, 248, 0.08) 58%, transparent 80%),
+    radial-gradient(44% 40% at 86% 82%, rgba(244, 156, 190, 0.38) 0%, rgba(244, 156, 190, 0.06) 58%, transparent 80%);
+}
+
+/* ============================================================================
+ * Unified Custom Glass Surfaces (crisp bright rim, inner glow, soft shadow)
+ * ============================================================================ */
+.glass-surface,
+.glass-panel {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.6) 100%);
+  backdrop-filter: blur(var(--glass-blur-base)) saturate(1.65);
+  -webkit-backdrop-filter: blur(var(--glass-blur-base)) saturate(1.65);
+  border: 1px solid var(--glass-border-light);
+  box-shadow:
+    0 14px 36px -8px rgba(198, 72, 115, 0.14),
+    0 4px 14px -4px rgba(30, 20, 24, 0.06),
+    var(--glass-specular-rim);
+}
+
+.glass-surface-elevated,
+.glass-panel-elevated {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.72) 100%);
+  backdrop-filter: blur(var(--glass-blur-elevated)) saturate(1.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur-elevated)) saturate(1.7);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow:
+    0 24px 54px -12px rgba(74, 155, 212, 0.18),
+    0 12px 30px -10px rgba(198, 72, 115, 0.15),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    inset 0 0 24px rgba(255, 255, 255, 0.4);
+}
+
+.glass-surface-subtle,
+.glass-panel-subtle {
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(var(--glass-blur-subtle)) saturate(1.45);
+  -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(1.45);
+  border: 1px solid rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 8px 24px -6px rgba(30, 20, 24, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.glass-surface-tinted-pink,
+.glass-liquid-pink {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.82) 0%, rgba(245, 195, 214, 0.5) 100%);
+  backdrop-filter: blur(20px) saturate(1.65);
+  -webkit-backdrop-filter: blur(20px) saturate(1.65);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow:
+    0 16px 40px -8px rgba(212, 86, 130, 0.24),
+    var(--glass-specular-rim);
+}
+
+.glass-surface-tinted-sky,
+.glass-liquid-sky {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.82) 0%, rgba(168, 216, 250, 0.5) 100%);
+  backdrop-filter: blur(20px) saturate(1.65);
+  -webkit-backdrop-filter: blur(20px) saturate(1.65);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow:
+    0 16px 40px -8px rgba(74, 155, 212, 0.22),
+    var(--glass-specular-rim);
+}
+
+.glass-surface-neutral {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 10px 28px -8px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.glass-liquid-wedding {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86) 0%, rgba(245, 201, 216, 0.38) 52%, rgba(185, 223, 250, 0.38) 100%);
+  backdrop-filter: blur(22px) saturate(1.65);
+  -webkit-backdrop-filter: blur(22px) saturate(1.65);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow:
+    0 20px 48px -10px rgba(180, 140, 160, 0.22),
+    var(--glass-specular-rim);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(198, 72, 115, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Lightweight glass card for dense grids (20+ template cards): 8px blur on desktop,
+   clean high-clarity translucent background without expensive blur on phones. */
+.glass-card-lite {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 12px 30px -10px rgba(198, 72, 115, 0.16),
+    0 4px 12px -4px rgba(30, 20, 24, 0.06),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98),
+    inset 0 0 16px rgba(255, 255, 255, 0.36);
+}
+
+@media (min-width: 768px) {
+  .glass-card-lite {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(8px) saturate(1.45);
+    -webkit-backdrop-filter: blur(8px) saturate(1.45);
+  }
+}
+
+/* Zero-backdrop-filter mobile & coarse-touch optimization:
+ * Replaces heavy per-pixel offscreen blurs on scrolling elements with crisp
+ * multi-stop specular translucent fills so every phone runs at smooth 60-120fps.
+ */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  .glass-surface,
+  .glass-panel {
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 248, 251, 0.82) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-surface-elevated,
+  .glass-panel-elevated {
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 252, 0.88) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-surface-subtle,
+  .glass-panel-subtle,
+  .glass-surface-neutral,
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-surface-tinted-pink,
+  .glass-liquid-pink {
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.92) 0%, rgba(250, 214, 228, 0.78) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-surface-tinted-sky,
+  .glass-liquid-sky {
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.92) 0%, rgba(196, 228, 252, 0.78) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-liquid-wedding {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(250, 218, 230, 0.72) 52%, rgba(206, 232, 252, 0.72) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .glass-template-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 440px;
+  }
+}
+
+/* Hover transitions use translateY & shadow ONLY — never scale() */
+.glass-card-hover {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, opacity 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glass-card-hover:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow:
+      0 24px 50px -12px rgba(214, 99, 137, 0.2),
+      0 8px 20px -6px rgba(74, 155, 212, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+    border-color: rgba(255, 255, 255, 1);
+  }
+}
+
+@media (hover: none) {
+  .glass-card-hover:active {
+    transform: translate3d(0, -1px, 0);
+    opacity: 0.96;
+  }
+}
+
+/* ============================================================================
+ * Liquid Glass Template Catalog Cards (zero heavy blur on 20-card container)
+ * Achieves genuine optical depth via translucent multi-stop gradient, 1px bright
+ * rim, inset inner glow, ::before specular corner highlight, and soft tinted shadow.
+ * ============================================================================ */
+.glass-template-card {
+  position: relative;
+  border-radius: 28px;
+  background: linear-gradient(
+    152deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 244, 248, 0.56) 52%,
+    rgba(241, 248, 255, 0.64) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 18px 40px -14px rgba(196, 72, 118, 0.18),
+    0 8px 20px -8px rgba(74, 155, 212, 0.14),
+    0 2px 6px rgba(30, 20, 24, 0.04),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 0 24px rgba(255, 255, 255, 0.44);
+  transition:
+    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-template-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    88% 62% at 10% 3%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.24) 36%,
+    rgba(255, 255, 255, 0) 68%
+  );
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.88;
+  transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.32s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glass-template-card:hover {
+    transform: translate3d(0, -6px, 0);
+    box-shadow:
+      0 28px 56px -14px rgba(198, 72, 115, 0.24),
+      0 12px 28px -8px rgba(74, 155, 212, 0.2),
+      inset 0 1.5px 0 rgba(255, 255, 255, 1),
+      inset 0 0 28px rgba(255, 255, 255, 0.58);
+  }
+
+  .glass-template-card:hover::before {
+    transform: translate3d(10px, 6px, 0);
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .glass-template-card:active {
+    transform: translate3d(0, 2px, 0);
+    opacity: 0.94;
+  }
+}
+
+/* Price glass pill: dense high-contrast frosted fill on mobile, light 10px blur on desktop */
+.glass-price-pill {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 6px 18px -4px rgba(30, 20, 24, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  color: #1E1418;
+}
+
+@media (min-width: 768px) {
+  .glass-price-pill {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(10px) saturate(1.55);
+    -webkit-backdrop-filter: blur(10px) saturate(1.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-template-card,
+  .glass-template-card::before {
+    transition: none !important;
+  }
+  .glass-template-card:hover,
+  .glass-template-card:hover::before,
+  .glass-template-card:active {
+    transform: none !important;
+  }
+}
+
+/* Fallback when backdrop-filter is unsupported */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-surface,
+  .glass-panel,
+  .glass-surface-elevated,
+  .glass-panel-elevated,
+  .glass-surface-subtle,
+  .glass-panel-subtle,
+  .glass-surface-tinted-pink,
+  .glass-liquid-pink,
+  .glass-surface-tinted-sky,
+  .glass-liquid-sky,
+  .glass-surface-neutral,
+  .glass-liquid-wedding,
+  .glass-pill,
+  .glass-card-lite,
+  .glass-template-card,
+  .glass-price-pill {
+    background: rgba(255, 252, 253, 0.94);
+    border-color: rgba(226, 123, 155, 0.22);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface,
+  .glass-panel,
+  .glass-surface-elevated,
+  .glass-panel-elevated,
+  .glass-surface-subtle,
+  .glass-panel-subtle,
+  .glass-surface-tinted-pink,
+  .glass-liquid-pink,
+  .glass-surface-tinted-sky,
+  .glass-liquid-sky,
+  .glass-surface-neutral,
+  .glass-liquid-wedding,
+  .glass-pill,
+  .glass-card-lite,
+  .glass-template-card,
+  .glass-price-pill,
+  .lg-contact-pill {
+    background: rgba(255, 253, 254, 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ============================================================================
+ * Apple Liquid Glass Optical Specular Surfaces & Contact Pill (60 FPS Safe)
+ * ============================================================================ */
+.lg-optical-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.lg-optical-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(92% 58% at 12% 0%, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.22) 40%, rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 28%);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.92;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+}
+
+.lg-optical-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.lg-icon-orb {
+  position: relative;
+  box-shadow:
+    0 10px 24px -8px rgba(198, 72, 115, 0.24),
+    0 4px 10px -4px rgba(74, 155, 212, 0.16),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lg-contact-pill {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 244, 248, 0.72) 55%, rgba(236, 246, 255, 0.78) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 10px 26px -8px rgba(198, 72, 115, 0.2),
+    0 3px 10px -4px rgba(74, 155, 212, 0.15),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 0 14px rgba(255, 255, 255, 0.42);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 768px) {
+  .lg-contact-pill {
+    backdrop-filter: blur(18px) saturate(1.75);
+    -webkit-backdrop-filter: blur(18px) saturate(1.75);
+  }
+}
+
+.lg-contact-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(85% 65% at 15% 0%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 68%);
+  pointer-events: none;
+}
+
+.lg-dark-glass {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(38, 20, 29, 0.92) 0%, rgba(56, 26, 41, 0.9) 52%, rgba(23, 39, 54, 0.92) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 28px 64px -16px rgba(30, 14, 22, 0.48),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 40px rgba(245, 201, 216, 0.08);
+}
+
+@media (min-width: 768px) {
+  .lg-dark-glass {
+    backdrop-filter: blur(22px) saturate(1.45);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lg-optical-card::after,
+  .lg-contact-pill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      112deg,
+      rgba(255, 255, 255, 0) 26%,
+      rgba(255, 255, 255, 0.48) 47%,
+      rgba(245, 201, 216, 0.2) 52%,
+      rgba(255, 255, 255, 0) 70%
+    );
+    transform: translate3d(-120%, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+    transition: transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  }
+
+  .lg-optical-card:hover::before {
+    transform: translate3d(10px, 4px, 0);
+    opacity: 1;
+  }
+
+  .lg-optical-card:hover::after,
+  .lg-contact-pill:hover::after {
+    transform: translate3d(120%, 0, 0);
+    opacity: 1;
+  }
+
+  .group:hover .lg-icon-orb {
+    transform: translate3d(0, -3px, 0);
+  }
+
+  .lg-contact-pill:hover {
+    transform: translate3d(0, -1.5px, 0);
+    box-shadow:
+      0 14px 32px -8px rgba(198, 72, 115, 0.28),
+      0 6px 14px -4px rgba(74, 155, 212, 0.2),
+      inset 0 1.5px 0 rgba(255, 255, 255, 1);
+  }
+}
+
+@media (hover: none) {
+  .lg-contact-pill:active {
+    transform: translate3d(0, 1px, 0);
+    opacity: 0.94;
+  }
+}
+
+/* ============================================================================
+ * 60-FPS Scroll-Triggered Compositor Reveals (transform & opacity ONLY)
+ * ============================================================================ */
+.lg-reveal-single,
+.lg-reveal-group .lg-reveal-item {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition:
+    opacity 540ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--lg-stagger, 0) * 75ms);
+}
+
+.lg-reveal-single.is-visible,
+.lg-reveal-group.is-visible .lg-reveal-item {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 767px) {
+  .lg-reveal-single,
+  .lg-reveal-group .lg-reveal-item {
+    transform: translate3d(0, 12px, 0);
+    transition-duration: 380ms, 420ms;
+    transition-delay: calc(var(--lg-stagger, 0) * 50ms);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-optical-card::before,
+  .lg-optical-card::after,
+  .lg-contact-pill,
+  .lg-contact-pill::after,
+  .lg-icon-orb,
+  .lg-reveal-single,
+  .lg-reveal-group .lg-reveal-item {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .lg-reveal-single,
+  .lg-reveal-group .lg-reveal-item {
+    opacity: 1 !important;
+  }
+}
+
+/* Ensure liquidglass.dev web components adopt Taklifim clarity, touch ergonomics & never get scale() */
+lg-button,
+lg-navbar,
+lg-switch,
+lg-slider,
+lg-toast,
+lg-segmented,
+lg-menu,
+lg-button .lg-button__el,
+lg-navbar > a,
+lg-navbar > button,
+lg-navbar .lg-nav__copy > span,
+.lg-seg__option,
+.lg-menu__trigger,
+.lg-menu__items > button,
+.lg-menu__copy > span {
+  transform: none;
+  font-family: var(--font-ui);
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+lg-button,
+lg-switch {
+  touch-action: manipulation;
+}
+
+lg-slider,
+.lg-slider__input {
+  touch-action: pan-y;
+}
+
+lg-button .lg-button__el {
+  color: #1E1418;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+lg-button[tone="tinted"] .lg-button__el {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(30, 20, 24, 0.28);
+}
+
+lg-button[tone="tinted"] .lg-surface__tint {
+  background: linear-gradient(135deg, rgba(202, 68, 114, 0.78) 0%, rgba(164, 42, 86, 0.84) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 12px 28px -8px rgba(176, 52, 96, 0.44);
+}
+
+lg-button[tone="light"] .lg-button__el {
+  color: #1E1418;
+}
+
+lg-button[tone="light"] .lg-surface__tint {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 10px 26px -8px rgba(30, 20, 24, 0.14);
+}
+
+lg-button[tone="light"] .lg-button__el:hover .lg-surface__tint {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+lg-button[tone="clear"] .lg-button__el {
+  color: #1E1418;
+}
+
+lg-button[tone="clear"] .lg-surface__tint {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(30, 20, 24, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.98), 0 8px 22px -6px rgba(30, 20, 24, 0.12);
+}
+
+lg-button[tone="clear"] .lg-button__el:hover .lg-surface__tint {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(30, 20, 24, 0.24);
+}
+
+/* Header CTA compact sizing at 1024px–1279px so Brand + Navbar + Controls fit comfortably */
+lg-button.taklifim-nav-cta .lg-button__el {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (min-width: 1280px) {
+  lg-button.taklifim-nav-cta .lg-button__el {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 15.5px;
+  }
+}
+
+/* Top capsule navbar sizing so long Russian/Uzbek/English labels fit cleanly from 1024px+ */
+lg-navbar.taklifim-top-navbar {
+  gap: 1px;
+  padding: 4px;
+}
+
+lg-navbar.taklifim-top-navbar > a,
+lg-navbar.taklifim-top-navbar > button,
+lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+  height: 34px;
+  line-height: 34px;
+  padding: 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+@media (min-width: 1152px) {
+  lg-navbar.taklifim-top-navbar > a,
+  lg-navbar.taklifim-top-navbar > button,
+  lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+    height: 36px;
+    line-height: 36px;
+    padding: 0 11px;
+    font-size: 14.5px;
+  }
+}
+
+@media (min-width: 1280px) {
+  lg-navbar.taklifim-top-navbar {
+    gap: 3px;
+  }
+
+  lg-navbar.taklifim-top-navbar > a,
+  lg-navbar.taklifim-top-navbar > button,
+  lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+    padding: 0 13px;
+    font-size: 15.5px;
+  }
+}
+
+/* Leaflet map container and popups inherit Cormorant Garamond */
+.leaflet-container,
+.leaflet-popup-content,
+.leaflet-popup-content-wrapper,
+.leaflet-control {
+  font-family: var(--font-ui) !important;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Pure-CSS GlassSegmented track & indicator */
+.taklifim-seg-track {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.taklifim-seg-track::-webkit-scrollbar {
+  display: none;
+}
+
+.taklifim-seg-indicator {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taklifim-seg-indicator {
+    transition: none !important;
+  }
+}
+
+/* Wedding text gradients */
+.text-gradient-rose {
+  background: linear-gradient(135deg, #1E1418 0%, #C94F79 58%, #3B88C3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom scrollbars with pink/sky accents */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #F5C9D8, #B9DFFA);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #E27B9B, #7FBEEB);
+}
+
+/* ============================================================================
+ * GPU Compositor Animations ONLY (transform & opacity — zero layout thrash)
+ * ============================================================================ */
+@keyframes floatSmooth {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(0.4deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes glassBlobDriftA {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(28px, 18px, 0);
+    opacity: 0.72;
+  }
+}
+
+@keyframes glassBlobDriftB {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.52;
+  }
+  50% {
+    transform: translate3d(-24px, 22px, 0);
+    opacity: 0.7;
+  }
+}
+
+@keyframes glassBlobDriftC {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.48;
+  }
+  50% {
+    transform: translate3d(18px, -20px, 0);
+    opacity: 0.66;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bounceGentle {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+.animate-float-smooth {
+  animation: floatSmooth 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.animate-glass-blob-a {
+  animation: glassBlobDriftA 18s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-glass-blob-b {
+  animation: glassBlobDriftB 22s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-glass-blob-c {
+  animation: glassBlobDriftC 20s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-bounce-gentle {
+  animation: bounceGentle 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (max-width: 767px) {
+  /* Save mobile GPU & battery: static radial mesh already renders full backdrop colors smoothly */
+  .animate-glass-blob-a,
+  .animate-glass-blob-b,
+  .animate-glass-blob-c,
+  .animate-pulse-glow,
+  .animate-float-smooth,
+  .animate-bounce-gentle {
+    animation: none;
+    will-change: auto;
+  }
+
+  .taklifim-seg-indicator {
+    will-change: auto;
+  }
+
+  /* Snappier micro-transitions on mobile */
+  .animate-fadeIn {
+    animation-duration: 0.2s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-smooth,
+  .animate-pulse-glow,
+  .animate-glass-blob-a,
+  .animate-glass-blob-b,
+  .animate-glass-blob-c,
+  .animate-fadeIn,
+  .animate-bounce-gentle,
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ============================================================================
+ * Page Viewport Offsets, Modal Isolation & Horizontal Scrollbar Suppression
+ * ============================================================================ */
+.taklifim-page-top {
+  padding-top: calc(var(--header-h, 64px) + 12px);
+}
+
+.taklifim-page-bottom {
+  padding-bottom: calc(var(--bottom-nav-h, 76px) + env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+@media (min-width: 1024px) {
+  .taklifim-page-bottom {
+    padding-bottom: 5rem;
+  }
+}
+
+html.taklifim-modal-open .taklifim-bottom-nav {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.no-scrollbar,
+.taklifim-preview-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.taklifim-preview-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================================
+ * CSS Container Query Responsive System for All 20 Invitation Templates
+ * Ensures identical balanced framing inside 260-350px builder phone previews,
+ * real mobile phones (320-430px), tablets (768px), and desktops (1024px+).
+ * ============================================================================ */
+.taklifim-tpl-root {
+  container-type: inline-size;
+  container-name: tpl;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.taklifim-tpl-wrap {
+  width: 100%;
+  max-width: 36rem;
+  margin-inline: auto;
+  padding-block: clamp(1.5rem, 6cqw, 3rem);
+  padding-inline: clamp(0.625rem, 3.2cqw, 1rem);
+}
+
+.taklifim-tpl-hero-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: clamp(1.5rem, 6.5cqw, 3rem);
+  padding-inline: clamp(0.875rem, 5cqw, 2.5rem);
+}
+
+.taklifim-tpl-hero-card-spacious {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: clamp(1.5rem, 7cqw, 3.5rem);
+  padding-inline: clamp(0.875rem, 5.5cqw, 3rem);
+}
+
+.taklifim-tpl-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: clamp(1rem, 4.5cqw, 2rem);
+}
+
+.taklifim-tpl-eyebrow {
+  max-width: 100%;
+  text-align: center;
+  font-size: clamp(11px, 2.7cqw, 13px);
+  letter-spacing: clamp(0.1em, 0.42cqw, 0.2em);
+  line-height: 1.45;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.taklifim-tpl-fit-title {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  margin-inline: auto;
+}
+
+.taklifim-tpl-fit-title[data-force-inline="1"] > span {
+  flex-wrap: nowrap !important;
+  flex-direction: row !important;
+  width: max-content !important;
+}
+
+.taklifim-tpl-date-pill {
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  text-align: center;
+  padding-block: 0.45rem;
+  padding-inline: clamp(0.85rem, 3.5cqw, 1.6rem);
+  font-size: clamp(13px, 3.1cqw, 15px);
+  font-weight: 600;
+}
+
+/* Scoped template body prose readability for Cormorant Garamond */
+.taklifim-tpl-hero-card p.italic,
+.taklifim-tpl-hero-card-spacious p.italic,
+.taklifim-tpl-card > p {
+  font-size: clamp(0.95rem, 3.4cqw, 1.125rem);
+  line-height: 1.6;
+}
+
+.taklifim-cq-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.125rem;
+}
+
+.taklifim-cq-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.taklifim-cq-countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.35rem, 1.6cqw, 0.75rem);
+}
+
+@container tpl (min-width: 440px) {
+  .taklifim-cq-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .taklifim-cq-row {
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+}
+

@@ -1,0 +1,152 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "templates": {
+      ".read": true,
+      ".write": false
+    },
+
+    "slugs": {
+      ".read": true,
+      "$slug": {
+        ".write": "auth != null && (!data.exists() || root.child('invitations').child(data.val()).child('ownerId').val() === auth.uid || root.child('invitations').child(data.val()).child('ownerUid').val() === auth.uid) && (!newData.exists() || (newData.isString() && (root.child('invitations').child(newData.val()).child('ownerId').val() === auth.uid || root.child('invitations').child(newData.val()).child('ownerUid').val() === auth.uid)))"
+      }
+    },
+
+    "invitations": {
+      ".indexOn": ["ownerId", "ownerUid", "slug"],
+      ".read": "auth != null && ((query.orderByChild === 'ownerId' && query.equalTo === auth.uid) || (query.orderByChild === 'ownerUid' && query.equalTo === auth.uid))",
+      "$id": {
+        ".read": "data.child('status').val() === 'paid' || data.child('status').val() === 'published' || (auth != null && (data.child('ownerId').val() === auth.uid || data.child('ownerUid').val() === auth.uid))",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && (!newData.child('ownerId').exists() || newData.child('ownerId').val() === auth.uid) && (!newData.child('ownerUid').exists() || newData.child('ownerUid').val() === auth.uid) && (newData.child('ownerId').val() === auth.uid || newData.child('ownerUid').val() === auth.uid)) || (data.exists() && (data.child('ownerId').val() === auth.uid || data.child('ownerUid').val() === auth.uid) && (!newData.exists() || ((newData.child('ownerId').val() === auth.uid || newData.child('ownerUid').val() === auth.uid) && (!newData.child('ownerId').exists() || newData.child('ownerId').val() === auth.uid || newData.child('ownerId').val() === data.child('ownerId').val()) && (!newData.child('ownerUid').exists() || newData.child('ownerUid').val() === auth.uid || newData.child('ownerUid').val() === data.child('ownerUid').val())))))",
+        ".validate": "!data.child('status').exists() || newData.child('status').exists()",
+        "status": {
+          ".validate": "(!newData.exists() && !newData.parent().exists()) || (!data.exists() && (newData.val() === 'draft' || newData.val() === 'pending_payment')) || (data.exists() && (newData.val() === data.val() || ((data.val() === 'draft' || data.val() === 'pending_payment') && (newData.val() === 'draft' || newData.val() === 'pending_payment'))))"
+        },
+        "paymentStatus": {
+          ".validate": "(!newData.exists() && (!newData.parent().exists() || !data.exists())) || (!data.exists() && (newData.val() === 'draft' || newData.val() === 'pending_payment') && (!newData.parent().child('status').exists() || newData.parent().child('status').val() === 'draft' || newData.parent().child('status').val() === 'pending_payment')) || (data.exists() && (newData.val() === data.val() || ((data.val() === 'draft' || data.val() === 'pending_payment') && (newData.val() === 'draft' || newData.val() === 'pending_payment'))))"
+        },
+        "orderId": {
+          ".validate": "!newData.exists() || !data.exists() || newData.val() === data.val()"
+        },
+        "receiptUrl": {
+          ".validate": false
+        },
+        "customerPhone": {
+          ".validate": false
+        }
+      }
+    },
+
+    "orders": {
+      ".read": false,
+      ".write": false,
+      "$orderId": {
+        ".read": "auth != null && data.child('ownerUid').val() === auth.uid",
+        ".write": false
+      }
+    },
+
+    "userOrders": {
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+
+    "receiptAttempts": {
+      ".read": false,
+      ".write": false
+    },
+
+    "guests": {
+      ".indexOn": ["invitationSlug", "invitationOwnerId"],
+      ".read": "(auth != null && query.orderByChild === 'invitationOwnerId' && query.equalTo === auth.uid) || (query.orderByChild === 'invitationSlug' && query.equalTo != null && root.child('slugs').child(query.equalTo).exists() && (root.child('invitations').child(root.child('slugs').child(query.equalTo).val()).child('status').val() === 'paid' || root.child('invitations').child(root.child('slugs').child(query.equalTo).val()).child('status').val() === 'published'))",
+      "$id": {
+        ".read": "auth != null && (data.child('invitationOwnerId').val() === auth.uid || root.child('invitations').child(data.child('invitationId').val()).child('ownerId').val() === auth.uid || root.child('invitations').child(data.child('invitationId').val()).child('ownerUid').val() === auth.uid)",
+        ".write": "(!data.exists() && newData.exists() && $id.matches(/^g-[0-9]{10,16}(-[0-9]{1,6})?$/) && root.child('invitations').child(newData.child('invitationId').val()).exists() && (root.child('invitations').child(newData.child('invitationId').val()).child('status').val() === 'paid' || root.child('invitations').child(newData.child('invitationId').val()).child('status').val() === 'published') && root.child('invitations').child(newData.child('invitationId').val()).child('slug').val() === newData.child('invitationSlug').val() && (!newData.child('invitationOwnerId').exists() || newData.child('invitationOwnerId').val() === '' || newData.child('invitationOwnerId').val() === root.child('invitations').child(newData.child('invitationId').val()).child('ownerId').val() || newData.child('invitationOwnerId').val() === root.child('invitations').child(newData.child('invitationId').val()).child('ownerUid').val())) || (data.exists() && !newData.exists() && auth != null && (data.child('invitationOwnerId').val() === auth.uid || root.child('invitations').child(data.child('invitationId').val()).child('ownerId').val() === auth.uid || root.child('invitations').child(data.child('invitationId').val()).child('ownerUid').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['id', 'invitationId', 'invitationSlug', 'fullName', 'attending', 'guestCount', 'submittedAt'])",
+        "id": {
+          ".validate": "newData.isString() && newData.val() === $id"
+        },
+        "invitationId": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+        },
+        "invitationSlug": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+        },
+        "invitationOwnerId": {
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+        "fullName": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120"
+        },
+        "phone": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "attending": {
+          ".validate": "newData.isBoolean()"
+        },
+        "guestCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20"
+        },
+        "mealPreference": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "message": {
+          ".validate": "newData.isString() && newData.val().length <= 1000"
+        },
+        "submittedAt": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+
+    "messages": {
+      ".read": false,
+      ".write": false,
+      "$id": {
+        ".write": "!data.exists() && newData.exists() && $id.matches(/^msg-[0-9]{10,16}(-[a-zA-Z0-9_-]{1,16})?$/)",
+        ".validate": "newData.hasChildren(['id', 'name', 'contact', 'subject', 'message', 'status', 'createdAt'])",
+        "id": {
+          ".validate": "newData.isString() && newData.val() === $id"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120"
+        },
+        "contact": {
+          ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 150"
+        },
+        "subject": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+        },
+        "message": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2000"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val() === 'new'"
+        },
+        "createdAt": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}
