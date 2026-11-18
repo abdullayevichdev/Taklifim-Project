@@ -5,6 +5,7 @@ import { TemplateRenderProps } from './types';
 import { resolveTemplate } from '../utils/templateResolver';
 import { reportTemplateResolutionError } from '../utils/templateAlert';
 import { TemplateResolutionError } from '../components/TemplateResolutionError';
+import { resolveCormorantFont, isItalicFontPreference } from '../utils/typography';
 
 // Individual template designs
 import { Template01_AureliaRoyal } from './designs/Template01_AureliaRoyal';
@@ -121,26 +122,33 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
   const accentColor = invitation.customColors?.accent || templateDef.colorStyle.accent;
   const bgColor = invitation.customColors?.background || templateDef.colorStyle.background;
   const textColor = invitation.customColors?.text || templateDef.colorStyle.text;
-  const headingFont = invitation.customFonts?.heading || templateDef.typography.headingFont;
+  const rawHeadingPref = invitation.customFonts?.heading || templateDef.typography.headingFont;
+  const headingFont = resolveCormorantFont(rawHeadingPref);
+  const preferItalicHeading = isItalicFontPreference(rawHeadingPref);
 
   return (
-    <Component
-      invitation={invitation}
-      template={templateDef}
-      language={language}
-      isDarkTheme={isDarkTheme}
-      isPreview={isPreview}
-      primaryColor={primaryColor}
-      secondaryColor={secondaryColor}
-      accentColor={accentColor}
-      bgColor={bgColor}
-      textColor={textColor}
-      headingFont={headingFont}
-      onRSVPSubmit={onRSVPSubmit}
-      onWishSubmit={onWishSubmit}
-      wishesList={wishesList}
-      interactiveMap={interactiveMap}
-      musicPlayer={musicPlayer}
-    />
+    <div style={{ fontStyle: undefined }}>
+      <Component
+        invitation={invitation}
+        template={templateDef}
+        language={language}
+        isDarkTheme={isDarkTheme}
+        isPreview={isPreview}
+        primaryColor={primaryColor}
+        secondaryColor={secondaryColor}
+        accentColor={accentColor}
+        bgColor={bgColor}
+        textColor={textColor}
+        headingFont={headingFont}
+        onRSVPSubmit={onRSVPSubmit}
+        onWishSubmit={onWishSubmit}
+        wishesList={wishesList}
+        interactiveMap={interactiveMap}
+        musicPlayer={musicPlayer}
+      />
+      {preferItalicHeading && (
+        <style>{`.taklifim-tpl-fit-title { font-style: italic; }`}</style>
+      )}
+    </div>
   );
 };

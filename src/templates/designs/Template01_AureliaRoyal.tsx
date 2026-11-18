@@ -45,7 +45,7 @@ export const Template01_AureliaRoyal: React.FC<TemplateRenderProps> = (props) =>
               <TemplateFitTitle
                 text={invitation.hostNames}
                 className="font-black tracking-tight text-[#2A2420] drop-shadow-xs"
-                style={{ fontFamily: headingFont || 'Playfair Display' }}
+                style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
               />
               <div className="flex items-center justify-center gap-3">
                 <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#B48B47]" />

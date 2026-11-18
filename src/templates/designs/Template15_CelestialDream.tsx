@@ -33,7 +33,7 @@ export const Template15_CelestialDream: React.FC<TemplateRenderProps> = (props) 
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#261E38]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#6B5B95]">
               <span>✨</span>

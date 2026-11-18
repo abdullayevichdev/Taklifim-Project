@@ -50,7 +50,7 @@ export const Template02_WhiteSerenade: React.FC<TemplateRenderProps> = (props) =
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#1E1418]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-rose-300">
               <span>🌸</span>

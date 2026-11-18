@@ -38,7 +38,7 @@ export const Footer: React.FC = () => {
                 Taklifim
               </span>
             </Link>
-            <p className="text-sm text-[#5C4F48] leading-relaxed max-w-sm">
+            <p className="text-[16px] text-[#4A383F] leading-relaxed max-w-sm">
               {t.footer?.about ||
                 '«Har bir lahzaga o‘zgacha taklif.» To‘y, yubiley va marosimlaringiz uchun eng nafis raqamli interaktiv taklifnomalar yaratish platformasi.'}
             </p>
@@ -76,10 +76,10 @@ export const Footer: React.FC = () => {
 
           {/* Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1E1418]">
+            <h4 className="text-[13.5px] font-bold uppercase tracking-[0.09em] text-[#1E1418]">
               {t.footer?.servicesTitle || 'Xizmatlar'}
             </h4>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-2.5 text-[16px]">
               <li>
                 <Link to="/templates" className="text-[#5C4F48] hover:text-[#C94F79] transition-colors">
                   {t.footer?.templatesLink || 'Shablonlar katalogi'}
@@ -108,10 +108,10 @@ export const Footer: React.FC = () => {
 
           {/* Support & Company */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1E1418]">
+            <h4 className="text-[13.5px] font-bold uppercase tracking-[0.09em] text-[#1E1418]">
               {t.footer?.companyTitle || 'Kompaniya'}
             </h4>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-2.5 text-[16px]">
               <li>
                 <Link to="/faq" className="text-[#5C4F48] hover:text-[#C94F79] transition-colors">
                   {t.footer?.faqLink || 'Savol-javoblar'}
@@ -137,7 +137,7 @@ export const Footer: React.FC = () => {
 
           {/* Language and Region */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1E1418]">
+            <h4 className="text-[13.5px] font-bold uppercase tracking-[0.09em] text-[#1E1418]">
               {t.footer?.chooseLanguage || 'Tilni tanlang'}
             </h4>
             <div className="flex flex-col gap-1.5">
@@ -154,10 +154,10 @@ export const Footer: React.FC = () => {
                     key={item.code}
                     type="button"
                     onClick={() => setLanguage(item.code)}
-                    className={`flex items-center gap-2.5 px-3 py-2 min-h-[38px] rounded-xl text-xs font-medium text-left transition-all cursor-pointer ${
+                    className={`flex items-center gap-2.5 px-3 py-2 min-h-[38px] rounded-xl text-[15px] font-medium text-left transition-all cursor-pointer ${
                       isActive
                         ? 'glass-surface-elevated text-[#1E1418] font-bold'
-                        : 'text-[#5C4F48] hover:bg-white/60 hover:text-[#1E1418]'
+                        : 'text-[#4A383F] hover:bg-white/60 hover:text-[#1E1418]'
                     }`}
                   >
                     <FlagIcon code={item.code} />
@@ -170,7 +170,7 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#5C4F48] gap-4">
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[14.5px] text-[#4A383F] gap-4">
           <p>
             © {new Date().getFullYear()} Taklifim.{' '}
             {t.footer?.allRightsReserved || 'Barcha huquqlar himoyalangan.'}

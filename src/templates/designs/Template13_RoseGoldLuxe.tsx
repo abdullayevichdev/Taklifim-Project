@@ -33,7 +33,7 @@ export const Template13_RoseGoldLuxe: React.FC<TemplateRenderProps> = (props) =>
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#26171A]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#B76E79]">
               <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-[#B76E79] to-transparent" />

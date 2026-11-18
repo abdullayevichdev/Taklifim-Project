@@ -28,7 +28,7 @@ export const Template07_BlushElegance: React.FC<TemplateRenderProps> = (props) =
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#2D1A21]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-3">
               <div className="w-16 h-px bg-[#C86D85]/40" />

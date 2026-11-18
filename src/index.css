@@ -1,7 +1,15 @@
+@import "./fonts/cormorant-garamond.css";
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-serif: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-mono: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+}
+
 :root {
-  --font-primary: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-ui: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-primary: var(--font-ui);
 
   /* Taklifim Brand Palette */
   --color-cream: #FDF9F5;
@@ -54,48 +62,93 @@
 
 @layer base {
   *, *::before, *::after {
-    font-family: var(--font-primary);
+    font-family: var(--font-ui);
   }
 
-  html, body {
+  html {
     background-color: #FCEEF4;
     color: #1E1418;
-    font-family: var(--font-primary);
+    font-family: var(--font-ui);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
-    line-height: 1.6;
-    letter-spacing: -0.01em;
+  }
+
+  body {
+    background-color: #FCEEF4;
+    color: #1E1418;
+    font-family: var(--font-ui);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    line-height: 1.55;
+    letter-spacing: 0;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-primary);
-    letter-spacing: -0.02em;
+    font-family: var(--font-ui);
+    letter-spacing: -0.015em;
     font-weight: 700;
+    font-feature-settings: "lnum" 1;
+    font-variant-numeric: lining-nums;
   }
 
-  p, span, div, label, input, textarea, select, button, a {
-    font-family: var(--font-primary);
+  p, span, div, label, a {
+    font-family: var(--font-ui);
   }
 
-  /* Typography System */
-  .font-playfair {
-    font-family: 'Playfair Display', serif !important;
+  input, textarea, select, button, optgroup {
+    font-family: inherit;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
-  .font-cinzel {
-    font-family: 'Cinzel', serif !important;
+  input::placeholder, textarea::placeholder {
+    font-family: inherit;
+    opacity: 0.78;
+  }
+
+  /* Unified Cormorant Garamond Typography Utilities */
+  .font-playfair,
+  .font-cinzel,
+  .font-jakarta,
+  .font-sans,
+  .font-serif {
+    font-family: var(--font-ui) !important;
   }
 
   .font-script,
   .font-alex,
   .font-great-vibes {
-    font-family: 'Great Vibes', cursive !important;
+    font-family: var(--font-ui) !important;
+    font-style: italic;
   }
 
-  .font-jakarta,
-  .font-sans {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
+  .font-mono {
+    font-family: var(--font-ui) !important;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+}
+
+/* Cormorant Garamond has a compact x-height (~0.386em); lift .text-xs/.text-sm cleanly so all UI copy remains >=14px–16px without altering Tailwind rem spacing */
+@layer utilities {
+  .text-xs {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+
+  .text-sm {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .uppercase:not([class*="tracking-"]) {
+    letter-spacing: 0.08em;
   }
 }
 
@@ -667,9 +720,21 @@ lg-button,
 lg-navbar,
 lg-switch,
 lg-slider,
-lg-toast {
+lg-toast,
+lg-segmented,
+lg-menu,
+lg-button .lg-button__el,
+lg-navbar > a,
+lg-navbar > button,
+lg-navbar .lg-nav__copy > span,
+.lg-seg__option,
+.lg-menu__trigger,
+.lg-menu__items > button,
+.lg-menu__copy > span {
   transform: none;
-  font-family: var(--font-primary);
+  font-family: var(--font-ui);
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  font-variant-numeric: lining-nums tabular-nums;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -686,7 +751,9 @@ lg-slider,
 lg-button .lg-button__el {
   color: #1E1418;
   width: 100%;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 lg-button[tone="tinted"] .lg-button__el {
@@ -733,18 +800,19 @@ lg-button[tone="clear"] .lg-button__el:hover .lg-surface__tint {
 lg-button.taklifim-nav-cta .lg-button__el {
   min-height: 38px;
   padding: 0 12px;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 @media (min-width: 1280px) {
   lg-button.taklifim-nav-cta .lg-button__el {
     min-height: 40px;
     padding: 0 16px;
-    font-size: 13px;
+    font-size: 15.5px;
   }
 }
 
-/* Top capsule navbar sizing so long Russian labels fit cleanly from 1024px+ without clipping logo */
+/* Top capsule navbar sizing so long Russian/Uzbek/English labels fit cleanly from 1024px+ */
 lg-navbar.taklifim-top-navbar {
   gap: 1px;
   padding: 4px;
@@ -755,8 +823,8 @@ lg-navbar.taklifim-top-navbar > button,
 lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   height: 34px;
   line-height: 34px;
-  padding: 0 7px;
-  font-size: 11.5px;
+  padding: 0 8px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
@@ -766,8 +834,8 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
     height: 36px;
     line-height: 36px;
-    padding: 0 10px;
-    font-size: 12.5px;
+    padding: 0 11px;
+    font-size: 14.5px;
   }
 }
 
@@ -780,8 +848,18 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   lg-navbar.taklifim-top-navbar > button,
   lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
     padding: 0 13px;
-    font-size: 13.5px;
+    font-size: 15.5px;
   }
+}
+
+/* Leaflet map container and popups inherit Cormorant Garamond */
+.leaflet-container,
+.leaflet-popup-content,
+.leaflet-popup-content-wrapper,
+.leaflet-control {
+  font-family: var(--font-ui) !important;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 /* Pure-CSS GlassSegmented track & indicator */
@@ -1061,8 +1139,8 @@ html.taklifim-modal-open .taklifim-bottom-nav {
 .taklifim-tpl-eyebrow {
   max-width: 100%;
   text-align: center;
-  font-size: clamp(9px, 2.35cqw, 11px);
-  letter-spacing: clamp(0.11em, 0.55cqw, 0.3em);
+  font-size: clamp(11px, 2.7cqw, 13px);
+  letter-spacing: clamp(0.1em, 0.42cqw, 0.2em);
   line-height: 1.45;
   text-wrap: balance;
   overflow-wrap: break-word;
@@ -1092,8 +1170,17 @@ html.taklifim-modal-open .taklifim-bottom-nav {
   justify-content: center;
   text-align: center;
   padding-block: 0.45rem;
-  padding-inline: clamp(0.75rem, 3.5cqw, 1.5rem);
-  font-size: clamp(11px, 2.8cqw, 12px);
+  padding-inline: clamp(0.85rem, 3.5cqw, 1.6rem);
+  font-size: clamp(13px, 3.1cqw, 15px);
+  font-weight: 600;
+}
+
+/* Scoped template body prose readability for Cormorant Garamond */
+.taklifim-tpl-hero-card p.italic,
+.taklifim-tpl-hero-card-spacious p.italic,
+.taklifim-tpl-card > p {
+  font-size: clamp(0.95rem, 3.4cqw, 1.125rem);
+  line-height: 1.6;
 }
 
 .taklifim-cq-grid-2 {

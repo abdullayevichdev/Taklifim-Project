@@ -4,6 +4,7 @@ import { Link } from '../context/RouterContext';
 import { Template } from '../types';
 import { useLanguage, translateCategory } from '../locales';
 import { formatPriceUZS } from '../utils/logic';
+import { resolveCormorantFont } from '../utils/typography';
 
 interface TemplateCardProps {
   template: Template;
@@ -161,9 +162,9 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
             </span>
 
             <p
-              className="mt-1.5 text-[15px] sm:text-base font-bold leading-snug tracking-tight"
+              className="mt-1.5 text-[16px] sm:text-[17px] font-bold leading-snug tracking-tight"
               style={{
-                fontFamily: template.typography.headingFont,
+                fontFamily: resolveCormorantFont(template.typography.headingFont),
                 color: overlay.headingColor,
               }}
             >
@@ -250,7 +251,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
           {template.name}
         </h3>
 
-        <p className="text-xs text-[#4A383F] line-clamp-2 min-h-[2.45rem] leading-[1.52] mt-1.5">
+        <p className="text-xs text-[#4A383F] line-clamp-2 min-h-[2.75rem] leading-[1.52] mt-1.5">
           {description}
         </p>
 

@@ -23,7 +23,7 @@ export const Template12_VintageCharm: React.FC<TemplateRenderProps> = (props) =>
         <div className="taklifim-tpl-hero-card relative rounded-2xl text-center space-y-6 bg-[#F5EFE6] border-2 border-[#8A5D45]/30 shadow-lg">
           {/* Post Stamp Header */}
           <div className="flex items-center justify-between gap-2 border-b border-[#8A5D45]/20 pb-3">
-            <span className="text-[clamp(9px,2.4cqw,10px)] tracking-widest uppercase font-mono text-[#8A5D45] text-left">
+            <span className="text-[clamp(11px,2.6cqw,12px)] tracking-widest uppercase font-mono text-[#8A5D45] text-left">
               PAR AVION • TELEGRAMME
             </span>
             <div className="w-9 h-11 shrink-0 border-2 border-dashed border-[#8A5D45]/50 rounded flex items-center justify-center text-[10px] text-[#8A5D45]">
@@ -35,7 +35,7 @@ export const Template12_VintageCharm: React.FC<TemplateRenderProps> = (props) =>
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#3D291E]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="taklifim-tpl-eyebrow font-mono text-[#8A5D45] uppercase">
               {invitation.eventType || 'NOHUDIY AN’ANAVIY TO‘Y'}

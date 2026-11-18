@@ -27,8 +27,8 @@ export const mockTemplates: Template[] = [
       text: '#2A2420',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh oqshomi', 'Fotixa to‘yi'],
@@ -63,8 +63,8 @@ export const mockTemplates: Template[] = [
       text: '#231E1B',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh kechasi', 'Visol oqshomi'],
@@ -98,8 +98,8 @@ export const mockTemplates: Template[] = [
       text: '#1C2E25',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Milliy to‘y', 'Fotixa to‘yi', 'Sunnat to‘yi'],
@@ -133,8 +133,8 @@ export const mockTemplates: Template[] = [
       text: '#2B251F',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Yubiley', 'Katta tantana'],
@@ -167,8 +167,8 @@ export const mockTemplates: Template[] = [
       text: '#162E23',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Fotixa', 'Sunnat to‘yi'],
@@ -202,8 +202,8 @@ export const mockTemplates: Template[] = [
       text: '#2D2126',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Fotixa to‘yi', 'Unashuv', 'Nikoh'],
@@ -236,8 +236,8 @@ export const mockTemplates: Template[] = [
       text: '#302025',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh', 'Fotixa'],
@@ -270,8 +270,8 @@ export const mockTemplates: Template[] = [
       text: '#222B1B',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Fotixa to‘yi', 'Ochiq osmon ostidagi to‘y', 'Unashuv'],
@@ -304,8 +304,8 @@ export const mockTemplates: Template[] = [
       text: '#1E293B',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh', 'Yubiley'],
@@ -339,8 +339,8 @@ export const mockTemplates: Template[] = [
       text: '#F1F5F9',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Yubiley', 'Dabdabali to‘y', 'Tantanali kecha'],
@@ -373,8 +373,8 @@ export const mockTemplates: Template[] = [
       text: '#0F172A',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh', 'Zamonaviy kecha'],
@@ -407,8 +407,8 @@ export const mockTemplates: Template[] = [
       text: '#2C1B14',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Yubiley', 'Kumush to‘y', 'Fotixa'],
@@ -442,8 +442,8 @@ export const mockTemplates: Template[] = [
       text: '#351D22',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh kechasi', 'Fotixa'],
@@ -476,8 +476,8 @@ export const mockTemplates: Template[] = [
       text: '#1B2E20',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Bog‘dagi to‘y', 'Fotixa'],
@@ -511,8 +511,8 @@ export const mockTemplates: Template[] = [
       text: '#292138',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Tug‘ilgan kun', 'Yubiley', 'Qizlar bayrami'],
@@ -545,8 +545,8 @@ export const mockTemplates: Template[] = [
       text: '#3B221B',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Fotixa to‘yi', 'Unashuv', 'Nikoh'],
@@ -579,8 +579,8 @@ export const mockTemplates: Template[] = [
       text: '#362320',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Beshik to‘y', 'Chaqaloq bayrami', 'Aqiqa'],
@@ -613,8 +613,8 @@ export const mockTemplates: Template[] = [
       text: '#FFF1F4',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['To‘y', 'Nikoh oqshomi', 'Katta tantana'],
@@ -647,8 +647,8 @@ export const mockTemplates: Template[] = [
       text: '#F8FAFC',
     },
     typography: {
-      headingFont: 'Cinzel',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Zamonaviy to‘y', 'Yubiley', 'Kechki ziyofat'],
@@ -682,8 +682,8 @@ export const mockTemplates: Template[] = [
       text: '#1C3545',
     },
     typography: {
-      headingFont: 'Playfair Display',
-      bodyFont: 'Plus Jakarta Sans',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Cormorant Garamond',
     },
     suitableFor: {
       uz: ['Beshik to‘y', 'Chaqaloq bayrami', '1 yosh to‘yi'],

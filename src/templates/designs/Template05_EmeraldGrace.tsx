@@ -34,7 +34,7 @@ export const Template05_EmeraldGrace: React.FC<TemplateRenderProps> = (props) =>
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-white"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-amber-300">
               <span>🌿</span>

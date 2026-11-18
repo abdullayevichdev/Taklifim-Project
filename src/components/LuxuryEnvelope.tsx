@@ -201,7 +201,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
 
         {/* Card Header */}
         <div className="pt-1 relative z-10">
-          <div className="flex items-center justify-center gap-1.5 text-[9px] tracking-[0.26em] uppercase text-[#B8860B] font-extrabold mb-1">
+          <div className="flex items-center justify-center gap-1.5 text-[11px] tracking-[0.2em] uppercase text-[#9A6E08] font-bold mb-1">
             <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
             <span>{headerLabel}</span>
             <Sparkles className="w-2.5 h-2.5 text-[#D4AF37]" />
@@ -211,29 +211,29 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
 
         {/* Couple Names & Ceremony */}
         <div className="py-1.5 space-y-1 relative z-10">
-          <p className="text-[10px] uppercase tracking-widest text-[#8A776A] font-medium">
+          <p className="text-[11.5px] uppercase tracking-[0.14em] text-[#6E5C50] font-semibold">
             {ceremonyLabel}
           </p>
           <h2 className="font-playfair text-2xl sm:text-[26px] font-bold text-[#2A1820] leading-tight">
             {hostNames}
           </h2>
-          <p className="font-script text-2xl sm:text-[28px] text-[#C0607D]">
+          <p className="font-script text-2xl sm:text-[28px] text-[#B84C6E]">
             {scriptSubtitle}
           </p>
         </div>
 
         {/* Invitation Message Snippet */}
-        <div className="text-[10.5px] leading-relaxed text-[#6E5E58] italic px-2 relative z-10">
+        <div className="text-[12.5px] leading-relaxed text-[#52443E] italic px-2 relative z-10">
           {quote}
         </div>
 
         {/* Event Details: Date & Venue */}
-        <div className="border-t border-[#EFE7D8] pt-2 space-y-1 text-xs text-[#52443E] relative z-10">
-          <div className="inline-flex items-center gap-1.5 font-bold text-[#8A5A1B] text-[11px] tabular-nums">
+        <div className="border-t border-[#EFE7D8] pt-2 space-y-1 text-[13px] text-[#52443E] relative z-10">
+          <div className="inline-flex items-center gap-1.5 font-bold text-[#8A5A1B] text-[13px] tabular-nums">
             <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
             <span>{eventDate}</span>
           </div>
-          <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#7A6A64]">
+          <div className="flex items-center justify-center gap-1.5 text-[12.5px] text-[#62524C]">
             <MapPin className="w-3.5 h-3.5 text-[#C0607D]" />
             <span>{venueName}</span>
           </div>
@@ -245,7 +245,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
             <button
               type="button"
               onClick={handleSiteClick}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#2B1B22] to-[#42212E] hover:from-[#3D2530] hover:to-[#542B3B] text-[#FFF4E4] font-bold text-[11px] tracking-wider uppercase shadow-md flex items-center justify-center gap-2 group transition-[transform,opacity] duration-200 whitespace-nowrap"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#2B1B22] to-[#42212E] hover:from-[#3D2530] hover:to-[#542B3B] text-[#FFF4E4] font-bold text-[12.5px] tracking-[0.08em] uppercase shadow-md flex items-center justify-center gap-2 group transition-[transform,opacity] duration-200 whitespace-nowrap"
             >
               <span className="truncate">{viewSiteLabel}</span>
               <ArrowRight className="w-3.5 h-3.5 text-[#E27B9B] group-hover:translate-x-1 transition-transform shrink-0" />

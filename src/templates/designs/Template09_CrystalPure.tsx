@@ -33,7 +33,7 @@ export const Template09_CrystalPure: React.FC<TemplateRenderProps> = (props) => 
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#132A38]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#3B6B88]">
               <span>💎</span>

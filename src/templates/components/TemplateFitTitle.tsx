@@ -105,7 +105,7 @@ export const TemplateFitTitle: React.FC<TemplateFitTitleProps> = ({
       }
 
       if (overflowWidth > availWidth - 1) {
-        const ratio = (availWidth - 2) / overflowWidth;
+        const ratio = Math.max(0.25, (availWidth - 4) / overflowWidth);
         const nextPx = Math.max(minFontSize, Math.floor(targetBase * ratio * 10) / 10);
         heading.style.fontSize = `${nextPx}px`;
 
@@ -174,22 +174,22 @@ export const TemplateFitTitle: React.FC<TemplateFitTitleProps> = ({
               stackNames ? 'flex-col gap-[0.06em]' : 'flex-wrap gap-x-[0.26em] gap-y-[0.06em]'
             }`}
           >
-            <span data-fit-part className="max-w-full text-center leading-[1.08]">
+            <span data-fit-part className="max-w-full text-center leading-[1.12]">
               {couple.left}
             </span>
             <span
               data-fit-part
-              className="max-w-full text-center leading-[1.0] opacity-90"
+              className="max-w-full text-center leading-[1.05] opacity-90"
               style={{ fontSize: stackNames ? '0.78em' : '0.92em' }}
             >
               {couple.sep}
             </span>
-            <span data-fit-part className="max-w-full text-center leading-[1.08]">
+            <span data-fit-part className="max-w-full text-center leading-[1.12]">
               {couple.right}
             </span>
           </span>
         ) : (
-          <span className="block w-full max-w-full text-center leading-[1.12]">{text}</span>
+          <span className="block w-full max-w-full text-center leading-[1.16]">{text}</span>
         )}
       </h1>
     </div>

@@ -36,8 +36,8 @@ export const Template19_ModernNoir: React.FC<TemplateRenderProps> = (props) => {
           <div className="space-y-3">
             <TemplateFitTitle
               text={invitation.hostNames}
-              className="font-black tracking-tight text-white uppercase drop-shadow-md"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              className="font-black tracking-[0.04em] text-white uppercase drop-shadow-md"
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-3">
               <div className="w-12 h-px bg-[#D4AF37]" />

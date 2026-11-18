@@ -36,7 +36,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
   language = 'uz',
   primaryColor = '#B48B47',
   isDarkTheme = false,
-  headingFont = 'Playfair Display',
+  headingFont = 'Cormorant Garamond',
   interactiveMap,
 }) => {
   const labels = {

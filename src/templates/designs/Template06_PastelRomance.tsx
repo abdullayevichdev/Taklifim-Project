@@ -31,7 +31,7 @@ export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) =
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#2D1B22]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-[#E27B9B] to-transparent mx-auto" />
           </div>

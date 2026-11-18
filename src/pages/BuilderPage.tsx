@@ -1859,7 +1859,7 @@ export const BuilderPage: React.FC = () => {
                   <div className="pt-2">
                     <label className="font-bold text-[#3A2D28] block mb-1">{t.builder.fontLabel}</label>
                     <CustomDropdown
-                      value={invitationState.customFonts?.heading || 'Playfair Display'}
+                      value={invitationState.customFonts?.heading || 'Cormorant Garamond'}
                       onChange={(val) =>
                         setInvitationState((p) => ({
                           ...p,
@@ -1870,10 +1870,24 @@ export const BuilderPage: React.FC = () => {
                       buttonClassName="w-full justify-between"
                       dropdownClassName="w-full left-0 right-0"
                       options={[
-                        { value: 'Playfair Display', label: `Playfair Display — ${t.builder.fontClassic}` },
-                        { value: 'Cinzel', label: `Cinzel — ${t.builder.fontRoyal}` },
-                        { value: 'Great Vibes', label: `Great Vibes — ${t.builder.fontScript}` },
-                        { value: 'Plus Jakarta Sans', label: `Plus Jakarta Sans — ${t.builder.fontModern}` },
+                        { value: 'Cormorant Garamond', label: `Cormorant Garamond — ${t.builder.fontClassic}` },
+                        { value: 'Cormorant Garamond Serif', label: `Cormorant Garamond — ${t.builder.fontRoyal}` },
+                        { value: 'Cormorant Garamond Italic', label: `Cormorant Garamond — ${t.builder.fontScript}` },
+                        { value: 'Cormorant Garamond Clean', label: `Cormorant Garamond — ${t.builder.fontModern}` },
+                        ...(invitationState.customFonts?.heading &&
+                        ![
+                          'Cormorant Garamond',
+                          'Cormorant Garamond Serif',
+                          'Cormorant Garamond Italic',
+                          'Cormorant Garamond Clean',
+                        ].includes(invitationState.customFonts.heading)
+                          ? [
+                              {
+                                value: invitationState.customFonts.heading,
+                                label: `Cormorant Garamond (${invitationState.customFonts.heading})`,
+                              },
+                            ]
+                          : []),
                       ]}
                     />
                   </div>

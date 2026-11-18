@@ -33,7 +33,7 @@ export const Template20_SweetButterfly: React.FC<TemplateRenderProps> = (props) 
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#142A3B]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#4A8BB8]">
               <span>☁️</span>

@@ -5,6 +5,7 @@ import { mockTemplates } from '../data/mockTemplates';
 import { api } from '../services/api';
 import { formatPriceUZS } from '../utils/logic';
 import { resolveTemplate } from '../utils/templateResolver';
+import { resolveCormorantFont } from '../utils/typography';
 import { Template } from '../types';
 import {
   GlassSurface,
@@ -136,7 +137,7 @@ export const TemplateDetailPage: React.FC = () => {
                       <h2
                         className="text-2xl font-bold tracking-tight"
                         style={{
-                          fontFamily: template.typography.headingFont,
+                          fontFamily: resolveCormorantFont(template.typography.headingFont),
                           color: template.colorStyle.text,
                         }}
                       >
@@ -211,7 +212,7 @@ export const TemplateDetailPage: React.FC = () => {
                       <h2
                         className="text-3xl font-bold tracking-tight"
                         style={{
-                          fontFamily: template.typography.headingFont,
+                          fontFamily: resolveCormorantFont(template.typography.headingFont),
                           color: template.colorStyle.text,
                         }}
                       >

@@ -33,7 +33,7 @@ export const Template04_GoldenSymphony: React.FC<TemplateRenderProps> = (props) 
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#2E261D]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#C59A4E]">
               <span className="text-xs">𝄞</span>

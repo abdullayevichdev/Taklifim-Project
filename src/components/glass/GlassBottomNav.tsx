@@ -125,7 +125,7 @@ export const GlassBottomNav: React.FC = () => {
               }`}
             >
               <Icon className={`w-[18px] h-[18px] shrink-0 ${tab.isActive ? 'stroke-[2.25]' : 'stroke-[1.9]'}`} aria-hidden="true" />
-              <span className="text-[10px] leading-tight font-semibold tracking-tight truncate max-w-full px-0.5">
+              <span className="text-[12px] leading-tight font-semibold tracking-tight truncate max-w-full px-0.5">
                 {tab.label}
               </span>
             </a>

@@ -109,11 +109,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         marker
           .bindPopup(
             `
-            <div style="font-family: system-ui, sans-serif; min-width: 160px;">
-              <strong style="font-size: 13px; color: #231E1B; display: block; margin-bottom: 4px;">
+            <div style="font-family: inherit; min-width: 165px;">
+              <strong style="font-size: 15px; font-weight: 700; color: #1E1418; display: block; margin-bottom: 4px;">
                 ${venueName}
               </strong>
-              <p style="font-size: 11px; color: #7A6A63; margin: 0;">
+              <p style="font-size: 13px; font-weight: 500; color: #4A383F; margin: 0; line-height: 1.4;">
                 ${venueAddress}
               </p>
             </div>

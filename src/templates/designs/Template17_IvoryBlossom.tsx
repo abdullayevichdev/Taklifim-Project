@@ -33,7 +33,7 @@ export const Template17_IvoryBlossom: React.FC<TemplateRenderProps> = (props) =>
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#2E1D1A]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-rose-300">
               <span>🌸</span>

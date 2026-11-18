@@ -33,7 +33,7 @@ export const Template18_RoyalRuby: React.FC<TemplateRenderProps> = (props) => {
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-white drop-shadow-md"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-amber-400">
               <span>⚜️</span>

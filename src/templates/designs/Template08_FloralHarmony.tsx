@@ -33,7 +33,7 @@ export const Template08_FloralHarmony: React.FC<TemplateRenderProps> = (props) =
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#1E2B16]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#5C7449]">
               <span>🌿</span>

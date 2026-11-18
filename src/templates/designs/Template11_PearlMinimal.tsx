@@ -28,8 +28,8 @@ export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) =>
             <TemplateFitTitle
               text={invitation.hostNames}
               maxFontSize={56}
-              className="font-light tracking-tight text-slate-900 uppercase"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              className="font-medium tracking-[0.04em] text-slate-900 uppercase"
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="w-8 h-px bg-slate-300 mx-auto" />
           </div>
@@ -41,7 +41,7 @@ export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) =>
           )}
 
           {invitation.invitationQuote && (
-            <p className="font-light italic text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+            <p className="font-medium italic text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
               {invitation.invitationQuote}
             </p>
           )}
@@ -54,7 +54,7 @@ export const Template11_PearlMinimal: React.FC<TemplateRenderProps> = (props) =>
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
         {invitation.invitationMessage && (
           <div className="taklifim-tpl-card rounded-2xl text-center space-y-3 bg-white border border-slate-100 shadow-xs">
-            <p className="text-xs sm:text-sm leading-relaxed text-slate-600 font-light max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-600 font-normal max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>
           </div>
         )}
         {invitation.schedule && invitation.schedule.length > 0 && <SharedSchedule schedule={invitation.schedule} language={language} primaryColor={primary} />}

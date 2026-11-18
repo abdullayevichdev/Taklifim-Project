@@ -43,7 +43,7 @@ export const Template03_VelvetSharqona: React.FC<TemplateRenderProps> = (props) 
               <TemplateFitTitle
                 text={invitation.hostNames}
                 className="font-black tracking-tight text-[#184738]"
-                style={{ fontFamily: headingFont || 'Playfair Display' }}
+                style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
               />
               <div className="flex items-center justify-center gap-2 text-[#C59A4E]">
                 <span>❖</span>

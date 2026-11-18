@@ -33,7 +33,7 @@ export const Template16_SunlitTerracotta: React.FC<TemplateRenderProps> = (props
             <TemplateFitTitle
               text={invitation.hostNames}
               className="font-black tracking-tight text-[#3A1E17]"
-              style={{ fontFamily: headingFont || 'Playfair Display' }}
+              style={{ fontFamily: headingFont || 'Cormorant Garamond' }}
             />
             <div className="flex items-center justify-center gap-2 text-[#C06C54]">
               <span>☀️</span>

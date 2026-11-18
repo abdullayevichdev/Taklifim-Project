@@ -15,7 +15,7 @@ export const SharedSchedule: React.FC<SharedScheduleProps> = ({
   language = 'uz',
   primaryColor = '#B48B47',
   isDarkTheme = false,
-  headingFont = 'Playfair Display',
+  headingFont = 'Cormorant Garamond',
 }) => {
   if (!schedule || schedule.length === 0) return null;
 

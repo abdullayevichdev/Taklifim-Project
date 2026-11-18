@@ -17,7 +17,7 @@ export const SharedRSVP: React.FC<SharedRSVPProps> = ({
   language = 'uz',
   primaryColor = '#B48B47',
   isDarkTheme = false,
-  headingFont = 'Playfair Display',
+  headingFont = 'Cormorant Garamond',
   deadline,
   askMealPreference = true,
   onRSVPSubmit,

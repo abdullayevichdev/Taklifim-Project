@@ -279,10 +279,10 @@ export const Header: React.FC = () => {
                   <Phone className="w-3 h-3 xl:w-3.5 xl:h-3.5 text-[#B23864]" aria-hidden="true" />
                 </span>
                 <span className="flex flex-col leading-none text-left pr-0.5">
-                  <span className="text-[11px] xl:text-[11.5px] font-extrabold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
+                  <span className="text-[13px] xl:text-[13.5px] font-bold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
                     +998 933223580
                   </span>
-                  <span className="text-[9px] xl:text-[9.5px] font-semibold tracking-[0.015em] text-[#8A3152] whitespace-nowrap mt-0.5">
+                  <span className="text-[11px] xl:text-[11.5px] font-semibold tracking-[0.02em] text-[#8A3152] whitespace-nowrap mt-0.5">
                     Avazxanov Abdulhay
                   </span>
                 </span>
@@ -298,7 +298,7 @@ export const Header: React.FC = () => {
                 renderTriggerLabel={(selected) => (
                   <span className="inline-flex items-center gap-1.5">
                     <FlagIcon code={selected.value} />
-                    <span className="font-bold text-[11.5px] xl:text-[12px] tracking-wide">
+                    <span className="font-bold text-[13px] xl:text-[13.5px] tracking-wide">
                       {selected.value.toUpperCase()}
                     </span>
                   </span>
@@ -374,10 +374,10 @@ export const Header: React.FC = () => {
               <Phone className="w-3 h-3 text-[#B23864]" aria-hidden="true" />
             </span>
             <span className="flex flex-col leading-none text-left pr-0.5">
-              <span className="text-[11px] font-extrabold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
+              <span className="text-[13px] font-bold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
                 +998 933223580
               </span>
-              <span className="text-[9px] font-semibold tracking-[0.015em] text-[#8A3152] whitespace-nowrap mt-0.5">
+              <span className="text-[11px] font-semibold tracking-[0.02em] text-[#8A3152] whitespace-nowrap mt-0.5">
                 Avazxanov Abdulhay
               </span>
             </span>
@@ -393,7 +393,7 @@ export const Header: React.FC = () => {
             renderTriggerLabel={(selected) => (
               <span className="inline-flex items-center gap-1.5">
                 <FlagIcon code={selected.value} />
-                <span className="font-bold text-[11px] tracking-wide">
+                <span className="font-bold text-[12.5px] tracking-wide">
                   {selected.value.toUpperCase()}
                 </span>
               </span>

@@ -18,7 +18,7 @@ export const SharedGallery: React.FC<SharedGalleryProps> = ({
   language = 'uz',
   primaryColor = '#B48B47',
   isDarkTheme = false,
-  headingFont = 'Playfair Display',
+  headingFont = 'Cormorant Garamond',
 }) => {
   const [activeIdx, setActiveIdx] = useState(0);
 

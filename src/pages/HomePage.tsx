@@ -174,12 +174,12 @@ export const HomePage: React.FC = () => {
                 rounded="full"
                 className="inline-flex items-center px-3.5 sm:px-4 py-1.5"
               >
-                <span className="text-[11px] sm:text-xs font-extrabold tracking-wide uppercase text-[#3A1C25]">
+                <span className="text-[12px] sm:text-[13px] font-bold tracking-[0.08em] uppercase text-[#3A1C25]">
                   {t.hero.badge}
                 </span>
               </GlassSurface>
 
-              <div className="font-script text-[34px] sm:text-[44px] lg:text-[48px] text-[#A8325B] tracking-wide leading-[1.15] -mb-3 drop-shadow-[0_1px_1px_rgba(255,255,255,0.88)]">
+              <div className="font-script text-[34px] sm:text-[44px] lg:text-[48px] font-semibold text-[#A8325B] tracking-wide leading-[1.15] -mb-3 drop-shadow-[0_1px_1px_rgba(255,255,255,0.88)]">
                 {t.hero.script}
               </div>
 
@@ -187,7 +187,7 @@ export const HomePage: React.FC = () => {
                 {t.hero.title}
               </h1>
 
-              <p className="text-base sm:text-[17px] text-[#2F2027] max-w-xl leading-relaxed font-medium drop-shadow-[0_1px_1px_rgba(255,255,255,0.78)]">
+              <p className="text-[18px] sm:text-[19px] text-[#2F2027] max-w-xl leading-relaxed font-medium drop-shadow-[0_1px_1px_rgba(255,255,255,0.78)]">
                 {t.hero.subtitle}
               </p>
 
@@ -610,7 +610,7 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-center text-[#5C4F48] mt-7 pt-5 border-t border-white/60 italic">
+          <p className="text-[13px] text-center text-[#4A383F] mt-7 pt-5 border-t border-white/60 italic">
             * {t.stats.demoNotice}
           </p>
         </GlassSurface>

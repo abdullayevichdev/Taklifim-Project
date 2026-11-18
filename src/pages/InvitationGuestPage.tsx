@@ -16,6 +16,7 @@ import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { resolveTemplate } from '../utils/templateResolver';
 import { reportTemplateResolutionError } from '../utils/templateAlert';
 import { TemplateResolutionError } from '../components/TemplateResolutionError';
+import { resolveCormorantFont, isItalicFontPreference } from '../utils/typography';
 import { Language, GuestRSVP, InvitationData } from '../types';
 import { translations, translateCategory } from '../locales';
 import confetti from 'canvas-confetti';
@@ -770,8 +771,10 @@ export const InvitationGuestPage: React.FC = () => {
       ? invitation.customColors.text
       : templateDef.colorStyle.text;
 
-  const headingFont =
-    invitation.customFonts?.heading || templateDef.typography.headingFont || 'Playfair Display';
+  const rawHeadingFontPref =
+    invitation.customFonts?.heading || templateDef.typography.headingFont || 'Cormorant Garamond';
+  const headingFont = resolveCormorantFont(rawHeadingFontPref);
+  const preferItalicCoverHeading = isItalicFontPreference(rawHeadingFontPref);
 
   // Tilga moslashtirilgan to'liq dinamik matnlar
   const getLocalizedContent = (inv: InvitationData, lang: Language) => {
@@ -942,6 +945,8 @@ export const InvitationGuestPage: React.FC = () => {
           <div className="space-y-2">
             <h1
               className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${
+                preferItalicCoverHeading ? 'italic' : ''
+              } ${
                 isDarkTheme ? 'text-white' : 'text-[#1E1418]'
               }`}
               style={{ fontFamily: headingFont }}
