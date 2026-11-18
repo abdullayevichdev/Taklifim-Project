@@ -242,7 +242,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: 'custom',
     });
 
@@ -260,6 +260,13 @@ async function startServer() {
       }
     });
   } else {
+    app.use(
+      '/video',
+      express.static(path.resolve(__dirname, 'dist/video'), {
+        immutable: true,
+        maxAge: '365d',
+      })
+    );
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist/index.html'));

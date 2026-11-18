@@ -13,6 +13,7 @@ import { CustomDropdown } from '../components/CustomDropdown';
 import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
+import { InvitationShell } from '../components/InvitationShell';
 import { resolveTemplate } from '../utils/templateResolver';
 import { reportTemplateResolutionError } from '../utils/templateAlert';
 import { TemplateResolutionError } from '../components/TemplateResolutionError';
@@ -21,7 +22,6 @@ import { Language, GuestRSVP, InvitationData } from '../types';
 import { translations, translateCategory } from '../locales';
 import confetti from 'canvas-confetti';
 import {
-  Gem,
   Loader2,
   Calendar,
   Clock,
@@ -37,7 +37,6 @@ import {
   Utensils,
   Music,
   ExternalLink,
-  MailOpen,
   Globe,
   Instagram,
   Phone,
@@ -236,27 +235,6 @@ const guestTranslations: Record<Language, {
   },
 };
 
-// Dinamik kelin-kuyov monogrammasi (Masalan, Asrorbek va Madina => "A & M")
-const getMonogram = (inv: InvitationData | null): string => {
-  if (!inv) return 'T';
-  if (inv.partner1Name && inv.partner2Name) {
-    const p1 = inv.partner1Name.trim().charAt(0).toUpperCase();
-    const p2 = inv.partner2Name.trim().charAt(0).toUpperCase();
-    return `${p1} & ${p2}`;
-  }
-  const raw = inv.hostNames || '';
-  const parts = raw.split(/&|va|and|\+/i).map((s) => s.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    const p1 = parts[0].charAt(0).toUpperCase();
-    const p2 = parts[1].charAt(0).toUpperCase();
-    return `${p1} & ${p2}`;
-  }
-  if (parts.length === 1 && parts[0].length > 0) {
-    return parts[0].charAt(0).toUpperCase();
-  }
-  return 'A & M';
-};
-
 export const InvitationGuestPage: React.FC = () => {
   const { params, navigate } = useRouter();
   const { showToast } = useAuth();
@@ -291,11 +269,8 @@ export const InvitationGuestPage: React.FC = () => {
 
   // Envelope cover opening state
   const [isCoverOpened, setIsCoverOpened] = useState<boolean>(false);
-  const [isOpeningAnimation, setIsOpeningAnimation] = useState<boolean>(false);
 
-  const handleOpenInvitation = () => {
-    setIsOpeningAnimation(true);
-
+  const fireOpeningConfetti = () => {
     try {
       // 1-bosqich: Markaziy ulug'vor oltin va pushti portlash
       confetti({
@@ -364,11 +339,6 @@ export const InvitationGuestPage: React.FC = () => {
     } catch {
       // ignore
     }
-
-    setTimeout(() => {
-      setIsCoverOpened(true);
-      setIsOpeningAnimation(false);
-    }, 900);
   };
 
   // Countdown state
@@ -821,283 +791,139 @@ export const InvitationGuestPage: React.FC = () => {
 
   const loc = getLocalizedContent(invitation, invLang);
 
-  // 1. LUXURY WEDDING ENVELOPE COVER OPENING EFFECT
-  if (!isCoverOpened) {
-    return (
+  const coverLanguageSwitcher = (
+    <GlassSegmented<Language>
+      value={invLang}
+      onChange={setInvLang}
+      ariaLabel="UZ / RU / EN"
+      options={[
+        { value: 'uz', label: 'UZ' },
+        { value: 'ru', label: 'RU' },
+        { value: 'en', label: 'EN' },
+      ]}
+    />
+  );
+
+  const coverFooterBadge = (
+    <GlassSurface
+      variant="subtle"
+      rounded="full"
+      className="inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold text-[#3B2A30]"
+    >
+      <TaklifimLogo className="w-3.5 h-3.5" />
+      <span>{gt.createdOn}</span>
+    </GlassSurface>
+  );
+
+  return (
+    <InvitationShell
+      isOpened={isCoverOpened}
+      onOpenStart={fireOpeningConfetti}
+      onOpen={() => setIsCoverOpened(true)}
+      enableConfetti={false}
+      variant="fullscreen"
+      headerLabel={activeLocaleT.hero.envelopeHeader}
+      ceremonyLabel={loc.weddingCeremony}
+      hostNames={invitation.hostNames}
+      subtitleText={loc.invitationQuote}
+      openButtonLabel={gt.openEnvelope}
+      hintText={gt.clickToOpen}
+      coverTopOverlay={coverLanguageSwitcher}
+      coverFooterOverlay={coverFooterBadge}
+      fallbackBgColor={bgColor}
+      backdropImage={templateDef.previewImage}
+    >
+      {/* GUEST PAGE FULL VIEW */}
       <div
-        className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative overflow-hidden"
-        style={{ backgroundColor: bgColor }}
+        className="min-h-screen transition-colors pb-24 relative"
+        style={{ backgroundColor: bgColor, color: textColor }}
       >
-        {/* Template Visual Theme Backdrop */}
-        {templateDef.previewImage && (
-          <div
-            className="fixed inset-0 pointer-events-none -z-10 bg-cover bg-center transition-opacity duration-700"
-            style={{
-              backgroundImage: `url(${templateDef.previewImage})`,
-              opacity: isDarkTheme ? 0.38 : 0.28,
-              filter: isDarkTheme ? 'contrast(1.15) brightness(0.85)' : 'contrast(1.05)',
-            }}
+        {/* Floating Invitation Header: Liquid Glass Language switch & Share */}
+        <div className="fixed top-2.5 sm:top-3 left-2.5 sm:left-4 right-2.5 sm:right-4 z-40 max-w-4xl mx-auto flex items-center justify-between gap-2 pointer-events-none">
+          <div className="pointer-events-auto">
+            <GlassSegmented<Language>
+              value={invLang}
+              onChange={setInvLang}
+              ariaLabel="UZ / RU / EN"
+              options={[
+                { value: 'uz', label: 'UZ' },
+                { value: 'ru', label: 'RU' },
+                { value: 'en', label: 'EN' },
+              ]}
+            />
+          </div>
+
+          <div className="pointer-events-auto flex items-center gap-2">
+            <GlassButton
+              tone="light"
+              size="sm"
+              onClick={() => setShowShareModal(true)}
+              className="!min-w-[44px] !min-h-[40px] !px-3.5 shadow-[0_10px_28px_-6px_rgba(30,20,24,0.2)]"
+              title={activeLocaleT.common.share}
+              aria-label={activeLocaleT.common.share}
+            >
+              <span className="inline-flex items-center sm:gap-2">
+                <Share2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span className="hidden sm:inline text-xs font-semibold">
+                  {activeLocaleT.common.share}
+                </span>
+              </span>
+            </GlassButton>
+          </div>
+        </div>
+
+        {/* Dedicated Dynamic Template Renderer */}
+        <TemplateRenderer
+          invitation={invitation}
+          language={invLang}
+          isPreview={false}
+          onRSVPSubmit={handleGuestRSVP}
+          onWishSubmit={handleGuestWish}
+          wishesList={guestList
+            .filter((g) => g.message && g.message.trim().length > 0)
+            .map((g) => ({
+              id: g.id,
+              name: g.fullName,
+              message: g.message || '',
+              date: g.submittedAt || '',
+            }))}
+          interactiveMap={
+            invitation.latitude && invitation.longitude ? (
+              <div className="rounded-2xl overflow-hidden shadow-inner border border-black/5 aspect-[16/10] w-full">
+                <iframe
+                  title="Google Maps"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  src={`https://maps.google.com/maps?q=${invitation.latitude},${invitation.longitude}&z=15&output=embed`}
+                />
+              </div>
+            ) : undefined
+          }
+        />
+
+        {/* Floating Music Player if enabled & uploaded */}
+        {invitation.musicEnabled && invitation.musicUrl && (
+          <MusicPlayer
+            url={invitation.musicUrl}
+            title={invitation.musicTitle}
+            autoPlay={true}
+            delaySeconds={5}
+            language={invLang}
           />
         )}
 
-        {/* Top Floating Language Switcher for Envelope Screen */}
-        <div className="fixed sm:absolute top-3 left-3 z-40">
-          <GlassSegmented<Language>
-            value={invLang}
-            onChange={setInvLang}
-            ariaLabel="UZ / RU / EN"
-            options={[
-              { value: 'uz', label: 'UZ' },
-              { value: 'ru', label: 'RU' },
-              { value: 'en', label: 'EN' },
-            ]}
+        {/* Share Modal */}
+        {showShareModal && (
+          <ShareModal
+            url={`/i/${slug}`}
+            title={`${invitation.hostNames} — ${invitation.eventTitle || translateCategory(invitation.eventType, invLang)}`}
+            language={invLang}
+            onClose={() => setShowShareModal(false)}
           />
-        </div>
-
-        {/* Soft floating romance ambient glow (CSS radial gradient — zero blur filter pass) */}
-        <div
-          className="absolute top-1/4 -left-20 w-80 h-80 rounded-full opacity-35 pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${secondaryColor} 0%, transparent 70%)` }}
-        />
-        <div
-          className="absolute bottom-1/4 -right-20 w-80 h-80 rounded-full opacity-35 pointer-events-none"
-          style={{ background: `radial-gradient(circle, ${primaryColor} 0%, transparent 70%)` }}
-        />
-
-        {/* Liquid Glass Luxury Envelope Card */}
-        <div
-          className={`relative max-w-md w-full rounded-[36px] p-8 sm:p-10 text-center space-y-6 transition-all duration-700 motion-reduce:transition-none ${
-            isDarkTheme
-              ? 'bg-[#0E1A2B]/94 md:bg-[#0E1A2B]/88 md:backdrop-blur-2xl text-white border border-amber-300/35 shadow-[0_25px_80px_rgba(0,0,0,0.65)]'
-              : 'glass-surface-elevated text-[#1E1418]'
-          } ${
-            isOpeningAnimation ? 'opacity-80 -translate-y-4' : 'animate-fadeIn motion-reduce:animate-none'
-          }`}
-          style={{
-            boxShadow: `0 25px 60px -15px ${primaryColor}35, 0 0 0 1px ${
-              isDarkTheme ? 'rgba(212,175,55,0.28)' : 'rgba(255, 255, 255, 0.92)'
-            }`,
-          }}
-        >
-          {/* Decorative Envelope Flap Header */}
-          <div className="relative pt-2">
-            <div
-              className="w-16 h-1 mx-auto rounded-full opacity-45 mb-3"
-              style={{ backgroundColor: primaryColor }}
-            />
-            <span
-              className="font-script text-3xl sm:text-4xl tracking-wider block font-bold leading-relaxed mb-1"
-              style={{
-                color: isDarkTheme ? '#F5D061' : '#7A4A28',
-                textShadow: isDarkTheme
-                  ? '0 2px 10px rgba(0,0,0,0.6)'
-                  : '0 1px 2px rgba(255, 255, 255, 0.9)',
-              }}
-            >
-              {gt.envelopeSubtitle}
-            </span>
-            <div
-              className={`text-[10px] uppercase tracking-[0.25em] font-extrabold mt-1 ${
-                isDarkTheme ? 'text-amber-200/85' : 'text-[#4A383F]'
-              }`}
-            >
-              {loc.weddingCeremony}
-            </div>
-          </div>
-
-          {/* Royal Wax Seal Monogram */}
-          <div className="relative py-2 flex justify-center">
-            <button
-              type="button"
-              disabled={isOpeningAnimation}
-              onClick={handleOpenInvitation}
-              aria-label={gt.openEnvelope}
-              className={`w-24 h-24 rounded-full p-1.5 shadow-[0_12px_32px_rgba(198,72,115,0.34)] flex items-center justify-center cursor-pointer transition-all duration-700 motion-reduce:transition-none relative group ${
-                isOpeningAnimation
-                  ? 'rotate-180 opacity-85'
-                  : 'hover:-translate-y-1'
-              }`}
-              style={{
-                background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-              }}
-            >
-              <div
-                className={`w-full h-full rounded-full flex flex-col items-center justify-center border-2 border-white shadow-inner ${
-                  isDarkTheme
-                    ? 'bg-[#0B1525]'
-                    : 'bg-gradient-to-tr from-[#FFF5F8] via-white to-[#F0F8FF]'
-                }`}
-              >
-                <Gem className="w-4 h-4 mb-0.5" style={{ color: primaryColor }} aria-hidden="true" />
-                <span
-                  className={`font-playfair text-xs font-black tracking-widest ${
-                    isDarkTheme ? 'text-amber-300' : 'text-[#1E1418]'
-                  }`}
-                >
-                  {getMonogram(invitation)}
-                </span>
-              </div>
-              <div className="absolute inset-0 rounded-full border border-white/60 opacity-40 pointer-events-none" />
-            </button>
-          </div>
-
-          {/* Couple Names & Title */}
-          <div className="space-y-2">
-            <h1
-              className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${
-                preferItalicCoverHeading ? 'italic' : ''
-              } ${
-                isDarkTheme ? 'text-white' : 'text-[#1E1418]'
-              }`}
-              style={{ fontFamily: headingFont }}
-            >
-              {invitation.hostNames}
-            </h1>
-            <p
-              className={`text-xs sm:text-sm max-w-xs mx-auto leading-relaxed italic ${
-                isDarkTheme ? 'text-slate-200' : 'text-[#4A383F]'
-              }`}
-            >
-              {loc.invitationQuote}
-            </p>
-          </div>
-
-          {/* Grand Opening Liquid Glass CTA */}
-          <div className="pt-2 space-y-2.5">
-            <GlassButton
-              tone="tinted"
-              size="lg"
-              loading={isOpeningAnimation}
-              onClick={handleOpenInvitation}
-              className="w-full"
-              leftIcon={<Heart className="w-4 h-4 fill-white text-white" aria-hidden="true" />}
-              rightIcon={<MailOpen className="w-4 h-4 text-white/90" aria-hidden="true" />}
-            >
-              {gt.openEnvelope}
-            </GlassButton>
-            <span
-              className={`text-[11px] block font-medium ${
-                isDarkTheme ? 'text-amber-200/85' : 'text-[#4A383F]'
-              }`}
-            >
-              {gt.clickToOpen}
-            </span>
-          </div>
-
-          {/* Taklifim Platform Badge at bottom of Cover */}
-          <div className="pt-2 flex items-center justify-center">
-            {isDarkTheme ? (
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 md:bg-slate-900/80 md:backdrop-blur-md border border-white/15 text-[11px] font-semibold text-amber-200 shadow-xs">
-                <TaklifimLogo className="w-3.5 h-3.5" />
-                <span>{gt.createdOn}</span>
-              </div>
-            ) : (
-              <GlassSurface
-                variant="subtle"
-                rounded="full"
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 text-[11px] font-semibold text-[#4A383F]"
-              >
-                <TaklifimLogo className="w-3.5 h-3.5" />
-                <span>{gt.createdOn}</span>
-              </GlassSurface>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-    );
-  }
-
-  // GUEST PAGE FULL VIEW
-  return (
-    <div
-      className="min-h-screen transition-colors pb-24 relative"
-      style={{ backgroundColor: bgColor, color: textColor }}
-    >
-      {/* Floating Invitation Header: Liquid Glass Language switch & Share */}
-      <div className="fixed top-2.5 sm:top-3 left-2.5 sm:left-4 right-2.5 sm:right-4 z-40 max-w-4xl mx-auto flex items-center justify-between gap-2 pointer-events-none">
-        <div className="pointer-events-auto">
-          <GlassSegmented<Language>
-            value={invLang}
-            onChange={setInvLang}
-            ariaLabel="UZ / RU / EN"
-            options={[
-              { value: 'uz', label: 'UZ' },
-              { value: 'ru', label: 'RU' },
-              { value: 'en', label: 'EN' },
-            ]}
-          />
-        </div>
-
-        <div className="pointer-events-auto flex items-center gap-2">
-          <GlassButton
-            tone="light"
-            size="sm"
-            onClick={() => setShowShareModal(true)}
-            className="!min-w-[44px] !min-h-[40px] !px-3.5 shadow-[0_10px_28px_-6px_rgba(30,20,24,0.2)]"
-            title={activeLocaleT.common.share}
-            aria-label={activeLocaleT.common.share}
-          >
-            <span className="inline-flex items-center sm:gap-2">
-              <Share2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline text-xs font-semibold">
-                {activeLocaleT.common.share}
-              </span>
-            </span>
-          </GlassButton>
-        </div>
-      </div>
-
-      {/* Dedicated Dynamic Template Renderer */}
-      <TemplateRenderer
-        invitation={invitation}
-        language={invLang}
-        isPreview={false}
-        onRSVPSubmit={handleGuestRSVP}
-        onWishSubmit={handleGuestWish}
-        wishesList={guestList
-          .filter((g) => g.message && g.message.trim().length > 0)
-          .map((g) => ({
-            id: g.id,
-            name: g.fullName,
-            message: g.message || '',
-            date: g.submittedAt || '',
-          }))}
-        interactiveMap={
-          invitation.latitude && invitation.longitude ? (
-            <div className="rounded-2xl overflow-hidden shadow-inner border border-black/5 aspect-[16/10] w-full">
-              <iframe
-                title="Google Maps"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                src={`https://maps.google.com/maps?q=${invitation.latitude},${invitation.longitude}&z=15&output=embed`}
-              />
-            </div>
-          ) : undefined
-        }
-      />
-
-      {/* Floating Music Player if enabled & uploaded */}
-      {invitation.musicEnabled && invitation.musicUrl && (
-        <MusicPlayer
-          url={invitation.musicUrl}
-          title={invitation.musicTitle}
-          autoPlay={true}
-          delaySeconds={5}
-          language={invLang}
-        />
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <ShareModal
-          url={`/i/${slug}`}
-          title={`${invitation.hostNames} — ${invitation.eventTitle || translateCategory(invitation.eventType, invLang)}`}
-          language={invLang}
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
-    </div>
+    </InvitationShell>
   );
 };

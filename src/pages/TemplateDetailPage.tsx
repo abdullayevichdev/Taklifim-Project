@@ -23,7 +23,9 @@ import {
   Eye,
   Calendar,
   MapPin,
+  RotateCcw,
 } from 'lucide-react';
+import { InvitationShell } from '../components/InvitationShell';
 
 export const TemplateDetailPage: React.FC = () => {
   const { params, navigate } = useRouter();
@@ -31,7 +33,12 @@ export const TemplateDetailPage: React.FC = () => {
   const slug = params.slug;
 
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+  const [isCoverOpened, setIsCoverOpened] = useState<boolean>(false);
   const [allTemplates, setAllTemplates] = useState<Template[]>(mockTemplates);
+
+  useEffect(() => {
+    setIsCoverOpened(false);
+  }, [slug]);
 
   useEffect(() => {
     async function load() {
@@ -105,12 +112,24 @@ export const TemplateDetailPage: React.FC = () => {
             <span>{t.templateDetail.backToCatalog}</span>
           </Link>
 
-          <GlassSegmented<'mobile' | 'desktop'>
-            options={deviceOptions}
-            value={previewDevice}
-            onChange={(val) => setPreviewDevice(val)}
-            ariaLabel={t.templateDetail.mobileView}
-          />
+          <div className="flex flex-wrap items-center gap-2.5">
+            {isCoverOpened && (
+              <button
+                type="button"
+                onClick={() => setIsCoverOpened(false)}
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 rounded-full glass-surface text-xs font-semibold text-[#1E1418] hover:bg-white transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-[#C64873]" aria-hidden="true" />
+                <span>{t.hero.envelopeHeader}</span>
+              </button>
+            )}
+            <GlassSegmented<'mobile' | 'desktop'>
+              options={deviceOptions}
+              value={previewDevice}
+              onChange={(val) => setPreviewDevice(val)}
+              ariaLabel={t.templateDetail.mobileView}
+            />
+          </div>
         </div>
 
         {/* Main Grid */}
@@ -120,72 +139,91 @@ export const TemplateDetailPage: React.FC = () => {
             <GlassSurface variant="elevated" rounded="3xl" className="p-4 sm:p-8 flex justify-center">
               {previewDevice === 'mobile' ? (
                 <div className="w-[296px] sm:w-[336px] rounded-[44px] p-4 bg-[#231E1B] shadow-2xl ring-1 ring-white/25 relative">
-                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-30" />
+                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-40 pointer-events-none" />
 
                   <div
-                    className="w-full h-[600px] rounded-[36px] overflow-y-auto overflow-x-hidden relative p-6 pt-9 text-center flex flex-col justify-between border border-black/10 select-none shadow-inner"
+                    className="w-full h-[600px] rounded-[36px] overflow-hidden relative border border-black/10 select-none shadow-inner"
                     style={{ backgroundColor: template.colorStyle.background }}
                   >
-                    <div className="space-y-4">
+                    <InvitationShell
+                      isOpened={isCoverOpened}
+                      onOpen={() => setIsCoverOpened(true)}
+                      enableConfetti={true}
+                      variant="frame"
+                      frameRadiusClass="rounded-[36px]"
+                      compact={true}
+                      headerLabel={t.hero.envelopeHeader}
+                      ceremonyLabel={categoryLabel}
+                      hostNames={t.hero.sampleGroomBride}
+                      openButtonLabel={t.hero.openEnvelopeBtn}
+                      fallbackBgColor={template.colorStyle.background}
+                    >
                       <div
-                        className="text-[10px] tracking-widest uppercase font-bold"
-                        style={{ color: template.colorStyle.primary }}
+                        className="w-full h-full overflow-y-auto overflow-x-hidden taklifim-preview-scroll p-6 pt-9 text-center flex flex-col justify-between"
+                        style={{ backgroundColor: template.colorStyle.background }}
                       >
-                        {categoryLabel.toUpperCase()} • {t.templateDetail.sampleTag}
-                      </div>
+                        <div className="space-y-4">
+                          <div
+                            className="text-[10px] tracking-widest uppercase font-bold"
+                            style={{ color: template.colorStyle.primary }}
+                          >
+                            {categoryLabel.toUpperCase()} • {t.templateDetail.sampleTag}
+                          </div>
 
-                      <h2
-                        className="text-2xl font-bold tracking-tight"
-                        style={{
-                          fontFamily: resolveCormorantFont(template.typography.headingFont),
-                          color: template.colorStyle.text,
-                        }}
-                      >
-                        {t.hero.sampleGroomBride}
-                      </h2>
+                          <h2
+                            className="text-2xl font-bold tracking-tight"
+                            style={{
+                              fontFamily: resolveCormorantFont(template.typography.headingFont),
+                              color: template.colorStyle.text,
+                            }}
+                          >
+                            {t.hero.sampleGroomBride}
+                          </h2>
 
-                      <div
-                        className="w-10 h-0.5 mx-auto opacity-50"
-                        style={{ backgroundColor: template.colorStyle.primary }}
-                      />
+                          <div
+                            className="w-10 h-0.5 mx-auto opacity-50"
+                            style={{ backgroundColor: template.colorStyle.primary }}
+                          />
 
-                      <div className="w-full h-48 rounded-2xl overflow-hidden shadow-sm border border-white/60">
-                        <img src={template.previewImage} alt={template.name} className="w-full h-full object-cover" />
-                      </div>
+                          <div className="w-full h-48 rounded-2xl overflow-hidden shadow-sm border border-white/60">
+                            <img src={template.previewImage} alt={template.name} className="w-full h-full object-cover" />
+                          </div>
 
-                      <p
-                        className="text-xs leading-relaxed italic px-2"
-                        style={{ color: template.colorStyle.text, opacity: 0.85 }}
-                      >
-                        {t.templateDetail.sampleQuote}
-                      </p>
+                          <p
+                            className="text-xs leading-relaxed italic px-2"
+                            style={{ color: template.colorStyle.text, opacity: 0.85 }}
+                          >
+                            {t.templateDetail.sampleQuote}
+                          </p>
 
-                      <div className="py-2 space-y-1 text-xs">
-                        <div
-                          className="font-bold flex items-center justify-center gap-1.5"
-                          style={{ color: template.colorStyle.primary }}
-                        >
-                          <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
-                          <span>{t.hero.sampleDate}</span>
+                          <div className="py-2 space-y-1 text-xs">
+                            <div
+                              className="font-bold flex items-center justify-center gap-1.5"
+                              style={{ color: template.colorStyle.primary }}
+                            >
+                              <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
+                              <span>{t.hero.sampleDate}</span>
+                            </div>
+                            <div
+                              className="text-[11px] flex items-center justify-center gap-1"
+                              style={{ color: template.colorStyle.text, opacity: 0.78 }}
+                            >
+                              <MapPin className="w-3 h-3" aria-hidden="true" />
+                              <span>{t.hero.sampleVenue}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div
-                          className="text-[11px] flex items-center justify-center gap-1"
-                          style={{ color: template.colorStyle.text, opacity: 0.78 }}
-                        >
-                          <MapPin className="w-3 h-3" aria-hidden="true" />
-                          <span>{t.hero.sampleVenue}</span>
+
+                        <div className="pt-4 border-t border-black/5">
+                          <div
+                            className="w-full py-2.5 rounded-xl text-xs font-bold text-white shadow-xs"
+                            style={{ backgroundColor: template.colorStyle.primary }}
+                          >
+                            {t.templateDetail.sampleButton}
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-black/5">
-                      <div
-                        className="w-full py-2.5 rounded-xl text-xs font-bold text-white shadow-xs"
-                        style={{ backgroundColor: template.colorStyle.primary }}
-                      >
-                        {t.templateDetail.sampleButton}
-                      </div>
-                    </div>
+                    </InvitationShell>
                   </div>
                 </div>
               ) : (
@@ -199,43 +237,62 @@ export const TemplateDetailPage: React.FC = () => {
                     </span>
                   </div>
                   <div
-                    className="w-full h-[480px] rounded-2xl overflow-y-auto p-8 text-center flex flex-col justify-between"
+                    className="w-full h-[480px] rounded-2xl overflow-hidden relative"
                     style={{ backgroundColor: template.colorStyle.background }}
                   >
-                    <div className="max-w-md mx-auto space-y-4">
+                    <InvitationShell
+                      isOpened={isCoverOpened}
+                      onOpen={() => setIsCoverOpened(true)}
+                      enableConfetti={true}
+                      variant="frame"
+                      frameRadiusClass="rounded-2xl"
+                      compact={false}
+                      headerLabel={t.hero.envelopeHeader}
+                      ceremonyLabel={categoryLabel}
+                      hostNames={t.hero.sampleGroomBride}
+                      openButtonLabel={t.hero.openEnvelopeBtn}
+                      fallbackBgColor={template.colorStyle.background}
+                    >
                       <div
-                        className="text-xs tracking-widest uppercase font-bold"
-                        style={{ color: template.colorStyle.primary }}
+                        className="w-full h-full overflow-y-auto taklifim-preview-scroll p-8 text-center flex flex-col justify-between"
+                        style={{ backgroundColor: template.colorStyle.background }}
                       >
-                        {categoryLabel}
+                        <div className="max-w-md mx-auto space-y-4">
+                          <div
+                            className="text-xs tracking-widest uppercase font-bold"
+                            style={{ color: template.colorStyle.primary }}
+                          >
+                            {categoryLabel}
+                          </div>
+                          <h2
+                            className="text-3xl font-bold tracking-tight"
+                            style={{
+                              fontFamily: resolveCormorantFont(template.typography.headingFont),
+                              color: template.colorStyle.text,
+                            }}
+                          >
+                            {t.hero.sampleGroomBride}
+                          </h2>
+                          <div className="w-full h-44 rounded-2xl overflow-hidden shadow-xs border border-white">
+                            <img src={template.previewImage} alt={template.name} className="w-full h-full object-cover" />
+                          </div>
+                          <p
+                            className="text-sm leading-relaxed italic"
+                            style={{ color: template.colorStyle.text, opacity: 0.85 }}
+                          >
+                            {t.templateDetail.sampleQuoteDesktop}
+                          </p>
+                        </div>
+                        <div className="pt-4">
+                          <span
+                            className="inline-block px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs"
+                            style={{ backgroundColor: template.colorStyle.primary }}
+                          >
+                            {t.templateDetail.sampleRsvpShort}
+                          </span>
+                        </div>
                       </div>
-                      <h2
-                        className="text-3xl font-bold tracking-tight"
-                        style={{
-                          fontFamily: resolveCormorantFont(template.typography.headingFont),
-                          color: template.colorStyle.text,
-                        }}
-                      >
-                        {t.hero.sampleGroomBride}
-                      </h2>
-                      <div className="w-full h-44 rounded-2xl overflow-hidden shadow-xs border border-white">
-                        <img src={template.previewImage} alt={template.name} className="w-full h-full object-cover" />
-                      </div>
-                      <p
-                        className="text-sm leading-relaxed italic"
-                        style={{ color: template.colorStyle.text, opacity: 0.85 }}
-                      >
-                        {t.templateDetail.sampleQuoteDesktop}
-                      </p>
-                    </div>
-                    <div className="pt-4">
-                      <span
-                        className="inline-block px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs"
-                        style={{ backgroundColor: template.colorStyle.primary }}
-                      >
-                        {t.templateDetail.sampleRsvpShort}
-                      </span>
-                    </div>
+                    </InvitationShell>
                   </div>
                 </div>
               )}

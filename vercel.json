@@ -4,7 +4,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|images/|.*\\.(?:js|mjs|css|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|mp3|ogg|wav|mp4|webm)$).*)",
+      "source": "/((?!api/|assets/|images/|video/|.*\\.(?:js|mjs|css|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|mp3|ogg|wav|mp4|webm)$).*)",
       "destination": "/index.html"
     }
   ],
@@ -26,6 +26,15 @@
   "headers": [
     {
       "source": "/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/video/(.*)",
       "headers": [
         {
           "key": "Cache-Control",

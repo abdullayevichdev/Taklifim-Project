@@ -1213,3 +1213,74 @@ html.taklifim-modal-open .taklifim-bottom-nav {
   }
 }
 
+/* ============================================================================
+ * CoverVideo: Suppress all native iOS Safari / WebKit / Chromium media controls
+ * and style crisp translucent Liquid Glass overlays over the opening video.
+ * ============================================================================ */
+.taklifim-cover-video {
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.taklifim-cover-video::-webkit-media-controls,
+.taklifim-cover-video::-webkit-media-controls-enclosure,
+.taklifim-cover-video::-webkit-media-controls-panel,
+.taklifim-cover-video::-webkit-media-controls-play-button,
+.taklifim-cover-video::-webkit-media-controls-start-playback-button,
+.taklifim-cover-video::-webkit-media-controls-overlay-play-button,
+.taklifim-cover-video::-webkit-media-controls-timeline,
+.taklifim-cover-video::-webkit-media-controls-current-time-display,
+.taklifim-cover-video::-webkit-media-controls-time-remaining-display,
+.taklifim-cover-video::-webkit-media-controls-mute-button,
+.taklifim-cover-video::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.taklifim-cover-glass-pill {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 250, 252, 0.64) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 12px 32px -8px rgba(30, 20, 24, 0.18),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98);
+}
+
+@media (min-width: 768px) {
+  .taklifim-cover-glass-pill {
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  }
+}
+
+.taklifim-cover-cta {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 244, 248, 0.82) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 14px 34px -8px rgba(30, 20, 24, 0.28),
+    0 4px 12px -2px rgba(198, 72, 115, 0.22),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1);
+  color: #1E1418;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 768px) {
+  .taklifim-cover-cta {
+    backdrop-filter: blur(16px) saturate(1.6);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  }
+}
+
+

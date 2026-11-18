@@ -9,6 +9,7 @@ import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
+import { InvitationShell } from '../components/InvitationShell';
 import { LocationPickerMap } from '../components/LocationPickerMap';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
@@ -165,6 +166,7 @@ export const BuilderPage: React.FC = () => {
   const [isLoadingInvitation, setIsLoadingInvitation] = useState<boolean>(Boolean(queryInvitationId));
   const [activeTabMobile, setActiveTabMobile] = useState<'settings' | 'preview'>('settings');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+  const [isPreviewCoverOpened, setIsPreviewCoverOpened] = useState<boolean>(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
@@ -3064,8 +3066,8 @@ export const BuilderPage: React.FC = () => {
           {/* RIGHT: LIVE REACTIVE PREVIEW (mounted on mobile only when Preview tab is active so settings typing has zero hidden re-render overhead) */}
           {(isDesktopViewport || activeTabMobile === 'preview') && (
             <div className="lg:col-span-6 flex flex-col items-center lg:sticky lg:top-[var(--header-sticky-top,76px)]">
-              {/* Device View Toggle */}
-              <div className="mb-4">
+              {/* Device View & Cover/Content Toggle */}
+              <div className="mb-4 flex flex-wrap items-center justify-center gap-2.5">
                 <GlassSegmented
                   ariaLabel={t.builder.previewShortTab}
                   value={previewDevice}
@@ -3083,19 +3085,44 @@ export const BuilderPage: React.FC = () => {
                     },
                   ]}
                 />
+
+                <GlassSegmented<'cover' | 'content'>
+                  ariaLabel={t.hero.envelopeHeader}
+                  value={isPreviewCoverOpened ? 'content' : 'cover'}
+                  onChange={(val) => setIsPreviewCoverOpened(val === 'content')}
+                  options={[
+                    { value: 'cover', label: t.hero.envelopeHeader },
+                    { value: 'content', label: t.builder.previewShortTab },
+                  ]}
+                />
               </div>
 
               {previewDevice === 'mobile' ? (
                 <div className="w-[320px] sm:w-[350px] rounded-[44px] p-4 bg-[#231E1B] shadow-2xl ring-1 ring-white/20 relative transition-all">
                   {/* Speaker Notch */}
-                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-30" />
+                  <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#151210] rounded-full z-40 pointer-events-none" />
 
-                  <div className="w-full h-[620px] rounded-[36px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll pt-6 border border-black/10 select-none shadow-inner relative bg-white">
-                    <TemplateRenderer
-                      invitation={invitationState}
-                      language={language}
-                      isPreview={true}
-                    />
+                  <div className="w-full h-[620px] rounded-[36px] overflow-hidden border border-black/10 select-none shadow-inner relative bg-white">
+                    <InvitationShell
+                      isOpened={isPreviewCoverOpened}
+                      onOpen={() => setIsPreviewCoverOpened(true)}
+                      enableConfetti={true}
+                      variant="frame"
+                      frameRadiusClass="rounded-[36px]"
+                      compact={true}
+                      headerLabel={t.hero.envelopeHeader}
+                      ceremonyLabel={invitationState.eventType || t.hero.sampleCeremony}
+                      hostNames={invitationState.hostNames || t.hero.sampleGroomBride}
+                      openButtonLabel={t.hero.openEnvelopeBtn}
+                    >
+                      <div className="w-full h-full overflow-y-auto overflow-x-hidden taklifim-preview-scroll pt-6">
+                        <TemplateRenderer
+                          invitation={invitationState}
+                          language={language}
+                          isPreview={true}
+                        />
+                      </div>
+                    </InvitationShell>
                   </div>
                 </div>
               ) : (
@@ -3113,12 +3140,27 @@ export const BuilderPage: React.FC = () => {
                     <div className="w-8" />
                   </div>
 
-                  <div className="w-full h-[600px] overflow-y-auto overflow-x-hidden taklifim-preview-scroll select-none shadow-inner relative bg-white">
-                    <TemplateRenderer
-                      invitation={invitationState}
-                      language={language}
-                      isPreview={true}
-                    />
+                  <div className="w-full h-[600px] overflow-hidden select-none shadow-inner relative bg-white">
+                    <InvitationShell
+                      isOpened={isPreviewCoverOpened}
+                      onOpen={() => setIsPreviewCoverOpened(true)}
+                      enableConfetti={true}
+                      variant="frame"
+                      frameRadiusClass="rounded-none"
+                      compact={false}
+                      headerLabel={t.hero.envelopeHeader}
+                      ceremonyLabel={invitationState.eventType || t.hero.sampleCeremony}
+                      hostNames={invitationState.hostNames || t.hero.sampleGroomBride}
+                      openButtonLabel={t.hero.openEnvelopeBtn}
+                    >
+                      <div className="w-full h-full overflow-y-auto overflow-x-hidden taklifim-preview-scroll">
+                        <TemplateRenderer
+                          invitation={invitationState}
+                          language={language}
+                          isPreview={true}
+                        />
+                      </div>
+                    </InvitationShell>
                   </div>
                 </div>
               )}
