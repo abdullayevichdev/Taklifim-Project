@@ -6,6 +6,7 @@ import { resolveTemplate } from '../utils/templateResolver';
 import { reportTemplateResolutionError } from '../utils/templateAlert';
 import { TemplateResolutionError } from '../components/TemplateResolutionError';
 import { resolveCormorantFont, isItalicFontPreference } from '../utils/typography';
+import { getLocalizedInvitation } from '../utils/localization';
 
 // Individual template designs
 import { Template01_AureliaRoyal } from './designs/Template01_AureliaRoyal';
@@ -126,10 +127,12 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
   const headingFont = resolveCormorantFont(rawHeadingPref);
   const preferItalicHeading = isItalicFontPreference(rawHeadingPref);
 
+  const localizedInvitation = getLocalizedInvitation(invitation, language);
+
   return (
     <div style={{ fontStyle: undefined }}>
       <Component
-        invitation={invitation}
+        invitation={localizedInvitation}
         template={templateDef}
         language={language}
         isDarkTheme={isDarkTheme}

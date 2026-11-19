@@ -30,11 +30,11 @@ const SIZE_CLASSES: Record<NonNullable<GlassButtonProps['size']>, string> = {
 
 const FALLBACK_TONES: Record<LgTone, string> = {
   tinted:
-    'bg-gradient-to-r from-[#D45682] to-[#B23864] text-white shadow-[0_12px_28px_-8px_rgba(184,62,106,0.46),inset_0_1px_0_rgba(255,255,255,0.45)] border border-white/55 hover:brightness-105',
+    'bg-gradient-to-r from-[#D45682] to-[#B23864] text-white shadow-[0_14px_32px_-8px_rgba(184,62,106,0.48),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105',
   light:
-    'glass-surface text-[#1E1418] bg-white/84 border border-white/98 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_10px_26px_-8px_rgba(30,20,24,0.14)] hover:bg-white/95',
+    'text-[#1E1418] bg-white/90 shadow-[0_12px_30px_-8px_rgba(30,20,24,0.16),inset_0_1px_0_rgba(255,255,255,1)] hover:bg-white',
   clear:
-    'bg-white/82 md:bg-white/62 md:backdrop-blur-md text-[#1E1418] border border-[#1E1418]/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_8px_22px_-6px_rgba(30,20,24,0.12)] hover:bg-white/88 md:hover:bg-white/82 hover:border-[#1E1418]/22',
+    'bg-white/82 md:bg-white/62 md:backdrop-blur-md text-[#1E1418] shadow-[0_10px_24px_-6px_rgba(30,20,24,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] hover:bg-white/90',
 };
 
 /**

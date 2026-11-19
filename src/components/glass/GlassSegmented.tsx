@@ -178,7 +178,7 @@ function GlassSegmentedInner<T extends string = string>({
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
-      className={`taklifim-seg-track relative inline-flex items-center max-w-full p-1 rounded-[20px] border border-white/95 bg-white/86 md:bg-white/58 md:backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_6px_18px_-6px_rgba(198,72,115,0.14)] overflow-x-auto no-scrollbar snap-x snap-proximity ${
+      className={`taklifim-seg-track relative inline-flex items-center max-w-full p-1 rounded-[20px] bg-white/88 md:bg-white/60 md:backdrop-blur-md shadow-[0_8px_24px_-6px_rgba(30,20,24,0.12)] overflow-x-auto no-scrollbar snap-x snap-proximity ${
         fullWidth ? 'w-full' : ''
       } ${className}`}
     >

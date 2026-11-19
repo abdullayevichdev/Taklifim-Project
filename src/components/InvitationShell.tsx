@@ -196,7 +196,7 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
 
             {/* Full-viewport on mobile (390x844), sleek portrait stage on desktop (1440x900) */}
             <div
-              className="relative w-full h-[100dvh] sm:h-[min(88vh,780px)] sm:max-w-[420px] sm:rounded-[38px] overflow-hidden shadow-2xl sm:ring-1 sm:ring-white/80 flex flex-col justify-between"
+              className="relative w-full h-[100dvh] sm:h-[min(88vh,780px)] sm:max-w-[420px] sm:rounded-[38px] overflow-hidden shadow-2xl sm:ring-1 sm:ring-white/80 flex flex-col justify-end"
               style={{ backgroundColor: fallbackBgColor }}
             >
               <CoverVideo
@@ -205,32 +205,8 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
                 className="sm:rounded-[38px]"
               />
 
-              {/* Top Couple Header Pill — leaves central envelope/seal/key completely clear */}
-              <div className="relative z-30 pt-16 sm:pt-7 px-4 flex justify-center pointer-events-none">
-                <div className="taklifim-cover-glass-pill rounded-2xl px-4 py-2.5 text-center max-w-[92%]">
-                  <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#7A324B]">
-                    <span>{headerLabel}</span>
-                    {ceremonyLabel && (
-                      <>
-                        <span aria-hidden="true">•</span>
-                        <span>{ceremonyLabel}</span>
-                      </>
-                    )}
-                  </div>
-                  <h1 className="font-playfair text-xl sm:text-2xl font-extrabold text-[#1E1418] leading-tight mt-0.5 truncate">
-                    {hostNames}
-                  </h1>
-                </div>
-              </div>
-
-              {/* Bottom CTA Area — Liquid Glass button over video */}
-              <div className="relative z-30 pb-8 sm:pb-7 px-5 flex flex-col items-center gap-2.5">
-                {subtitleText && (
-                  <p className="taklifim-cover-glass-pill rounded-xl px-3.5 py-1.5 text-[11px] sm:text-xs text-[#2E2025] italic text-center max-w-xs leading-snug">
-                    {subtitleText}
-                  </p>
-                )}
-
+              {/* Bottom CTA Area — only "Taklifnomani ochish" button over video */}
+              <div className="relative z-30 pb-8 sm:pb-7 px-5 flex flex-col items-center">
                 <button
                   type="button"
                   disabled={isClosingCover}
@@ -241,16 +217,6 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
                   <span className="truncate">{openButtonLabel}</span>
                   <ArrowRight className="w-4 h-4 text-[#C64873] group-hover:translate-x-1 transition-transform shrink-0" aria-hidden="true" />
                 </button>
-
-                {hintText && (
-                  <span className="taklifim-cover-glass-pill rounded-full px-3 py-0.5 text-[11px] font-semibold text-[#3B2A30] text-center">
-                    {hintText}
-                  </span>
-                )}
-
-                {coverFooterOverlay && (
-                  <div className="pt-0.5 flex justify-center">{coverFooterOverlay}</div>
-                )}
               </div>
             </div>
           </div>
@@ -272,7 +238,7 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
       {/* Cover overlay with CoverVideo — unmounts completely once opened */}
       {shouldMountCover && (
         <div
-          className={`absolute inset-0 w-full h-full ${frameRadiusClass} overflow-hidden flex flex-col justify-between z-20 transition-opacity duration-400 ease-out ${
+          className={`absolute inset-0 w-full h-full ${frameRadiusClass} overflow-hidden flex flex-col justify-end z-20 transition-opacity duration-400 ease-out ${
             isClosingCover ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}
           style={{ backgroundColor: fallbackBgColor }}
@@ -283,28 +249,11 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
             className={frameRadiusClass}
           />
 
-          {/* Top Liquid Glass Couple Label (sits below device speaker notch) */}
-          <div
-            className={`relative z-30 ${
-              compact ? 'pt-9 px-3' : 'pt-11 px-4'
-            } flex justify-center pointer-events-none`}
-          >
-            <div className="taklifim-cover-glass-pill rounded-2xl px-3.5 py-2 text-center max-w-[92%]">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7A324B] truncate">
-                {headerLabel}
-                {ceremonyLabel ? ` • ${ceremonyLabel}` : ''}
-              </div>
-              <div className="font-playfair text-base sm:text-lg font-extrabold text-[#1E1418] leading-tight mt-0.5 truncate">
-                {hostNames}
-              </div>
-            </div>
-          </div>
-
           {/* Bottom Floating "Taklifnomani ochish" Liquid Glass CTA */}
           <div
             className={`relative z-30 ${
               compact ? 'pb-5 px-3' : 'pb-6 px-4'
-            } flex flex-col items-center gap-1.5`}
+            } flex flex-col items-center`}
           >
             <button
               type="button"
