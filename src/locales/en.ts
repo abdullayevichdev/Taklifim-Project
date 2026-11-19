@@ -1,7 +1,7 @@
 import { uz } from './uz';
 
 export const en: typeof uz = {
-  brandName: 'Taklifim',
+  brandName: 'INVITE',
   brandSlogan: 'A distinctive invitation for every moment.',
   brandDesc: 'A premier digital invitation platform for crafting interactive website invitations for weddings, anniversaries, and milestones.',
 
@@ -196,7 +196,7 @@ export const en: typeof uz = {
 
   benefits: {
     script: 'Convenience & Value',
-    title: 'Why Choose Taklifim?',
+    title: 'Why Choose INVITE?',
     items: [
       {
         title: 'Perfect for Any Smartphone',
@@ -373,7 +373,7 @@ export const en: typeof uz = {
     privacySections: [
       {
         title: '1. Data Collection',
-        body: 'Taklifim collects names, phone numbers, and event details strictly to create digital invitations and store guest RSVP responses. We never sell or disclose personal data to third parties without consent.',
+        body: 'INVITE collects names, phone numbers, and event details strictly to create digital invitations and store guest RSVP responses. We never sell or disclose personal data to third parties without consent.',
       },
       {
         title: '2. Data Security',
@@ -387,7 +387,7 @@ export const en: typeof uz = {
     termsSections: [
       {
         title: '1. Use of Service',
-        body: 'Taklifim provides tools to create interactive invitations for weddings, anniversaries, and special events. Users are responsible for ensuring uploaded text and photos comply with applicable laws and standards.',
+        body: 'INVITE provides tools to create interactive invitations for weddings, anniversaries, and special events. Users are responsible for ensuring uploaded text and photos comply with applicable laws and standards.',
       },
       {
         title: '2. Payment & Activation',
@@ -395,7 +395,7 @@ export const en: typeof uz = {
       },
       {
         title: '3. Intellectual Property',
-        body: 'All template designs, visual assets, and source code remain the intellectual property of Taklifim. Unauthorized copying or commercial resale is prohibited.',
+        body: 'All template designs, visual assets, and source code remain the intellectual property of INVITE. Unauthorized copying or commercial resale is prohibited.',
       },
     ],
   },
@@ -1217,7 +1217,7 @@ export const en: typeof uz = {
   },
 
   admin: {
-    title: 'Taklifim Admin Console',
+    title: 'INVITE Admin Console',
     passcodePrompt: 'Enter the 10-digit security passcode to access the management portal',
     enterCode: 'Passcode',
     unlockBtn: 'Unlock Portal',

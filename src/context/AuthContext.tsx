@@ -382,7 +382,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const res = await signInWithPopup(auth, provider);
@@ -415,7 +414,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');

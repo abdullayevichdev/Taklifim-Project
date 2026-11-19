@@ -22,22 +22,24 @@ export const TaklifimLogo: React.FC<TaklifimLogoProps> = ({
         {!imageError ? (
           <img
             src={logoImg}
-            alt="Taklifim"
+            alt="INVITE"
             className="w-full h-full object-cover rounded-full"
             onError={() => setImageError(true)}
             loading="eager"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#D9658B] to-[#B48B47] text-white font-serif font-black text-[10px]">
-            T
+            I
           </div>
         )}
       </div>
       {showText && (
-        <span className="font-playfair font-bold text-[#231E1B] tracking-tight">
-          Taklifim
+        <span className="font-playfair font-bold text-[#231E1B] tracking-wider uppercase">
+          INVITE
         </span>
       )}
     </div>
   );
 };
+
+export default TaklifimLogo;

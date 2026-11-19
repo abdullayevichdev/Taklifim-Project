@@ -233,7 +233,7 @@ export const TemplateDetailPage: React.FC = () => {
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     <span className="text-[10px] text-white/60 ml-2 font-mono truncate">
-                      taklifim.uz/i/{template.slug}-demo
+                      invite.uz/i/{template.slug}-demo
                     </span>
                   </div>
                   <div

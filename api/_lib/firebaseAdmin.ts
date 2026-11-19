@@ -114,7 +114,7 @@ export function getAdminApp(): App | null {
 
   const serviceAccount = parseServiceAccount();
   if (!serviceAccount) {
-    console.warn('[Taklifim] Firebase Admin credentials missing; server-side database sync running in memory/mock fallback mode.');
+    console.warn('[INVITE] Firebase Admin credentials missing; server-side database sync running in memory/mock fallback mode.');
     return null;
   }
 
@@ -124,7 +124,7 @@ export function getAdminApp(): App | null {
       databaseURL: getFirebaseDatabaseUrl(),
     });
   } catch (err) {
-    console.error('[Taklifim] Firebase Admin initializeApp failed:', (err as Error)?.message || err);
+    console.error('[INVITE] Firebase Admin initializeApp failed:', (err as Error)?.message || err);
     return null;
   }
 }

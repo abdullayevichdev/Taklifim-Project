@@ -416,7 +416,7 @@ export const TemplateThemeDecoration: React.FC<TemplateThemeDecorationProps> = (
         <div className="relative pointer-events-none select-none my-2 text-center">
           <div className="inline-flex items-center gap-2 py-1 px-3.5 rounded-full bg-white/90 border border-black/10 shadow-xs">
             <span className="text-[10px] font-bold tracking-widest uppercase text-[#5A451F]">
-              {getBadge('Taklifim Saroy Kolleksiyasi', 'Коллекция Taklifim', 'Taklifim Signature Suite')}
+              {getBadge('INVITE Saroy Kolleksiyasi', 'Коллекция INVITE', 'INVITE Signature Suite')}
             </span>
           </div>
         </div>

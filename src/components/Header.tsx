@@ -245,12 +245,12 @@ export const Header: React.FC = () => {
           <div className="w-8 h-8 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-[#F5C9D8] via-[#F5EBDD] to-[#B9DFFA] shadow-xs shrink-0 border border-white/90">
             <img
               src="/logo.jpg"
-              alt="Taklifim Logo"
+              alt="INVITE Logo"
               className="w-full h-full object-cover rounded-[10px]"
             />
           </div>
-          <span className="font-playfair text-base sm:text-lg xl:text-xl font-bold tracking-tight text-[#1E1418] whitespace-nowrap pr-0.5">
-            Taklifim
+          <span className="font-playfair text-base sm:text-lg xl:text-xl font-bold tracking-wider uppercase text-[#1E1418] whitespace-nowrap pr-0.5">
+            INVITE
           </span>
         </Link>
 

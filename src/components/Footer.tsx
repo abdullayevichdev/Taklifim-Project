@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
               <div className="w-10 h-10 rounded-2xl overflow-hidden p-0.5 bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center border border-white/90 shadow-xs">
                 <img
                   src="/logo.jpg"
-                  alt="Taklifim Logo"
+                  alt="INVITE Logo"
                   className="w-full h-full object-cover rounded-[12px]"
                   onError={(e) => {
                     const target = e.currentTarget;
@@ -34,8 +34,8 @@ export const Footer: React.FC = () => {
                   }}
                 />
               </div>
-              <span className="font-playfair text-2xl font-bold text-[#1E1418] tracking-wide">
-                Taklifim
+              <span className="font-playfair text-2xl font-bold text-[#1E1418] tracking-wider uppercase">
+                INVITE
               </span>
             </Link>
             <p className="text-[16px] text-[#4A383F] leading-relaxed max-w-sm">
@@ -172,7 +172,7 @@ export const Footer: React.FC = () => {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[14.5px] text-[#4A383F] gap-4">
           <p>
-            © {new Date().getFullYear()} Taklifim.{' '}
+            © {new Date().getFullYear()} INVITE.{' '}
             {t.footer?.allRightsReserved || 'Barcha huquqlar himoyalangan.'}
           </p>
           <div className="flex items-center gap-1.5">
