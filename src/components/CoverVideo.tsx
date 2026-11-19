@@ -32,12 +32,13 @@ export interface CoverVideoProps {
   onReady?: () => void;
 }
 
-const DEFAULT_POSTER = '/video/invitation-poster.jpg';
-const WEBM_SOURCE = '/video/invitation-loop.webm';
-const MP4_SOURCE = '/video/invitation-loop.mp4';
+const DEFAULT_POSTER = '/video/invitation-poster.jpg?v=2';
+const WEBM_SOURCE = '/video/invitation-loop.webm?v=2';
+const MP4_SOURCE = '/video/invitation-loop.mp4?v=2';
 
 const VIDEO_STYLE: React.CSSProperties = {
-  filter: 'saturate(0.95) brightness(0.98)',
+  transform: 'translateZ(0)',
+  backfaceVisibility: 'hidden',
 };
 
 function isReducedMotionPreferred(): boolean {
@@ -386,13 +387,13 @@ export const CoverVideo: React.FC<CoverVideoProps> = ({
       aria-hidden="true"
       className={`absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none ${className}`}
     >
-      {/* First-paint poster image; fades out smoothly once video reaches canplay & plays */}
+      {/* First-paint poster image; stays opaque behind video fade-in so background never bleeds through */}
       <img
         src={poster}
         alt=""
         draggable={false}
-        className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-500 ease-out ${
-          fadingOut ? 'opacity-0' : showVideoLayer ? 'opacity-0' : 'opacity-100'
+        className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-300 ease-out ${
+          fadingOut ? 'opacity-0' : 'opacity-100'
         }`}
         style={VIDEO_STYLE}
       />
@@ -413,13 +414,13 @@ export const CoverVideo: React.FC<CoverVideoProps> = ({
           tabIndex={-1}
           aria-hidden="true"
           onContextMenu={(e) => e.preventDefault()}
-          className={`taklifim-cover-video absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-500 ease-out ${
+          className={`taklifim-cover-video absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-200 ease-out ${
             fadingOut ? 'opacity-0' : showVideoLayer ? 'opacity-100' : 'opacity-0'
           }`}
           style={VIDEO_STYLE}
         >
-          <source src={WEBM_SOURCE} type="video/webm; codecs=vp9" />
           <source src={MP4_SOURCE} type="video/mp4" />
+          <source src={WEBM_SOURCE} type="video/webm; codecs=vp9" />
         </video>
       )}
     </div>
