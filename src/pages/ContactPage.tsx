@@ -130,7 +130,7 @@ export const ContactPage: React.FC = () => {
                       rel="noreferrer"
                       className="font-bold text-[#1E1418] hover:text-[#C94F79] transition-colors mt-0.5 block"
                     >
-                      INVITE
+                      TASHRIFIM
                     </a>
                     <p className="text-[#5C4F48]">{t.contact.telegramSub}</p>
                   </div>
@@ -148,7 +148,7 @@ export const ContactPage: React.FC = () => {
                       href="mailto:info@taklifim.uz"
                       className="font-bold text-[#1E1418] hover:text-[#C94F79] transition-colors mt-0.5 block"
                     >
-                      INVITE
+                      TASHRIFIM
                     </a>
                     <p className="text-[#5C4F48]">{t.contact.emailSub}</p>
                   </div>

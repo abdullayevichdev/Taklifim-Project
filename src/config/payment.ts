@@ -2,7 +2,7 @@ import { Language } from '../types';
 import { translations, uz } from '../locales';
 
 /**
- * INVITE To'lov Sozlamalari (Single Source of Truth)
+ * TASHRIFIM To'lov Sozlamalari (Single Source of Truth)
  * Barcha karta va to'lov ma'lumotlari faqat shu faylda saqlanadi.
  */
 

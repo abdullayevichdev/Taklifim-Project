@@ -35,7 +35,7 @@ export const Footer: React.FC = () => {
                 />
               </div>
               <span className="font-playfair text-2xl font-bold text-[#1E1418] tracking-wider uppercase">
-                INVITE
+                Tashrifim
               </span>
             </Link>
             <p className="text-[16px] text-[#4A383F] leading-relaxed max-w-sm">
@@ -172,7 +172,7 @@ export const Footer: React.FC = () => {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[14.5px] text-[#4A383F] gap-4">
           <p>
-            © {new Date().getFullYear()} INVITE.{' '}
+            © {new Date().getFullYear()} TASHRIFIM.{' '}
             {t.footer?.allRightsReserved || 'Barcha huquqlar himoyalangan.'}
           </p>
           <div className="flex items-center gap-1.5">

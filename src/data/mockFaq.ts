@@ -10,8 +10,8 @@ export const mockFaq: FAQItem[] = [
       en: 'How does a digital web invitation work?',
     },
     answer: {
-      uz: 'Siz tanlagan shablon asosida shaxsiy havola (masalan, invite.uz/i/nodir-malika) yaratiladi. Mehmonlar havolani bosganda, ularning telefonida audio, fotoalbom, xarita va RSVP tashrif tasdiqlash imkoniyati bo‘lgan go‘zal interaktiv sahifa ochiladi.',
-      ru: 'Создаётся уникальная ссылка (например, invite.uz/i/nodir-malika). Переходя по ней, гости открывают на своём телефоне персональную интерактивную страницу с музыкой, галереей, локацией на карте и кнопкой подтверждения присутствия.',
+      uz: 'Siz tanlagan shablon asosida shaxsiy havola (masalan, tashrifim.uz/i/nodir-malika) yaratiladi. Mehmonlar havolani bosganda, ularning telefonida audio, fotoalbom, xarita va RSVP tashrif tasdiqlash imkoniyati bo‘lgan go‘zal interaktiv sahifa ochiladi.',
+      ru: 'Создаётся уникальная ссылка (например, tashrifim.uz/i/nodir-malika). Переходя по ней, гости открывают на своём телефоне персональную интерактивную страницу с музыкой, галереей, локацией на карте и кнопкой подтверждения присутствия.',
       en: 'A personalized link is generated for your event. When guests tap the link on mobile or desktop, an elegant webpage opens featuring music, interactive map directions, photo galleries, and instant RSVP attendance confirmation.',
     },
   },
@@ -24,9 +24,9 @@ export const mockFaq: FAQItem[] = [
       en: 'Where do I view guest RSVP responses?',
     },
     answer: {
-      uz: 'INVITE mijoz kabinetida (Dashboard) maxsus «Mehmonlar ro‘yxati» bo‘limi mavjud. U yerda kimlar qatnashishi, necha kishi bo‘lib kelishi, ularning taom tanlovi va ezgu tilaklari real vaqtda jadval ko‘rinishida jamlanadi.',
+      uz: 'TASHRIFIM mijoz kabinetida (Dashboard) maxsus «Mehmonlar ro‘yxati» bo‘limi mavjud. U yerda kimlar qatnashishi, necha kishi bo‘lib kelishi, ularning taom tanlovi va ezgu tilaklari real vaqtda jadval ko‘rinishida jamlanadi.',
       ru: 'В личном кабинете на платформе доступна вкладка «Список гостей (RSVP)». Там в режиме реального времени отображаются все подтверждения: кто придёт, количество гостей, предпочтения по блюдам и пожелания.',
-      en: 'In your INVITE Customer Dashboard under "Guest List (RSVP)", all confirmations, companion counts, dietary selections, and congratulations are automatically cataloged and synced in real time.',
+      en: 'In your TASHRIFIM Customer Dashboard under "Guest List (RSVP)", all confirmations, companion counts, dietary selections, and congratulations are automatically cataloged and synced in real time.',
     },
   },
   {
@@ -52,9 +52,9 @@ export const mockFaq: FAQItem[] = [
       en: 'Can invitations be presented in multiple languages?',
     },
     answer: {
-      uz: 'Ha! INVITE o‘zbekcha, ruscha va inglizcha tillarni to‘liq qo‘llab-quvvatlaydi. Mehmon taklifnoma sahifasida o‘zi xohlagan tilni bir zumda tanlashi mumkin.',
-      ru: 'Да! Платформа INVITE полностью поддерживает узбекский, русский и английский языки. Гости могут переключать язык приглашения в один клик.',
-      en: 'Yes! INVITE natively supports Uzbek, Russian, and English. Guests can effortlessly switch languages directly from the invitation header.',
+      uz: 'Ha! TASHRIFIM o‘zbekcha, ruscha va inglizcha tillarni to‘liq qo‘llab-quvvatlaydi. Mehmon taklifnoma sahifasida o‘zi xohlagan tilni bir zumda tanlashi mumkin.',
+      ru: 'Да! Платформа TASHRIFIM полностью поддерживает узбекский, русский и английский языки. Гости могут переключать язык приглашения в один клик.',
+      en: 'Yes! TASHRIFIM natively supports Uzbek, Russian, and English. Guests can effortlessly switch languages directly from the invitation header.',
     },
   },
   {

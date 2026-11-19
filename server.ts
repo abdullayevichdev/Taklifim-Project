@@ -274,7 +274,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 INVITE local server Port ${PORT} (Telegram = webhook, long-polling yo'q)`);
+    console.log(`🚀 TASHRIFIM local server Port ${PORT} (Telegram = webhook, long-polling yo'q)`);
   });
 }
 

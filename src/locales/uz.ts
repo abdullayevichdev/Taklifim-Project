@@ -1,5 +1,5 @@
 export const uz = {
-  brandName: 'INVITE',
+  brandName: 'TASHRIFIM',
   brandSlogan: 'Har bir lahzaga o‘zgacha taklif.',
   brandDesc: 'To‘y, nikoh, yubiley va unutilmas tantanalar uchun nafis interaktiv raqamli taklifnomalar yaratish platformasi.',
 
@@ -203,7 +203,7 @@ export const uz = {
   // Afzalliklar
   benefits: {
     script: 'Qulaylik va Tejamkorlik',
-    title: 'Nega Aynan INVITE?',
+    title: 'Nega Aynan TASHRIFIM?',
     items: [
       {
         title: 'Har qanday smartfonga mos',
@@ -317,7 +317,7 @@ export const uz = {
   faq: {
     badge: 'Yordam va Ma’lumot',
     title: 'Ko‘p beriladigan savollar',
-    subtitle: 'INVITE platformasidan foydalanish va buyurtma berish jarayoniga oid barcha javoblar.',
+    subtitle: 'TASHRIFIM platformasidan foydalanish va buyurtma berish jarayoniga oid barcha javoblar.',
     searchPlaceholder: 'Savol qidirish (masalan: RSVP, to‘lov, havola)...',
     cats: {
       all: 'Barchasi',
@@ -386,7 +386,7 @@ export const uz = {
     privacySections: [
       {
         title: '1. Ma’lumotlarni yig‘ish',
-        body: 'INVITE platformasi taklifnoma yaratish va mehmonlar RSVP javoblarini saqlash uchun foydalanuvchilarning ismi, telefon raqami va tadbirga oid ma’lumotlarni yig‘adi. Biz ushbu ma’lumotlarni uchinchi shaxslarga ruxsatsiz bermaymiz.',
+        body: 'TASHRIFIM platformasi taklifnoma yaratish va mehmonlar RSVP javoblarini saqlash uchun foydalanuvchilarning ismi, telefon raqami va tadbirga oid ma’lumotlarni yig‘adi. Biz ushbu ma’lumotlarni uchinchi shaxslarga ruxsatsiz bermaymiz.',
       },
       {
         title: '2. Ma’lumotlarni himoyalash',
@@ -400,7 +400,7 @@ export const uz = {
     termsSections: [
       {
         title: '1. Xizmatlardan foydalanish',
-        body: 'INVITE platformasi foydalanuvchilarga to‘y, yubiley va boshqa marosimlar uchun raqamli taklifnoma yaratish xizmatini taqdim etadi. Foydalanuvchi kiritilgan ma’lumotlar va fotosuratlar qonuniy hamda axloqiy me’yorlarga mos kelishini ta’minlaydi.',
+        body: 'TASHRIFIM platformasi foydalanuvchilarga to‘y, yubiley va boshqa marosimlar uchun raqamli taklifnoma yaratish xizmatini taqdim etadi. Foydalanuvchi kiritilgan ma’lumotlar va fotosuratlar qonuniy hamda axloqiy me’yorlarga mos kelishini ta’minlaydi.',
       },
       {
         title: '2. To‘lov va faollashtirish',
@@ -408,7 +408,7 @@ export const uz = {
       },
       {
         title: '3. Mualliflik huquqi',
-        body: 'Platformadagi barcha shablon dizaynlari, grafik elementlar va dasturiy kodlar INVITE intellektual mulki hisoblanadi. Ulardan nusxa ko‘chirish yoki tijoriy qayta sotish taqiqlanadi.',
+        body: 'Platformadagi barcha shablon dizaynlari, grafik elementlar va dasturiy kodlar TASHRIFIM intellektual mulki hisoblanadi. Ulardan nusxa ko‘chirish yoki tijoriy qayta sotish taqiqlanadi.',
       },
     ],
   },
@@ -1239,7 +1239,7 @@ export const uz = {
 
   // Admin
   admin: {
-    title: 'INVITE Admin Paneli',
+    title: 'TASHRIFIM Admin Paneli',
     passcodePrompt: 'Admin paneliga kirish uchun 10 xonali maxfiy kodni kiriting',
     enterCode: 'Maxfiy kod',
     unlockBtn: 'Kodni tasdiqlash',

@@ -1,5 +1,5 @@
 {
-  "name": "INVITE - Interactive Digital Invitations",
+  "name": "TASHRIFIM - Interactive Digital Invitations",
   "description": "Har bir lahzaga o‘zgacha taklif. To‘y, yubiley va bayramlar uchun zamonaviy interaktiv raqamli taklifnomalar xizmati.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

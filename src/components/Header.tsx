@@ -250,7 +250,7 @@ export const Header: React.FC = () => {
             />
           </div>
           <span className="font-playfair text-base sm:text-lg xl:text-xl font-bold tracking-wider uppercase text-[#1E1418] whitespace-nowrap pr-0.5">
-            INVITE
+            Tashrifim
           </span>
         </Link>
 

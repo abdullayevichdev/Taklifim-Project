@@ -1499,7 +1499,7 @@ export const BuilderPage: React.FC = () => {
                     </label>
                     <div className="rounded-[var(--lg-radius)] overflow-hidden border border-black/10 bg-white/85 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
                       <div className="px-3.5 py-1.5 bg-white/70 border-b border-black/8 font-mono text-[11px] text-[#4A383F] break-all">
-                        {(typeof window !== 'undefined' ? window.location.origin : 'https://invite.uz')}/i/
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/
                       </div>
                       <div className="flex items-center gap-1.5 px-2.5 py-1.5 min-w-0">
                         <input
@@ -1529,7 +1529,7 @@ export const BuilderPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://invite.uz';
+                            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz';
                             const url = `${origin}/i/${invitationState.slug}`;
                             if (navigator.clipboard) {
                               navigator.clipboard.writeText(url);
@@ -1547,7 +1547,7 @@ export const BuilderPage: React.FC = () => {
                     <div className="text-[11px] text-[#4A383F] bg-white/55 px-3 py-1.5 rounded-xl border border-black/6">
                       <span className="font-semibold text-[#3A2D28]">{t.builder.fullLinkPreviewLabel} </span>
                       <span className="font-mono text-[#9E3E60] font-bold break-all">
-                        {(typeof window !== 'undefined' ? window.location.origin : 'https://invite.uz')}/i/{invitationState.slug}
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/{invitationState.slug}
                       </span>
                     </div>
                     <span className="text-[10px] text-[#4A383F] block">
@@ -3135,7 +3135,7 @@ export const BuilderPage: React.FC = () => {
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
                     </div>
                     <div className="flex-1 mx-4 px-3 py-1 rounded-lg bg-black/40 text-[10px] text-gray-400 font-mono truncate text-center border border-white/5">
-                      invite.uz/i/{invitationState.slug || invitationState.templateSlug}
+                      tashrifim.uz/i/{invitationState.slug || invitationState.templateSlug}
                     </div>
                     <div className="w-8" />
                   </div>
