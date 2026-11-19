@@ -1,8 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { LgTone } from '../../types/liquidglass';
-import { GlassControlBoundary } from '../ErrorBoundary';
-import { useLiquidGlassReady } from './loader';
 
 export interface GlassButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
   tone?: LgTone;
@@ -15,9 +13,8 @@ export interface GlassButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLBu
   rightIcon?: React.ReactNode;
   backdrop?: string;
   radius?: number | 'capsule';
-  /** Allows multi-line wrapped labels cleanly (bypasses <lg-button> single-line clipping) */
+  /** Allows multi-line wrapped labels cleanly */
   multiline?: boolean;
-  /** Forces pure CSS fallback rendering instead of <lg-button> */
   cssOnly?: boolean;
   onAnchorClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }
@@ -30,17 +27,15 @@ const SIZE_CLASSES: Record<NonNullable<GlassButtonProps['size']>, string> = {
 
 const FALLBACK_TONES: Record<LgTone, string> = {
   tinted:
-    'bg-gradient-to-r from-[#D45682] to-[#B23864] text-white shadow-[0_14px_32px_-8px_rgba(184,62,106,0.48),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105',
+    'bg-gradient-to-r from-[#D45682] to-[#B23864] text-white shadow-[0_12px_30px_-8px_rgba(184,62,106,0.42),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-105',
   light:
-    'text-[#1E1418] bg-white/90 shadow-[0_12px_30px_-8px_rgba(30,20,24,0.16),inset_0_1px_0_rgba(255,255,255,1)] hover:bg-white',
+    'text-[#1E1418] bg-white/92 shadow-[0_10px_26px_-6px_rgba(30,20,24,0.14),inset_0_1px_0_rgba(255,255,255,1)] hover:bg-white',
   clear:
-    'bg-white/82 md:bg-white/62 md:backdrop-blur-md text-[#1E1418] shadow-[0_10px_24px_-6px_rgba(30,20,24,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] hover:bg-white/90',
+    'bg-white/85 md:bg-white/70 md:backdrop-blur-md text-[#1E1418] shadow-[0_8px_22px_-6px_rgba(30,20,24,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-white/95',
 };
 
 /**
- * React 19-safe hybrid wrapper around <lg-button>.
- * Isolates React DOM keys between HTML fallback and <lg-button> and wraps the custom
- * element inside GlassControlBoundary so any runtime error gracefully reverts to native HTML.
+ * Pure Tailwind CSS GlassButton with 100% rounded pill shape and zero rectangular container artifacts.
  */
 export const GlassButton: React.FC<GlassButtonProps> = ({
   tone = 'tinted',
@@ -52,10 +47,6 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   disabled = false,
   leftIcon,
   rightIcon,
-  backdrop,
-  radius = 'capsule',
-  multiline = false,
-  cssOnly = false,
   className = '',
   onClick,
   onAnchorClick,
@@ -63,26 +54,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
   'aria-label': ariaLabel,
   ...rest
 }) => {
-  const usePureCss = cssOnly || multiline;
-  const { ready, failed } = useLiquidGlassReady(!usePureCss);
-  const lgRef = React.useRef<HTMLElement | null>(null);
   const isDisabled = disabled || loading;
-
-  React.useEffect(() => {
-    if (usePureCss || !ready || failed || !lgRef.current) return;
-    try {
-      const inner = lgRef.current.querySelector('.lg-button__el');
-      if (inner) {
-        if (ariaLabel) {
-          inner.setAttribute('aria-label', ariaLabel);
-        } else {
-          inner.removeAttribute('aria-label');
-        }
-      }
-    } catch {
-      // Ignore DOM sync issues on detached custom element
-    }
-  }, [ariaLabel, usePureCss, ready, failed]);
 
   const contentSlot = (
     <span className="inline-flex items-center justify-center gap-2 leading-snug text-center [text-wrap:balance] max-w-full">
@@ -103,20 +75,22 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     .filter(Boolean)
     .join(' ');
 
-  const fallbackElement = href ? (
-    <a
-      key={`css-a-${href}`}
-      href={href}
-      target={target}
-      aria-label={ariaLabel}
-      onClick={onAnchorClick || (onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>)}
-      className={baseClasses}
-    >
-      {contentSlot}
-    </a>
-  ) : (
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={target}
+        aria-label={ariaLabel}
+        onClick={onAnchorClick || (onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>)}
+        className={baseClasses}
+      >
+        {contentSlot}
+      </a>
+    );
+  }
+
+  return (
     <button
-      key={`css-btn-${type}`}
       type={type}
       disabled={isDisabled}
       aria-label={ariaLabel}
@@ -127,39 +101,6 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
       {contentSlot}
     </button>
   );
-
-  if (usePureCss || !ready || failed) {
-    return fallbackElement;
-  }
-
-  return (
-    <GlassControlBoundary fallback={fallbackElement}>
-      <lg-button
-        ref={lgRef as React.RefObject<never>}
-        key={`lg-${href ?? 'btn'}-${type}`}
-        tone={tone}
-        href={href}
-        target={target}
-        type={href ? undefined : type}
-        disabled={isDisabled ? true : undefined}
-        radius={radius}
-        backdrop={backdrop}
-        aria-label={ariaLabel}
-        onClick={(e) => {
-          if (isDisabled) {
-            e.preventDefault();
-            return;
-          }
-          if (href && onAnchorClick) {
-            onAnchorClick(e);
-          } else if (onClick) {
-            onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
-          }
-        }}
-        className={`inline-flex ${className}`}
-      >
-        {contentSlot}
-      </lg-button>
-    </GlassControlBoundary>
-  );
 };
+
+export default GlassButton;
