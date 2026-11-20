@@ -12,6 +12,7 @@ import { createServer as createViteServer } from 'vite';
 import {
   getAuthorizedOrderForUser,
   getFirebaseAdminDiagnosticError,
+  getUserRecord,
   getVerifiedUserPhone,
   hasFirebaseAdmin,
   verifyBearerToken,
@@ -159,11 +160,19 @@ async function startServer() {
         });
       }
 
-      const verifiedPhone = await getVerifiedUserPhone(authUser.uid);
-      if (!verifiedPhone) {
+      let verifiedContact = await getVerifiedUserPhone(authUser.uid);
+      if (!verifiedContact && authUser.uid.startsWith('tg_')) {
+        const userRecord = await getUserRecord(authUser.uid);
+        if (userRecord?.telegramUserId) {
+          verifiedContact = userRecord.username
+            ? `@${String(userRecord.username).replace(/^@+/, '')}`
+            : `tg:${userRecord.telegramUserId}`;
+        }
+      }
+      if (!verifiedContact) {
         return res.status(400).json({
           success: false,
-          error: "Chek yuborish uchun Telegram orqali tasdiqlangan telefon raqami talab qilinadi.",
+          error: "Chek yuborish uchun Telegram orqali tasdiqlangan hisob talab qilinadi.",
         });
       }
 
@@ -206,7 +215,7 @@ async function startServer() {
         templateId: templateId ? String(templateId) : undefined,
         templateSlug: templateSlug ? String(templateSlug) : undefined,
         customerName: customerName ? String(customerName) : '',
-        customerPhone: verifiedPhone,
+        customerPhone: verifiedContact,
         templateName: templateName ? String(templateName) : '',
         planName: planName ? String(planName) : undefined,
         weddingDate: weddingDate ? String(weddingDate) : '',
@@ -296,20 +305,10 @@ async function startServer() {
 
   app.post('/api/telegram/webhook', async (req: Request, res: Response) => {
     try {
-      const { webhookSecret } = getPaymentTelegramConfig();
-      const secretHeader = req.headers['x-telegram-bot-api-secret-token'];
-      if (!webhookSecret || typeof secretHeader !== 'string' || secretHeader !== webhookSecret) {
-        return res.status(403).json({ error: 'Unauthorized' });
-      }
-
-      if (req.body) {
-        await handlePaymentBotWebhookUpdate(req.body);
-      }
+      const { default: webhookHandler } = await import('./api/telegram/webhook.js');
+      return await webhookHandler(req as any, res as any);
+    } catch {
       return res.status(200).json({ status: 'ok' });
-    } catch (err: any) {
-      const safeMsg = sanitizeTelegramErrorMessage(err);
-      console.error('Telegram payment webhook handler error:', safeMsg);
-      return res.status(500).json({ error: safeMsg || 'Webhook error' });
     }
   });
 

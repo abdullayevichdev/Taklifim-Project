@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   getFirebaseAdminDiagnosticError,
+  getUserRecord,
   getVerifiedUserPhone,
   hasFirebaseAdmin,
   verifyBearerToken,
@@ -73,11 +74,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const verifiedPhone = await getVerifiedUserPhone(authUser.uid);
-    if (!verifiedPhone) {
+    let verifiedContact = await getVerifiedUserPhone(authUser.uid);
+    if (!verifiedContact && authUser.uid.startsWith('tg_')) {
+      const userRecord = await getUserRecord(authUser.uid);
+      if (userRecord?.telegramUserId) {
+        verifiedContact = userRecord.username
+          ? `@${String(userRecord.username).replace(/^@+/, '')}`
+          : `tg:${userRecord.telegramUserId}`;
+      }
+    }
+    if (!verifiedContact) {
       return res.status(400).json({
         success: false,
-        error: "Chek yuborish uchun Telegram orqali tasdiqlangan telefon raqami talab qilinadi.",
+        error: "Chek yuborish uchun Telegram orqali tasdiqlangan hisob talab qilinadi.",
       });
     }
 
@@ -127,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       templateId: templateId ? String(templateId) : undefined,
       templateSlug: templateSlug ? String(templateSlug) : undefined,
       customerName: customerName ? String(customerName) : '',
-      customerPhone: verifiedPhone,
+      customerPhone: verifiedContact,
       templateName: templateName ? String(templateName) : '',
       planName: planName ? String(planName) : undefined,
       weddingDate: weddingDate ? String(weddingDate) : '',

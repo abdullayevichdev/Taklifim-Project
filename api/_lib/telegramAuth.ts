@@ -21,7 +21,7 @@ import {
 } from './rateLimit.js';
 
 export type SupportedLang = 'uz' | 'ru' | 'en';
-export type LoginSessionStatus = 'pending' | 'awaiting_contact' | 'verified';
+export type LoginSessionStatus = 'pending' | 'confirmed' | 'awaiting_contact' | 'verified';
 
 export interface LoginSessionRecord {
   sessionId: string;
@@ -38,6 +38,7 @@ export interface LoginSessionRecord {
   firstName?: string;
   lastName?: string;
   username?: string;
+  confirmedAt?: number;
   verifiedAt?: number;
 }
 
@@ -117,8 +118,10 @@ const BOT_MESSAGES: Record<
     }) => string;
     privacyLinkLine: (url: string) => string;
     privacyFallbackLine: string;
+    confirmedSuccess: string;
     verifiedSuccess: string;
     expiredLink: string;
+    claimedByOtherUser: string;
     ownContactOnly: string;
     useButtonNotText: string;
     invalidPhoneError: string;
@@ -136,20 +139,21 @@ const BOT_MESSAGES: Record<
       `Raqam faqat kirish va buyurtmalar uchun ishlatiladi.\n${escapeHtml(privacyLine)}`,
     privacyLinkLine: (url) => `Maxfiylik siyosati: ${url}/privacy`,
     privacyFallbackLine: 'Maxfiylik siyosati saytimizda mavjud.',
+    confirmedSuccess: '✅ Tasdiqlandi! Saytga qaytishingiz mumkin.',
     verifiedSuccess:
       '✅ Tayyor! Telefon raqamingiz tasdiqlandi.\n\nEndi saytga qayting — tizimga avtomatik kirasiz.',
     expiredLink:
       '⏳ Kirish havolasi eskirgan yoki noto‘g‘ri.\n\nIltimos, saytdan «Telegram orqali kirish» tugmasini qayta bosing.',
+    claimedByOtherUser:
+      '⛔ Bu kirish havolasi allaqachon boshqa foydalanuvchi tomonidan tasdiqlangan.\n\nIltimos, saytdan yangi havola oling.',
     ownContactOnly:
       '⛔ Xavfsizlik sababli boshqa odamning kontaktini yuborish mumkin emas.\n\nIltimos, pastdagi «📱 Telefon raqamni ulashish» tugmasi orqali faqat o‘z raqamingizni yuboring.',
     useButtonNotText:
       'ℹ️ Iltimos, telefon raqamingizni qo‘lda yozmang — pastdagi «📱 Telefon raqamni ulashish» tugmasini bosing.',
     invalidPhoneError:
       '❌ Telefon raqami formati noto‘g‘ri aniqlandi. Iltimos, saytdan qayta urinib ko‘ring.',
-    plainStartGreeting: (siteUrl) =>
-      siteUrl
-        ? `👋 Assalomu alaykum!\n\nSaytga kirish uchun brauzerdagi «Telegram orqali kirish» tugmasidan foydalaning:\n${siteUrl}/login`
-        : '👋 Assalomu alaykum!\n\nKirish uchun saytdagi «Telegram orqali kirish» tugmasidan foydalaning.',
+    plainStartGreeting: (_siteUrl) =>
+      "Salom! Saytga kirish uchun saytdagi 'Telegram orqali kirish' tugmasini bosing.",
     openSiteBtn: '🌐 Saytga o‘tish',
   },
   ru: {
@@ -162,20 +166,21 @@ const BOT_MESSAGES: Record<
       `Номер используется только для входа и заказов.\n${escapeHtml(privacyLine)}`,
     privacyLinkLine: (url) => `Политика конфиденциальности: ${url}/privacy`,
     privacyFallbackLine: 'Политика конфиденциальности доступна на сайте.',
+    confirmedSuccess: '✅ Подтверждено! Вы можете вернуться на сайт.',
     verifiedSuccess:
       '✅ Готово! Ваш номер телефона подтверждён.\n\nТеперь вернитесь на сайт — вход выполнится автоматически.',
     expiredLink:
       '⏳ Ссылка для входа устарела или недействительна.\n\nПожалуйста, нажмите «Войти через Telegram» на сайте заново.',
+    claimedByOtherUser:
+      '⛔ Эта ссылка для входа уже подтверждена другим пользователем.\n\nПожалуйста, получите новую ссылку на сайте.',
     ownContactOnly:
       '⛔ В целях безопасности нельзя отправлять чужой контакт.\n\nНажмите кнопку «📱 Поделиться номером телефона» ниже, чтобы отправить только свой номер.',
     useButtonNotText:
       'ℹ️ Пожалуйста, не вводите номер вручную — нажмите кнопку «📱 Поделиться номером телефона» ниже.',
     invalidPhoneError:
       '❌ Некорректный формат номера телефона. Пожалуйста, попробуйте снова через сайт.',
-    plainStartGreeting: (siteUrl) =>
-      siteUrl
-        ? `👋 Здравствуйте!\n\nДля входа используйте кнопку «Войти через Telegram» на сайте:\n${siteUrl}/login`
-        : '👋 Здравствуйте!\n\nДля входа используйте кнопку «Войти через Telegram» на сайте.',
+    plainStartGreeting: (_siteUrl) =>
+      "Здравствуйте! Чтобы войти на сайт, нажмите кнопку «Войти через Telegram» на сайте.",
     openSiteBtn: '🌐 Перейти на сайт',
   },
   en: {
@@ -188,20 +193,21 @@ const BOT_MESSAGES: Record<
       `Your number is used only for sign-in and your orders.\n${escapeHtml(privacyLine)}`,
     privacyLinkLine: (url) => `Privacy Policy: ${url}/privacy`,
     privacyFallbackLine: 'Our Privacy Policy is available on our website.',
+    confirmedSuccess: '✅ Confirmed! You can return to the website.',
     verifiedSuccess:
       '✅ Done! Your phone number is verified.\n\nPlease return to the website — you will be signed in automatically.',
     expiredLink:
       '⏳ This sign-in link has expired or is invalid.\n\nPlease go back to the website and tap "Continue with Telegram" again.',
+    claimedByOtherUser:
+      '⛔ This sign-in link has already been claimed by another Telegram user.\n\nPlease request a new link from the website.',
     ownContactOnly:
       '⛔ For security reasons, you cannot forward someone else’s contact.\n\nPlease tap the "📱 Share phone number" button below to share your own number.',
     useButtonNotText:
       'ℹ️ Please do not type your phone number manually — tap the "📱 Share phone number" button below.',
     invalidPhoneError:
       '❌ Invalid phone number format. Please try again from the website.',
-    plainStartGreeting: (siteUrl) =>
-      siteUrl
-        ? `👋 Hello!\n\nTo sign in, please use the "Continue with Telegram" button on the website:\n${siteUrl}/login`
-        : '👋 Hello!\n\nTo sign in, please use the "Continue with Telegram" button on the website.',
+    plainStartGreeting: (_siteUrl) =>
+      "Hello! To sign in, please tap the 'Continue with Telegram' button on the website.",
     openSiteBtn: '🌐 Open Website',
   },
 };
@@ -558,7 +564,7 @@ export async function claimTelegramLogin(
     };
   }
 
-  if (session.status !== 'verified') {
+  if (session.status !== 'confirmed' && session.status !== 'verified') {
     return {
       statusCode: 200,
       body: { status: 'pending' },
@@ -567,12 +573,12 @@ export async function claimTelegramLogin(
 
   const tgUserId = String(session.telegramUserId || '').trim();
   const cleanPhone = normalizePhoneE164(session.phone);
-  if (!tgUserId || !cleanPhone) {
+  if (!tgUserId || (session.status === 'verified' && !cleanPhone)) {
     return {
       statusCode: 500,
       body: {
         status: 'error',
-        error: 'Verified session is missing Telegram user ID or phone.',
+        error: 'Confirmed session is missing required Telegram user ID or phone.',
       },
     };
   }
@@ -613,11 +619,14 @@ export async function claimTelegramLogin(
   const telegramDisplayName =
     tgFullName || (session.username ? `@${session.username}` : 'Telegram User');
 
+  const resolvedPhone = cleanPhone || existingUser?.phone || '';
+  const resolvedPhoneVerified = Boolean(cleanPhone || existingUser?.phoneVerified);
+
   const userPatch = stripUndefined({
     id: uid,
     name: existingUser?.name?.trim() ? existingUser.name : telegramDisplayName,
-    phone: cleanPhone,
-    phoneVerified: true,
+    phone: resolvedPhone,
+    phoneVerified: resolvedPhoneVerified,
     telegramUserId: tgUserId,
     telegramChatId: session.telegramChatId || tgUserId,
     firstName: session.firstName || '',
@@ -651,6 +660,7 @@ export async function claimTelegramLogin(
     statusCode: 200,
     body: {
       status: 'ok',
+      confirmed: true,
       customToken,
     },
   };
@@ -768,8 +778,11 @@ export async function handleTelegramCustomerMessage(
   if (startMatch) {
     const startPayload = startMatch[1] || '';
 
-    if (startPayload.startsWith('login_')) {
-      const sessionId = startPayload.slice('login_'.length);
+    if (startPayload) {
+      const sessionId = startPayload.startsWith('login_')
+        ? startPayload.slice('login_'.length)
+        : startPayload;
+
       if (!validateSessionId(sessionId)) {
         await deps.sendTelegramMessage({
           chat_id: chatId,
@@ -784,17 +797,7 @@ export async function handleTelegramCustomerMessage(
       const lang = normalizeLang(session?.lang, fallbackLang);
       const copy = BOT_MESSAGES[lang];
 
-      const isSameUserRetrying =
-        session?.status === 'awaiting_contact' &&
-        String(session.telegramUserId || '') === tgUserId;
-      const isPending = session?.status === 'pending';
-
-      if (
-        !session ||
-        (!isPending && !isSameUserRetrying) ||
-        !session.expiresAt ||
-        now > session.expiresAt
-      ) {
+      if (!session || !session.expiresAt || now > session.expiresAt) {
         await deps.sendTelegramMessage({
           chat_id: chatId,
           text: copy.expiredLink,
@@ -803,33 +806,44 @@ export async function handleTelegramCustomerMessage(
         return;
       }
 
-      await rtdb.ref().update({
-        [`loginSessions/${sessionId}/status`]: 'awaiting_contact',
-        [`loginSessions/${sessionId}/telegramUserId`]: tgUserId,
-        [`loginSessions/${sessionId}/telegramChatId`]: chatId,
-        [`loginSessions/${sessionId}/firstName`]: String(message.from.first_name || ''),
-        [`loginSessions/${sessionId}/lastName`]: String(message.from.last_name || ''),
-        [`loginSessions/${sessionId}/username`]: String(message.from.username || ''),
-        [`telegramPendingSessions/${tgUserId}`]: {
-          sessionId,
-          expiresAt: session.expiresAt,
-        },
-      });
+      if (session.status === 'pending') {
+        await rtdb.ref().update({
+          [`loginSessions/${sessionId}/status`]: 'confirmed',
+          [`loginSessions/${sessionId}/telegramUserId`]: tgUserId,
+          [`loginSessions/${sessionId}/telegramChatId`]: chatId,
+          [`loginSessions/${sessionId}/firstName`]: String(message.from.first_name || ''),
+          [`loginSessions/${sessionId}/lastName`]: String(message.from.last_name || ''),
+          [`loginSessions/${sessionId}/username`]: String(message.from.username || ''),
+          [`loginSessions/${sessionId}/confirmedAt`]: now,
+        });
 
-      const privacyLine = siteUrl ? copy.privacyLinkLine(siteUrl) : copy.privacyFallbackLine;
-      const brandName = deps.getBrandName ? deps.getBrandName() : getBrandName();
-      const verificationCode = session.verificationCode || '--';
+        await deps.sendTelegramMessage({
+          chat_id: chatId,
+          text: copy.confirmedSuccess,
+          reply_markup: { remove_keyboard: true },
+        });
+        return;
+      }
+
+      // Already claimed: idempotent for the same Telegram user, blocked for any other user
+      if (String(session.telegramUserId || '') === tgUserId) {
+        await deps.sendTelegramMessage({
+          chat_id: chatId,
+          text: copy.confirmedSuccess,
+          reply_markup: { remove_keyboard: true },
+        });
+        return;
+      }
+
       await deps.sendTelegramMessage({
         chat_id: chatId,
-        text: copy.sharePhonePrompt({ brandName, verificationCode, privacyLine }),
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        reply_markup: replyKeyboardFor(lang),
+        text: copy.claimedByOtherUser,
+        reply_markup: { remove_keyboard: true },
       });
       return;
     }
 
-    // Plain /start without login_ payload
+    // Plain /start without payload
     const copy = BOT_MESSAGES[fallbackLang];
     await deps.sendTelegramMessage({
       chat_id: chatId,

@@ -35,7 +35,8 @@ export function sanitizeTelegramErrorMessage(err: unknown): string {
 async function tgApiWithToken(
   botToken: string,
   method: string,
-  body: Record<string, unknown> | FormData
+  body: Record<string, unknown> | FormData,
+  timeoutMs = 8000
 ) {
   if (!botToken || botToken === 'MOCK_BOT_TOKEN') {
     return {
@@ -46,9 +47,12 @@ async function tgApiWithToken(
   }
 
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
       method: 'POST',
+      signal: controller.signal,
       ...(isForm
         ? { body: body as FormData }
         : {
@@ -72,6 +76,8 @@ async function tgApiWithToken(
       error_code: 502,
       description: sanitizeTelegramErrorMessage(err),
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -80,8 +86,49 @@ async function tgPaymentApi(method: string, body: Record<string, unknown> | Form
   return tgApiWithToken(botToken, method, body);
 }
 
+/**
+ * Sends a Telegram message using TELEGRAM_BOT_TOKEN (lazy-evaluated per call),
+ * wrapped in try/catch with an AbortController timeout.
+ */
+export async function sendTelegramBotMessage(
+  chatId: string | number,
+  text: string,
+  options?: {
+    parseMode?: 'HTML' | 'MarkdownV2';
+    replyMarkup?: Record<string, unknown>;
+    disableWebPagePreview?: boolean;
+    botToken?: string;
+    timeoutMs?: number;
+  }
+) {
+  try {
+    const token = options?.botToken || getPaymentTelegramConfig().botToken;
+    const payload: Record<string, unknown> = {
+      chat_id: chatId,
+      text,
+    };
+    if (options?.parseMode) payload.parse_mode = options.parseMode;
+    if (options?.replyMarkup) payload.reply_markup = options.replyMarkup;
+    if (options?.disableWebPagePreview !== undefined) {
+      payload.disable_web_page_preview = options.disableWebPagePreview;
+    }
+    return await tgApiWithToken(token, 'sendMessage', payload, options?.timeoutMs ?? 8000);
+  } catch (err) {
+    return {
+      ok: false,
+      error_code: 500,
+      description: sanitizeTelegramErrorMessage(err),
+    };
+  }
+}
+
 export async function sendTelegramMessage(payload: Record<string, unknown>) {
   const { botToken } = getTelegramAuthConfig();
+  return tgApiWithToken(botToken, 'sendMessage', payload);
+}
+
+export async function sendPaymentBotTelegramMessage(payload: Record<string, unknown>) {
+  const { botToken } = getPaymentTelegramConfig();
   return tgApiWithToken(botToken, 'sendMessage', payload);
 }
 
@@ -254,16 +301,15 @@ export async function handlePaymentBotWebhookUpdate(
   }
 
   if (update.message) {
-    const runtimeEnv = getTelegramRuntimeEnv();
-    const paymentBot = getPaymentTelegramConfig();
-    const authBot = getTelegramAuthConfig();
-    const sharesPrimaryBot =
-      runtimeEnv === 'production' ||
-      (authBot.botToken !== 'MOCK_BOT_TOKEN' && authBot.botToken === paymentBot.botToken);
-
-    if (sharesPrimaryBot || authDepsOverride) {
-      await handleLoginTelegramUpdate(update, authDepsOverride);
-    }
+    const deps: TelegramAuthDeps = authDepsOverride || {
+      ...getDefaultTelegramAuthDeps(),
+      getTelegramConfig: () => ({
+        ...getPaymentTelegramConfig(),
+        env: getTelegramRuntimeEnv(),
+      }),
+      sendTelegramMessage: sendPaymentBotTelegramMessage,
+    };
+    await handleLoginTelegramUpdate(update, deps);
   }
 }
 

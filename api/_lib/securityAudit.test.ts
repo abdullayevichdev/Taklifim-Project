@@ -45,6 +45,7 @@ import {
   handlePaymentTelegramUpdate,
   handleTelegramUpdate,
   sanitizeTelegramErrorMessage,
+  sendTelegramBotMessage,
 } from './telegram.js';
 import { checkExternalRateLimit, cleanupExpiredRateLimits } from './rateLimit.js';
 
@@ -1113,13 +1114,24 @@ test('GET /api/payment/status/[orderId] rejects non-GET (405) and unauthenticate
   assert.equal(getNoAuth.state.body.success, false);
 });
 
-test('POST /api/telegram/webhook validates method (405), secret token (403), and accepts valid webhook payload (200)', async () => {
+test('POST /api/telegram/webhook validates method (405), constant-time secret token (401), and returns 200 for authenticated updates even on internal failure', async () => {
   const prevSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   process.env.TELEGRAM_WEBHOOK_SECRET = 'test-webhook-secret-xyz';
   try {
     const getMock = makeMockVercelRes();
     await telegramWebhookHandler({ method: 'GET', headers: {} } as any, getMock.res);
     assert.equal(getMock.state.statusCode, 405);
+
+    const missingSecretMock = makeMockVercelRes();
+    await telegramWebhookHandler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { update_id: 1 },
+      } as any,
+      missingSecretMock.res
+    );
+    assert.equal(missingSecretMock.state.statusCode, 401);
 
     const badSecretMock = makeMockVercelRes();
     await telegramWebhookHandler(
@@ -1130,7 +1142,7 @@ test('POST /api/telegram/webhook validates method (405), secret token (403), and
       } as any,
       badSecretMock.res
     );
-    assert.equal(badSecretMock.state.statusCode, 403);
+    assert.equal(badSecretMock.state.statusCode, 401);
 
     const okMock = makeMockVercelRes();
     await telegramWebhookHandler(
@@ -1143,6 +1155,19 @@ test('POST /api/telegram/webhook validates method (405), secret token (403), and
     );
     assert.equal(okMock.state.statusCode, 200);
     assert.deepEqual(okMock.state.body, { status: 'ok' });
+
+    // Even if update has a malformed string body or internal processing error (e.g. missing Firebase), returns 200 to prevent Telegram retry storms
+    const malformedBodyMock = makeMockVercelRes();
+    await telegramWebhookHandler(
+      {
+        method: 'POST',
+        headers: { 'x-telegram-bot-api-secret-token': 'test-webhook-secret-xyz' },
+        body: '{invalid-json',
+      } as any,
+      malformedBodyMock.res
+    );
+    assert.equal(malformedBodyMock.state.statusCode, 200);
+    assert.deepEqual(malformedBodyMock.state.body, { status: 'ok' });
   } finally {
     if (prevSecret === undefined) {
       delete process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -1442,7 +1467,7 @@ test('Telegram auth handlers return proper JSON on invalid methods and JSON pars
   assert.equal(startBadJson.state.body.success, false);
 });
 
-test('startTelegramLogin + Telegram bot /start + contact verification + claimTelegramLogin full lifecycle (user & admin)', async () => {
+test('startTelegramLogin + Telegram bot /start confirmation + claimTelegramLogin full lifecycle (user & admin)', async () => {
   const ctx = makeInMemoryTelegramAuthDeps({
     botUsername: 'tashrifim_auth_bot',
     adminChatId: '777888999',
@@ -1491,7 +1516,7 @@ test('startTelegramLogin + Telegram bot /start + contact verification + claimTel
   );
   assert.equal(ctx.sentMessages.length, 0);
 
-  // 4. Customer opens bot in private chat -> shows phishing warning with brand + 2-digit code and request_contact in RU
+  // 4. Customer opens bot in private chat -> immediately marks session confirmed and links Telegram profile
   await handleTelegramCustomerMessage(
     {
       chat: { id: 123456, type: 'private' },
@@ -1501,73 +1526,47 @@ test('startTelegramLogin + Telegram bot /start + contact verification + claimTel
     ctx.deps
   );
   assert.equal(ctx.sentMessages.length, 1);
-  assert.equal((ctx.sentMessages[0].reply_markup as any).keyboard[0][0].request_contact, true);
-  assert.equal(ctx.sentMessages[0].parse_mode, 'HTML');
-  assert.match(String(ctx.sentMessages[0].text), /Tashrifim/);
-  assert.match(String(ctx.sentMessages[0].text), new RegExp(`<b>${verificationCode}</b>`));
-  assert.match(String(ctx.sentMessages[0].text), /Поделиться|поделитесь/i);
+  assert.match(String(ctx.sentMessages[0].text), /Подтверждено|Tasdiqlandi/i);
+  assert.equal(ctx.getTree().loginSessions[sessionId].status, 'confirmed');
+  assert.equal(ctx.getTree().loginSessions[sessionId].telegramUserId, '123456');
+  assert.equal(ctx.getTree().loginSessions[sessionId].firstName, 'Alisher');
+  assert.equal(ctx.getTree().loginSessions[sessionId].username, 'alisher_k');
 
-  // 5. Manually typed text is rejected and prompts button again
-  await handleTelegramCustomerMessage(
-    {
-      chat: { id: 123456, type: 'private' },
-      from: { id: 123456, first_name: 'Alisher' },
-      text: '+998901234567',
-    },
-    ctx.deps
-  );
-  assert.equal(ctx.sentMessages.length, 2);
-  assert.equal((ctx.sentMessages[1].reply_markup as any).keyboard[0][0].request_contact, true);
-
-  // 6. Forwarded someone else's contact is blocked!
-  await handleTelegramCustomerMessage(
-    {
-      chat: { id: 123456, type: 'private' },
-      from: { id: 123456, first_name: 'Alisher' },
-      contact: { user_id: 999999999, phone_number: '+998901112233' },
-    },
-    ctx.deps
-  );
-  assert.equal(ctx.sentMessages.length, 3);
-  assert.equal(ctx.getTree().loginSessions[sessionId].status, 'awaiting_contact');
-
-  // 7. Wrong claimSecret rejected with 403
+  // 5. Wrong claimSecret rejected with 403
   const wrongSecretClaim = await claimTelegramLogin(
     { sessionId, claimSecret: 'b'.repeat(48), clientIp: '10.0.0.1' },
     ctx.deps
   );
   assert.equal(wrongSecretClaim.statusCode, 403);
 
-  // 8. Own contact verified (international number e.g. US/RU +79991234567)
+  // 6. Different Telegram user CANNOT overwrite or claim the same session
   await handleTelegramCustomerMessage(
     {
-      chat: { id: 123456, type: 'private' },
-      from: { id: 123456, first_name: 'Alisher', last_name: 'Karimov', username: 'alisher_k' },
-      contact: { user_id: 123456, phone_number: '79991234567' },
+      chat: { id: 999888, type: 'private' },
+      from: { id: 999888, first_name: 'Hijacker', username: 'hijacker' },
+      text: `/start ${startParam}`,
     },
     ctx.deps
   );
-  assert.equal(ctx.sentMessages.length, 4);
-  assert.equal((ctx.sentMessages[3].reply_markup as any).remove_keyboard, true);
-  assert.equal(ctx.getTree().loginSessions[sessionId].status, 'verified');
-  assert.equal(ctx.getTree().telegramPendingSessions?.['123456'], undefined);
+  assert.equal(ctx.sentMessages.length, 2);
+  assert.equal(ctx.getTree().loginSessions[sessionId].telegramUserId, '123456');
 
-  // 9. Claim succeeds with Firebase Custom Token & saves verified user in RTDB (one-time)
+  // 7. Claim succeeds with Firebase Custom Token & saves user in RTDB (one-time)
   const okClaim = await claimTelegramLogin(
     { sessionId, claimSecret, clientIp: '10.0.0.1' },
     ctx.deps
   );
   assert.equal(okClaim.statusCode, 200);
   assert.equal(okClaim.body.status, 'ok');
+  assert.equal(okClaim.body.confirmed, true);
   assert.ok(typeof okClaim.body.customToken === 'string');
   assert.equal(ctx.createdCustomTokens[0].uid, 'tg_123456');
   assert.equal(ctx.createdCustomTokens[0].claims, undefined);
 
   const savedUser = ctx.getTree().users['tg_123456'];
   assert.equal(savedUser.id, 'tg_123456');
-  assert.equal(savedUser.phone, '+79991234567');
-  assert.equal(savedUser.phoneVerified, true);
   assert.equal(savedUser.telegramUserId, '123456');
+  assert.equal(savedUser.username, 'alisher_k');
   assert.equal(savedUser.lang, 'ru');
   assert.equal(savedUser.isAdmin, undefined);
 
@@ -1578,7 +1577,7 @@ test('startTelegramLogin + Telegram bot /start + contact verification + claimTel
   );
   assert.deepEqual(secondClaim.body, { status: 'expired' });
 
-  // 10. Admin login assigns { admin: true } custom token claim ONLY for positive personal chat ID
+  // 8. Admin login assigns { admin: true } custom token claim ONLY for positive personal chat ID
   const adminSecret = 'c'.repeat(48);
   const adminStart = await startTelegramLogin(
     { claimSecret: adminSecret, lang: 'uz', clientIp: '10.0.0.2' },
@@ -1589,15 +1588,7 @@ test('startTelegramLogin + Telegram bot /start + contact verification + claimTel
     {
       chat: { id: 777888999, type: 'private' },
       from: { id: 777888999, first_name: 'Admin' },
-      text: `/start login_${adminSid}`,
-    },
-    ctx.deps
-  );
-  await handleTelegramCustomerMessage(
-    {
-      chat: { id: 777888999, type: 'private' },
-      from: { id: 777888999, first_name: 'Admin' },
-      contact: { user_id: 777888999, phone_number: '+998901234567' },
+      text: `/start ${adminSid}`,
     },
     ctx.deps
   );
@@ -1640,21 +1631,13 @@ test('Telegram auth never grants admin claim when TELEGRAM_ADMIN_CHAT_ID is a ne
     },
     ctx.deps
   );
-  await handleTelegramCustomerMessage(
-    {
-      chat: { id: 555666, type: 'private' },
-      from: { id: 555666, first_name: 'User' },
-      contact: { user_id: 555666, phone_number: '+998901234567' },
-    },
-    ctx.deps
-  );
   const claimRes = await claimTelegramLogin({ sessionId: sid, claimSecret: secret, clientIp: '10.0.0.5' }, ctx.deps);
   assert.equal(claimRes.statusCode, 200);
   assert.equal(ctx.createdCustomTokens[0].claims, undefined);
   assert.equal(ctx.getTree().users['tg_555666'].isAdmin, undefined);
 });
 
-test('Telegram auth claim deletes session after 5 invalid secret attempts and handleTelegramUpdate routes customer messages without blocking', async () => {
+test('Telegram auth claim deletes session after 5 invalid secret attempts and handleTelegramUpdate routes /start without blocking', async () => {
   const ctx = makeInMemoryTelegramAuthDeps({ botUsername: 'tashrifim_bot' });
   const start = await startTelegramLogin(
     { claimSecret: 'x'.repeat(48), lang: 'en', clientIp: '10.0.0.9' },
@@ -1674,7 +1657,7 @@ test('Telegram auth claim deletes session after 5 invalid secret attempts and ha
     ctx.deps
   );
   assert.equal(ctx.sentMessages.length, 1);
-  assert.match(String(ctx.sentMessages[0].text), /share your phone number/i);
+  assert.match(String(ctx.sentMessages[0].text), /Confirmed/i);
 
   // 5 invalid secret attempts wipe out session
   for (let i = 1; i <= 5; i++) {
@@ -2158,7 +2141,108 @@ test('POST /api/auth/telegram/start lazy handler & GET /api/health/config return
   }
 });
 
+test('Telegram /start webhook flows: no payload, valid session, expired session, duplicate /start idempotency, different user lock, and sendTelegramBotMessage timeout', async () => {
+  const ctx = makeInMemoryTelegramAuthDeps({ botUsername: 'tashrifim_bot' });
 
+  // 1. /start without payload replies in Uzbek
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 101010, type: 'private' },
+      from: { id: 101010, first_name: 'Sardor' },
+      text: '/start',
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 1);
+  assert.equal(
+    ctx.sentMessages[0].text,
+    "Salom! Saytga kirish uchun saytdagi 'Telegram orqali kirish' tugmasini bosing."
+  );
 
+  // 2. Valid /start <sessionId> links user and marks confirmed with Uzbek reply
+  const startOk = await startTelegramLogin(
+    { claimSecret: 'k'.repeat(48), lang: 'uz', clientIp: '10.0.0.21' },
+    ctx.deps
+  );
+  const sidOk = String(startOk.body.sessionId);
 
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 202020, type: 'private' },
+      from: { id: 202020, first_name: 'Aziza', username: 'aziza_u' },
+      text: `/start ${sidOk}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 2);
+  assert.match(String(ctx.sentMessages[1].text), /Tasdiqlandi! Saytga qaytishingiz mumkin\./);
+  assert.equal(ctx.getTree().loginSessions[sidOk].status, 'confirmed');
+  assert.equal(ctx.getTree().loginSessions[sidOk].telegramUserId, '202020');
 
+  // 3. Duplicate /start by SAME user is idempotent
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 202020, type: 'private' },
+      from: { id: 202020, first_name: 'Aziza', username: 'aziza_u' },
+      text: `/start ${sidOk}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 3);
+  assert.match(String(ctx.sentMessages[2].text), /Tasdiqlandi! Saytga qaytishingiz mumkin\./);
+  assert.equal(ctx.getTree().loginSessions[sidOk].status, 'confirmed');
+  assert.equal(ctx.getTree().loginSessions[sidOk].telegramUserId, '202020');
+
+  // 4. Different Telegram user trying to claim the same session is blocked
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 303030, type: 'private' },
+      from: { id: 303030, first_name: 'Mallory', username: 'mallory_x' },
+      text: `/start ${sidOk}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 4);
+  assert.match(String(ctx.sentMessages[3].text), /boshqa foydalanuvchi/i);
+  assert.equal(ctx.getTree().loginSessions[sidOk].telegramUserId, '202020');
+
+  // 5. Expired session replies clear Uzbek error and does NOT confirm
+  const startExp = await startTelegramLogin(
+    { claimSecret: 'm'.repeat(48), lang: 'uz', clientIp: '10.0.0.22' },
+    ctx.deps
+  );
+  const sidExp = String(startExp.body.sessionId);
+  ctx.advanceTime(6 * 60 * 1000); // > 5 min TTL
+
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 404040, type: 'private' },
+      from: { id: 404040, first_name: 'Dilshod' },
+      text: `/start ${sidExp}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 5);
+  assert.match(String(ctx.sentMessages[4].text), /eskirgan/i);
+  assert.equal(ctx.getTree().loginSessions[sidExp].status, 'pending');
+
+  // 6. sendTelegramBotMessage returns safe redacted result when fetch aborts/times out
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = ((_url: any, init: any) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new Error('Request to https://api.telegram.org/bot555:SECRET_TOK/sendMessage aborted'));
+        });
+      })) as any;
+
+    const sendRes = await sendTelegramBotMessage(12345, 'Test', {
+      botToken: '555:SECRET_TOK',
+      timeoutMs: 20,
+    });
+    assert.equal(sendRes.ok, false);
+    assert.equal(String(sendRes.description).includes('SECRET_TOK'), false);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
