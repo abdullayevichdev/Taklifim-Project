@@ -142,10 +142,6 @@ export function getTelegramRuntimeEnv(): TelegramRuntimeEnv {
   return 'development';
 }
 
-function stripLeadingAt(raw: string): string {
-  return raw.replace(/\s+/g, '').replace(/^@+/, '');
-}
-
 /**
  * Payment & admin notification bot config.
  * Always reads the primary payment bot credentials (never overridden by Preview test auth vars).
@@ -163,76 +159,6 @@ export function getPaymentTelegramConfig() {
  */
 export function getTelegramConfig() {
   return getPaymentTelegramConfig();
-}
-
-/**
- * Telegram Login / Auth bot config (environment-aware):
- * - production: strictly TELEGRAM_BOT_TOKEN (never reads TELEGRAM_TEST_*)
- * - preview: strictly TELEGRAM_TEST_BOT_TOKEN
- * - development (local): TELEGRAM_TEST_BOT_TOKEN if set, else TELEGRAM_BOT_TOKEN
- */
-export function getTelegramAuthConfig() {
-  const runtimeEnv = getTelegramRuntimeEnv();
-  const adminChatId = cleanEnvString(process.env.TELEGRAM_ADMIN_CHAT_ID) || 'MOCK_ADMIN_CHAT_ID';
-  const prodToken = cleanEnvString(process.env.TELEGRAM_BOT_TOKEN);
-  const testToken = cleanEnvString(process.env.TELEGRAM_TEST_BOT_TOKEN);
-  const prodWebhookSecret = cleanEnvString(process.env.TELEGRAM_WEBHOOK_SECRET);
-  const loginWebhookSecret = cleanEnvString(process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET);
-  const testWebhookSecret = cleanEnvString(process.env.TELEGRAM_TEST_WEBHOOK_SECRET);
-
-  if (runtimeEnv === 'production') {
-    return {
-      env: runtimeEnv,
-      botToken: prodToken || 'MOCK_BOT_TOKEN',
-      adminChatId,
-      webhookSecret: loginWebhookSecret || prodWebhookSecret,
-    };
-  }
-
-  if (runtimeEnv === 'preview') {
-    return {
-      env: runtimeEnv,
-      botToken: testToken || 'MOCK_BOT_TOKEN',
-      adminChatId,
-      webhookSecret: testWebhookSecret || loginWebhookSecret || prodWebhookSecret,
-    };
-  }
-
-  return {
-    env: runtimeEnv,
-    botToken: testToken || prodToken || 'MOCK_BOT_TOKEN',
-    adminChatId,
-    webhookSecret: testWebhookSecret || loginWebhookSecret || prodWebhookSecret,
-  };
-}
-
-/**
- * Telegram Login / Auth bot username (environment-aware):
- * - production: strictly TELEGRAM_BOT_USERNAME || VITE_TELEGRAM_BOT_USERNAME
- * - preview: strictly TELEGRAM_TEST_BOT_USERNAME || VITE_TELEGRAM_TEST_BOT_USERNAME
- * - development (local): test username if set, else production username
- */
-export function getTelegramAuthBotUsername(): string {
-  const runtimeEnv = getTelegramRuntimeEnv();
-  const prodRaw =
-    cleanEnvString(process.env.TELEGRAM_BOT_USERNAME) ||
-    cleanEnvString(process.env.VITE_TELEGRAM_BOT_USERNAME);
-  const testRaw =
-    cleanEnvString(process.env.TELEGRAM_TEST_BOT_USERNAME) ||
-    cleanEnvString(process.env.VITE_TELEGRAM_TEST_BOT_USERNAME);
-
-  const selected =
-    runtimeEnv === 'production'
-      ? prodRaw
-      : runtimeEnv === 'preview'
-      ? testRaw
-      : testRaw || prodRaw;
-
-  return stripLeadingAt(selected);
-}
-
-export function getTelegramBotUsername(): string {
-  return getTelegramAuthBotUsername();
 }
 
 export function getBrandName(): string {

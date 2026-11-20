@@ -144,7 +144,7 @@ export async function uploadReceiptWithRetry(
       isNetworkError: false,
       idempotencyKey,
       error:
-        "Chek yuborish uchun Telegram orqali hisobingizga kirilgan bo'lishi kerak.",
+        "Chek yuborish uchun Google yoki Apple ID orqali hisobingizga kirilgan bo'lishi kerak.",
     };
   }
 

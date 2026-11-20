@@ -34,9 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ]);
 
     const runtimeEnv = envMod.getTelegramRuntimeEnv();
-    const authConfig = envMod.getTelegramAuthConfig();
     const paymentConfig = envMod.getPaymentTelegramConfig();
-    const authBotUsername = envMod.getTelegramAuthBotUsername();
     const fbEnv = adminMod.getFirebaseAdminEnvStatus();
 
     const adminReady = adminMod.hasFirebaseAdmin();
@@ -60,15 +58,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const hasActiveAuthBotToken = Boolean(
-      authConfig.botToken && authConfig.botToken !== 'MOCK_BOT_TOKEN'
+    const hasPaymentBotToken = Boolean(
+      paymentConfig.botToken && paymentConfig.botToken !== 'MOCK_BOT_TOKEN'
     );
-    const hasActiveAuthBotUsername = Boolean(
-      authBotUsername && authBotUsername.replace(/^@+/, '').trim().length > 0
+    const hasTelegramAdminChatId = Boolean(
+      paymentConfig.adminChatId && paymentConfig.adminChatId !== 'MOCK_ADMIN_CHAT_ID'
     );
 
-    const overallOk =
-      adminReady && rtdbReachable && hasActiveAuthBotToken && hasActiveAuthBotUsername;
+    const overallOk = adminReady && rtdbReachable && hasPaymentBotToken && hasTelegramAdminChatId;
 
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
@@ -80,23 +77,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hasFirebasePrivateKey: fbEnv.hasPrivateKey,
       hasFirebaseServiceAccountJson: fbEnv.hasServiceAccountJson,
       hasFirebaseDatabaseUrl: fbEnv.hasDatabaseUrl,
-      hasTelegramBotToken: Boolean(envMod.cleanEnvString(process.env.TELEGRAM_BOT_TOKEN)),
-      hasTelegramBotUsername: Boolean(envMod.cleanEnvString(process.env.TELEGRAM_BOT_USERNAME)),
-      hasTelegramTestBotToken: Boolean(envMod.cleanEnvString(process.env.TELEGRAM_TEST_BOT_TOKEN)),
-      hasTelegramTestBotUsername: Boolean(
-        envMod.cleanEnvString(process.env.TELEGRAM_TEST_BOT_USERNAME)
-      ),
-      hasViteTelegramBotUsername: Boolean(
-        envMod.cleanEnvString(process.env.VITE_TELEGRAM_BOT_USERNAME)
-      ),
-      hasActiveAuthBotToken,
-      hasActiveAuthBotUsername,
-      hasPaymentBotToken: Boolean(
-        paymentConfig.botToken && paymentConfig.botToken !== 'MOCK_BOT_TOKEN'
-      ),
-      hasTelegramAdminChatId: Boolean(
-        paymentConfig.adminChatId && paymentConfig.adminChatId !== 'MOCK_ADMIN_CHAT_ID'
-      ),
+      hasPaymentBotToken,
+      hasTelegramAdminChatId,
+      hasTelegramWebhookSecret: Boolean(paymentConfig.webhookSecret),
       firebaseAdminInit,
       rtdbReachable,
       rtdbCheckCode,

@@ -131,7 +131,7 @@ const AppContent: React.FC = () => {
       return <HomePage />;
     }
 
-    // Builder (Steps 1-10 guest-accessible; Step 11 payment requires Telegram sign-in)
+    // Builder (Steps 1-10 guest-accessible; Step 11 payment requires Google/Apple sign-in)
     if (routePath.startsWith('/create/')) {
       return <BuilderPage />;
     }
