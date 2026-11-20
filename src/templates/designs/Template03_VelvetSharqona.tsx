@@ -1,6 +1,7 @@
 import React from 'react';
 import { TemplateRenderProps } from '../types';
 import { SharedCountdown } from '../components/SharedCountdown';
+import { SharedPoem } from '../components/SharedPoem';
 import { SharedLocation } from '../components/SharedLocation';
 import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
@@ -82,6 +83,13 @@ export const Template03_VelvetSharqona: React.FC<TemplateRenderProps> = (props) 
           language={language}
           primaryColor={primary}
           variant="oriental"
+        />
+
+        <SharedPoem
+          templateSlug={props.template.slug}
+          language={props.language}
+          primaryColor={props.template.colorStyle.primary}
+          headingFont={props.headingFont}
         />
 
         {/* 2. INVITATION MESSAGE */}

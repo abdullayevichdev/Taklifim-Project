@@ -849,6 +849,21 @@ lg-navbar.taklifim-top-navbar {
   max-width: 100%;
 }
 
+/* Hover indicator: keep the label copy perfectly aligned with the real labels and crisp
+   (no refraction distortion / ghosted text while the pill moves). */
+lg-navbar.taklifim-top-navbar .lg-nav__copy {
+  gap: inherit;
+  padding: inherit;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+  color: #1E1418;
+  text-shadow: none;
+}
+
 lg-navbar.taklifim-top-navbar > a,
 lg-navbar.taklifim-top-navbar > button,
 lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
@@ -1434,6 +1449,143 @@ html.taklifim-modal-open .taklifim-bottom-nav {
   to { transform: scaleX(0.45); }
 }
 
+/* --- Envelope layers & per-layout opening animations --- */
+.tk-cover {
+  transform-style: preserve-3d;
+}
+
+.tk-layer {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+.tk-cover--opening {
+  animation: tk-cover-exit 1.3s ease-in forwards;
+}
+
+@keyframes tk-cover-exit {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.tk-cover--opening .tk-cover-fx {
+  transition: opacity 0.3s ease-out;
+  opacity: 0;
+}
+
+.tk-cover--opening .tk-cover-seal-wrap {
+  animation: tk-seal-open 0.5s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+.tk-cover--opening .tk-cover-seal {
+  animation: none;
+}
+
+@keyframes tk-seal-open {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  35% { transform: scale(1.16) rotate(-6deg); opacity: 1; }
+  100% { transform: scale(0.2) rotate(28deg); opacity: 0; }
+}
+
+.tk-cover--opening .tk-l-cross-top,
+.tk-cover--opening .tk-l-pocket-flap,
+.tk-cover--opening .tk-l-lotus-top {
+  animation: tk-flip-up 0.75s cubic-bezier(0.55, 0, 0.3, 1) 0.18s forwards;
+}
+
+.tk-cover--opening .tk-l-cross-left,
+.tk-cover--opening .tk-l-lotus-left {
+  animation: tk-flip-left 0.75s cubic-bezier(0.55, 0, 0.3, 1) 0.36s forwards;
+}
+
+.tk-cover--opening .tk-l-cross-right,
+.tk-cover--opening .tk-l-lotus-right {
+  animation: tk-flip-right 0.75s cubic-bezier(0.55, 0, 0.3, 1) 0.36s forwards;
+}
+
+.tk-cover--opening .tk-l-cross-bottom,
+.tk-cover--opening .tk-l-lotus-bottom {
+  animation: tk-flip-down 0.75s cubic-bezier(0.55, 0, 0.3, 1) 0.52s forwards;
+}
+
+/* Lotus opens petal by petal, clockwise */
+.tk-cover--opening .tk-l-lotus-right { animation-delay: 0.3s; }
+.tk-cover--opening .tk-l-lotus-bottom { animation-delay: 0.42s; }
+.tk-cover--opening .tk-l-lotus-left { animation-delay: 0.54s; }
+
+@keyframes tk-flip-up {
+  to { transform: rotateX(180deg); }
+}
+
+@keyframes tk-flip-down {
+  to { transform: rotateX(-180deg); }
+}
+
+@keyframes tk-flip-left {
+  to { transform: rotateY(-180deg); }
+}
+
+@keyframes tk-flip-right {
+  to { transform: rotateY(180deg); }
+}
+
+/* Pocket: flap lifts, card slides out of the pocket */
+.tk-cover--opening .tk-l-pocket-card {
+  animation: tk-card-rise 0.8s cubic-bezier(0.3, 0, 0.2, 1) 0.45s forwards;
+}
+
+@keyframes tk-card-rise {
+  to { transform: translateY(-16%) scale(1.03); }
+}
+
+/* Gatefold: doors swing open */
+.tk-cover--gatefold .tk-layer {
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
+.tk-cover--opening .tk-l-door-left {
+  animation: tk-door-left 0.95s cubic-bezier(0.45, 0, 0.2, 1) 0.22s forwards;
+}
+
+.tk-cover--opening .tk-l-door-right {
+  animation: tk-door-right 0.95s cubic-bezier(0.45, 0, 0.2, 1) 0.22s forwards;
+}
+
+@keyframes tk-door-left {
+  to { transform: rotateY(-112deg); filter: brightness(0.75); }
+}
+
+@keyframes tk-door-right {
+  to { transform: rotateY(112deg); filter: brightness(0.75); }
+}
+
+/* Ribbon: bow is untied, ribbons slide away */
+.tk-cover--opening .tk-l-ribbon-v-top { animation: tk-slide-up 0.7s cubic-bezier(0.5, 0, 0.3, 1) 0.3s forwards; }
+.tk-cover--opening .tk-l-ribbon-v-bottom { animation: tk-slide-down 0.7s cubic-bezier(0.5, 0, 0.3, 1) 0.3s forwards; }
+.tk-cover--opening .tk-l-ribbon-h-left { animation: tk-slide-left 0.7s cubic-bezier(0.5, 0, 0.3, 1) 0.42s forwards; }
+.tk-cover--opening .tk-l-ribbon-h-right { animation: tk-slide-right 0.7s cubic-bezier(0.5, 0, 0.3, 1) 0.42s forwards; }
+
+@keyframes tk-slide-up { to { transform: translateY(-105%); } }
+@keyframes tk-slide-down { to { transform: translateY(105%); } }
+@keyframes tk-slide-left { to { transform: translateX(-105%); } }
+@keyframes tk-slide-right { to { transform: translateX(105%); } }
+
+/* Arch: curtains draw aside behind the wall */
+.tk-cover--opening .tk-l-curtain-left {
+  animation: tk-curtain-left 0.95s cubic-bezier(0.45, 0, 0.2, 1) 0.2s forwards;
+}
+
+.tk-cover--opening .tk-l-curtain-right {
+  animation: tk-curtain-right 0.95s cubic-bezier(0.45, 0, 0.2, 1) 0.2s forwards;
+}
+
+@keyframes tk-curtain-left { to { transform: translateX(-46%) scaleX(0.5); } }
+@keyframes tk-curtain-right { to { transform: translateX(46%) scaleX(0.5); } }
+
 @media (prefers-reduced-motion: reduce) {
   .tk-cover-glow,
   .tk-cover-runner,
@@ -1443,10 +1595,24 @@ html.taklifim-modal-open .taklifim-bottom-nav {
   .tk-cover-flap-wings path {
     animation: none !important;
   }
+  .tk-cover--opening,
+  .tk-cover--opening * {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
   .tk-cover-particle {
     opacity: 0.6;
   }
   .tk-cover-glow {
     opacity: 0.8;
   }
+}
+
+.tk-shell-exit {
+  animation: tk-cover-exit 1.3s ease-in forwards;
+}
+
+.tk-cover--opening .tk-cover-glow {
+  animation: none;
+  opacity: 0;
 }
