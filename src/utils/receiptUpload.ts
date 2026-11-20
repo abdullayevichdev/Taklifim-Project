@@ -8,7 +8,7 @@ export interface UploadReceiptPayload {
   invitationId?: string;
   invitationSlug?: string;
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   templateId?: string;
   templateSlug?: string;
   templateName?: string;
@@ -144,7 +144,7 @@ export async function uploadReceiptWithRetry(
       isNetworkError: false,
       idempotencyKey,
       error:
-        "Chek yuborish uchun Google, Apple ID yoki Email orqali hisobingizga kirilgan bo'lishi kerak.",
+        "Chek yuborish uchun Telegram orqali hisobingizga kirilgan bo'lishi kerak.",
     };
   }
 

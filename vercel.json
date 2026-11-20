@@ -9,11 +9,20 @@
     }
   ],
   "functions": {
+    "api/auth/telegram/start.ts": {
+      "maxDuration": 15
+    },
+    "api/auth/telegram/claim.ts": {
+      "maxDuration": 15
+    },
     "api/payment/upload-receipt.ts": {
       "maxDuration": 30,
       "memory": 1024
     },
     "api/telegram/webhook.ts": {
+      "maxDuration": 20
+    },
+    "api/telegram/login-webhook.ts": {
       "maxDuration": 20
     },
     "api/telegram/template-alert.ts": {

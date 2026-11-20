@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyBearerToken } from '../_lib/firebaseAdmin.js';
-import { cleanAndValidateUzPhone } from '../_lib/phone.js';
+import {
+  getFirebaseAdminDiagnosticError,
+  getVerifiedUserPhone,
+  hasFirebaseAdmin,
+  verifyBearerToken,
+} from '../_lib/firebaseAdmin.js';
 import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
@@ -15,6 +19,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (req.headers.authorization && !hasFirebaseAdmin()) {
+      return res.status(500).json({
+        success: false,
+        error:
+          getFirebaseAdminDiagnosticError() ||
+          'Server Firebase Admin configuration is incomplete.',
+      });
+    }
+
     const authUser = await verifyBearerToken(req.headers.authorization);
     if (!authUser) {
       return res.status(401).json({
@@ -41,7 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       templateId,
       templateSlug,
       customerName,
-      customerPhone,
       templateName,
       planName,
       weddingDate,
@@ -54,11 +66,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idempotencyKey,
     } = parsedBody;
 
-    const cleanPhone = cleanAndValidateUzPhone(customerPhone);
-    if (!orderId || !cleanPhone || (!fileBase64 && !fileUrl)) {
+    if (!orderId || (!fileBase64 && !fileUrl)) {
       return res.status(400).json({
         success: false,
-        error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX) va chek faylini yuklang.",
+        error: "Iltimos, buyurtma ma'lumotlari va chek faylini yuklang.",
+      });
+    }
+
+    const verifiedPhone = await getVerifiedUserPhone(authUser.uid);
+    if (!verifiedPhone) {
+      return res.status(400).json({
+        success: false,
+        error: "Chek yuborish uchun Telegram orqali tasdiqlangan telefon raqami talab qilinadi.",
       });
     }
 
@@ -108,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       templateId: templateId ? String(templateId) : undefined,
       templateSlug: templateSlug ? String(templateSlug) : undefined,
       customerName: customerName ? String(customerName) : '',
-      customerPhone: cleanPhone,
+      customerPhone: verifiedPhone,
       templateName: templateName ? String(templateName) : '',
       planName: planName ? String(planName) : undefined,
       weddingDate: weddingDate ? String(weddingDate) : '',

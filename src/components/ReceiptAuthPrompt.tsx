@@ -1,56 +1,27 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useRouter } from '../context/RouterContext';
+import React, { useEffect, useRef } from 'react';
+import { Lock } from 'lucide-react';
 import { useLanguage } from '../locales';
-import { GlassSurface, GlassButton } from './glass';
-import { AlertCircle, Lock, Mail } from 'lucide-react';
+import { GlassSurface } from './glass';
+import { TelegramLoginWidget } from './TelegramLoginWidget';
 
 interface ReceiptAuthPromptProps {
   onBeforeEmailNavigate?: () => void;
+  onSuccess?: () => void;
 }
 
 export const ReceiptAuthPrompt: React.FC<ReceiptAuthPromptProps> = ({
   onBeforeEmailNavigate,
+  onSuccess,
 }) => {
-  const { loginWithGoogle, loginWithApple } = useAuth();
-  const { path, navigate } = useRouter();
   const { t } = useLanguage();
-  const [submitting, setSubmitting] = useState<'google' | 'apple' | null>(null);
-  const [authError, setAuthError] = useState<string>('');
+  const savedBeforeAuthRef = useRef(false);
 
-  const handleGoogle = async () => {
-    if (submitting) return;
-    setAuthError('');
-    setSubmitting('google');
-    try {
-      const res = await loginWithGoogle();
-      if (!res.success && res.message) {
-        setAuthError(res.message);
-      }
-    } finally {
-      setSubmitting(null);
+  useEffect(() => {
+    if (!savedBeforeAuthRef.current) {
+      savedBeforeAuthRef.current = true;
+      onBeforeEmailNavigate?.();
     }
-  };
-
-  const handleApple = async () => {
-    if (submitting) return;
-    setAuthError('');
-    setSubmitting('apple');
-    try {
-      const res = await loginWithApple();
-      if (!res.success && res.message) {
-        setAuthError(res.message);
-      }
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  const handleEmail = () => {
-    onBeforeEmailNavigate?.();
-    const target = path && path.startsWith('/') ? `/login?redirect=${encodeURIComponent(path)}` : '/login';
-    navigate(target);
-  };
+  }, [onBeforeEmailNavigate]);
 
   return (
     <GlassSurface
@@ -72,53 +43,7 @@ export const ReceiptAuthPrompt: React.FC<ReceiptAuthPromptProps> = ({
         </div>
       </div>
 
-      {authError && (
-        <div
-          role="alert"
-          className="text-xs text-rose-800 font-semibold flex items-start gap-2 bg-rose-50/95 p-3 rounded-xl border border-rose-200"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" aria-hidden="true" />
-          <span>{authError}</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <GlassButton
-          type="button"
-          tone="light"
-          size="sm"
-          disabled={Boolean(submitting)}
-          loading={submitting === 'google'}
-          onClick={handleGoogle}
-          className="w-full justify-center"
-        >
-          {t.auth.googleLoginBtn}
-        </GlassButton>
-
-        <button
-          type="button"
-          disabled={Boolean(submitting)}
-          onClick={handleApple}
-          className="min-h-[40px] px-3.5 py-2 rounded-full bg-[#1E1418] hover:bg-black text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
-        >
-          {submitting === 'apple' ? (
-            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : null}
-          <span>{t.auth.appleLoginBtn}</span>
-        </button>
-
-        <GlassButton
-          type="button"
-          tone="tinted"
-          size="sm"
-          disabled={Boolean(submitting)}
-          onClick={handleEmail}
-          leftIcon={<Mail className="w-3.5 h-3.5" aria-hidden="true" />}
-          className="w-full justify-center"
-        >
-          {t.auth.errors.receiptAuthEmailBtn}
-        </GlassButton>
-      </div>
+      <TelegramLoginWidget compact onSuccess={onSuccess} />
     </GlassSurface>
   );
 };

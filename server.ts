@@ -3,6 +3,7 @@
  * Production on Vercel uses /api/* serverless functions — no long-polling.
  */
 import express, { Request, Response } from 'express';
+import http from 'node:http';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -10,11 +11,26 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import {
   getAuthorizedOrderForUser,
+  getFirebaseAdminDiagnosticError,
+  getVerifiedUserPhone,
+  hasFirebaseAdmin,
   verifyBearerToken,
 } from './api/_lib/firebaseAdmin.js';
-import { handleTelegramUpdate, sendTemplateErrorAlertToTelegram } from './api/_lib/telegram.js';
-import { getTelegramConfig } from './api/_lib/env.js';
-import { cleanAndValidateUzPhone } from './api/_lib/phone.js';
+import {
+  getDefaultTelegramAuthDeps,
+  handleLoginTelegramUpdate,
+  handlePaymentBotWebhookUpdate,
+  sanitizeTelegramErrorMessage,
+  sendTemplateErrorAlertToTelegram,
+} from './api/_lib/telegram.js';
+import {
+  claimTelegramLogin,
+  startTelegramLogin,
+} from './api/_lib/telegramAuth.js';
+import {
+  getPaymentTelegramConfig,
+  getTelegramAuthConfig,
+} from './api/_lib/env.js';
 import { processUploadReceipt } from './api/_lib/uploadReceiptService.js';
 import { checkRateLimit } from './api/_lib/rateLimit.js';
 
@@ -34,8 +50,65 @@ async function startServer() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+  app.post('/api/auth/telegram/start', async (req: Request, res: Response) => {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await startTelegramLogin(
+        {
+          claimSecret: body.claimSecret,
+          lang: body.lang,
+          clientIp: req.ip || 'unknown',
+        },
+        getDefaultTelegramAuthDeps()
+      );
+      return res.status(result.statusCode).json(result.body);
+    } catch (err: any) {
+      console.error('Telegram auth start handler error:', {
+        message: err?.message,
+        code: err?.code,
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error while starting Telegram login.',
+      });
+    }
+  });
+
+  app.post('/api/auth/telegram/claim', async (req: Request, res: Response) => {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = await claimTelegramLogin(
+        {
+          sessionId: body.sessionId,
+          claimSecret: body.claimSecret,
+          clientIp: req.ip || 'unknown',
+        },
+        getDefaultTelegramAuthDeps()
+      );
+      return res.status(result.statusCode).json(result.body);
+    } catch (err: any) {
+      console.error('Telegram auth claim handler error:', {
+        message: err?.message,
+        code: err?.code,
+      });
+      return res.status(500).json({
+        status: 'error',
+        error: 'Internal server error while claiming Telegram login.',
+      });
+    }
+  });
+
   app.post('/api/payment/upload-receipt', async (req: Request, res: Response) => {
     try {
+      if (req.headers.authorization && !hasFirebaseAdmin()) {
+        return res.status(500).json({
+          success: false,
+          error:
+            getFirebaseAdminDiagnosticError() ||
+            'Server Firebase Admin configuration is incomplete.',
+        });
+      }
+
       const authUser = await verifyBearerToken(req.headers.authorization);
       if (!authUser) {
         return res.status(401).json({
@@ -51,7 +124,6 @@ async function startServer() {
         templateId,
         templateSlug,
         customerName,
-        customerPhone,
         templateName,
         planName,
         weddingDate,
@@ -64,11 +136,18 @@ async function startServer() {
         idempotencyKey,
       } = req.body || {};
 
-      const cleanPhone = cleanAndValidateUzPhone(customerPhone);
-      if (!orderId || !cleanPhone || (!fileBase64 && !fileUrl)) {
+      if (!orderId || (!fileBase64 && !fileUrl)) {
         return res.status(400).json({
           success: false,
-          error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX) va chek faylini yuklang.",
+          error: "Iltimos, buyurtma ma'lumotlari va chek faylini yuklang.",
+        });
+      }
+
+      const verifiedPhone = await getVerifiedUserPhone(authUser.uid);
+      if (!verifiedPhone) {
+        return res.status(400).json({
+          success: false,
+          error: "Chek yuborish uchun Telegram orqali tasdiqlangan telefon raqami talab qilinadi.",
         });
       }
 
@@ -111,7 +190,7 @@ async function startServer() {
         templateId: templateId ? String(templateId) : undefined,
         templateSlug: templateSlug ? String(templateSlug) : undefined,
         customerName: customerName ? String(customerName) : '',
-        customerPhone: cleanPhone,
+        customerPhone: verifiedPhone,
         templateName: templateName ? String(templateName) : '',
         planName: planName ? String(planName) : undefined,
         weddingDate: weddingDate ? String(weddingDate) : '',
@@ -142,6 +221,15 @@ async function startServer() {
 
   app.get('/api/payment/status/:orderId', async (req: Request, res: Response) => {
     try {
+      if (req.headers.authorization && !hasFirebaseAdmin()) {
+        return res.status(500).json({
+          success: false,
+          error:
+            getFirebaseAdminDiagnosticError() ||
+            'Server Firebase Admin configuration is incomplete.',
+        });
+      }
+
       const authUser = await verifyBearerToken(req.headers.authorization);
       if (!authUser) {
         return res.status(401).json({
@@ -192,19 +280,39 @@ async function startServer() {
 
   app.post('/api/telegram/webhook', async (req: Request, res: Response) => {
     try {
-      const { webhookSecret } = getTelegramConfig();
+      const { webhookSecret } = getPaymentTelegramConfig();
       const secretHeader = req.headers['x-telegram-bot-api-secret-token'];
-      if (!secretHeader || secretHeader !== webhookSecret) {
+      if (!webhookSecret || typeof secretHeader !== 'string' || secretHeader !== webhookSecret) {
         return res.status(403).json({ error: 'Unauthorized' });
       }
 
       if (req.body) {
-        await handleTelegramUpdate(req.body);
+        await handlePaymentBotWebhookUpdate(req.body);
       }
       return res.status(200).json({ status: 'ok' });
     } catch (err: any) {
-      console.error('Telegram webhook handler error:', err);
-      return res.status(500).json({ error: err.message || 'Webhook error' });
+      const safeMsg = sanitizeTelegramErrorMessage(err);
+      console.error('Telegram payment webhook handler error:', safeMsg);
+      return res.status(500).json({ error: safeMsg || 'Webhook error' });
+    }
+  });
+
+  app.post('/api/telegram/login-webhook', async (req: Request, res: Response) => {
+    try {
+      const { webhookSecret } = getTelegramAuthConfig();
+      const secretHeader = req.headers['x-telegram-bot-api-secret-token'];
+      if (!webhookSecret || typeof secretHeader !== 'string' || secretHeader !== webhookSecret) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+
+      if (req.body) {
+        await handleLoginTelegramUpdate(req.body);
+      }
+      return res.status(200).json({ status: 'ok' });
+    } catch (err: any) {
+      const safeMsg = sanitizeTelegramErrorMessage(err);
+      console.error('Telegram login webhook handler error:', safeMsg);
+      return res.status(500).json({ error: safeMsg || 'Login webhook error' });
     }
   });
 
@@ -240,9 +348,15 @@ async function startServer() {
     }
   });
 
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true, allowedHosts: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : { server: httpServer },
+      },
       appType: 'custom',
     });
 
@@ -273,7 +387,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 TASHRIFIM local server Port ${PORT} (Telegram = webhook, long-polling yo'q)`);
   });
 }

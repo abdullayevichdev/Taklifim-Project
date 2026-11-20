@@ -40,8 +40,8 @@ import {
   generateIdempotencyKey,
   isNetworkOrTimeoutError,
 } from '../utils/receiptUpload';
-import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { isFirebaseConfigured, storage } from '../services/firebase';
+import { TelegramLoginWidget } from '../components/TelegramLoginWidget';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
 import {
@@ -200,6 +200,7 @@ export const BuilderPage: React.FC = () => {
   const [uploadAttemptMsg, setUploadAttemptMsg] = useState<string>('');
   const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<string>('');
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [showStep11AuthModal, setShowStep11AuthModal] = useState<boolean>(false);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const receiptSubmitLockRef = useRef<boolean>(false);
   const existingSlugsRef = useRef<Set<string>>(new Set());
@@ -450,6 +451,120 @@ export const BuilderPage: React.FC = () => {
       active = false;
     };
   }, [authReady, queryInvitationId]);
+
+  const saveDraftLocally = useCallback(
+    (inv?: InvitationData) => {
+      if (queryInvitationId) return;
+      try {
+        localStorage.setItem('taklifim_builder_draft', JSON.stringify(inv || invitationState));
+      } catch {}
+    },
+    [invitationState, queryInvitationId]
+  );
+
+  // Auto-persist guest draft edits locally so login or reload never loses form progress
+  useEffect(() => {
+    if (queryInvitationId || isLoadingInvitation || invitationState.status !== 'draft') return;
+    const timer = window.setTimeout(() => {
+      saveDraftLocally(invitationState);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [invitationState, isLoadingInvitation, queryInvitationId, saveDraftLocally]);
+
+  // Bind any guest draft to the newly authenticated Telegram user and persist to RTDB
+  const draftClaimedForUidRef = useRef<string>('');
+  useEffect(() => {
+    if (!authReady || !hasFirebaseSession || !user?.id || queryInvitationId || isLoadingInvitation) {
+      return;
+    }
+    if (invitationState.ownerUid === user.id && invitationState.ownerId === user.id) {
+      return;
+    }
+    if (draftClaimedForUidRef.current === `${user.id}:${invitationState.id}`) {
+      return;
+    }
+    draftClaimedForUidRef.current = `${user.id}:${invitationState.id}`;
+
+    const boundDraft: InvitationData = {
+      ...invitationState,
+      ownerId: user.id,
+      ownerUid: user.id,
+      updatedAt: new Date().toISOString(),
+    };
+    setInvitationState(boundDraft);
+    saveDraftLocally(boundDraft);
+
+    api
+      .saveInvitation(boundDraft)
+      .then((saved) => {
+        if (
+          saved.id !== boundDraft.id ||
+          saved.slug !== boundDraft.slug ||
+          saved.ownerId !== boundDraft.ownerId ||
+          saved.ownerUid !== boundDraft.ownerUid
+        ) {
+          setInvitationState((prev) => ({
+            ...prev,
+            id: saved.id,
+            slug: saved.slug,
+            ownerId: saved.ownerId,
+            ownerUid: saved.ownerUid,
+          }));
+          saveDraftLocally({ ...boundDraft, id: saved.id, slug: saved.slug });
+        }
+      })
+      .catch(() => {});
+  }, [
+    authReady,
+    hasFirebaseSession,
+    user?.id,
+    queryInvitationId,
+    isLoadingInvitation,
+    invitationState,
+    saveDraftLocally,
+  ]);
+
+  const goToStep = useCallback(
+    (targetStep: number) => {
+      const clamped = Math.max(1, Math.min(11, targetStep));
+      if (clamped === 11 && authReady && (!isLoggedIn || !hasFirebaseSession)) {
+        saveDraftLocally();
+        setShowStep11AuthModal(true);
+        return;
+      }
+
+      setCurrentStep(clamped);
+      saveDraftLocally();
+
+      if (hasFirebaseSession && user?.id) {
+        api
+          .saveInvitation({
+            ...invitationState,
+            ownerId: user.id,
+            ownerUid: user.id,
+          })
+          .then((saved) => {
+            if (
+              saved.id !== invitationState.id ||
+              saved.slug !== invitationState.slug ||
+              saved.ownerId !== invitationState.ownerId ||
+              saved.ownerUid !== invitationState.ownerUid
+            ) {
+              setInvitationState((prev) => ({
+                ...prev,
+                id: saved.id,
+                slug: saved.slug,
+                ownerId: saved.ownerId,
+                ownerUid: saved.ownerUid,
+              }));
+              saveDraftLocally(saved);
+            }
+          })
+          .catch(() => {});
+      }
+    },
+    [authReady, isLoggedIn, hasFirebaseSession, user?.id, invitationState, saveDraftLocally]
+  );
 
   // Load user's known slugs once for uniqueness checks during auto-slug updates (only when Firebase session is active)
   useEffect(() => {
@@ -720,7 +835,7 @@ export const BuilderPage: React.FC = () => {
     if (!hasFirebaseSession) {
       setUploadError(
         t.auth?.errors?.receiptAuthRequiredDesc ||
-          'Chek yuborish uchun Google, Apple ID yoki Email orqali hisobingizga kirilgan bo‘lishi kerak.'
+          'Chek yuborish uchun Telegram orqali hisobingizga kirilgan bo‘lishi kerak.'
       );
       return;
     }
@@ -732,13 +847,6 @@ export const BuilderPage: React.FC = () => {
 
     if (!selectedFile || (!fileBase64 && !isPdf)) {
       setUploadError(t.builder.toasts.uploadReceiptFirst);
-      return;
-    }
-
-    const rawPhone = invitationState.socialLinks?.phone || user?.phone || '';
-    const cleanPhone = cleanAndValidateUzPhone(rawPhone);
-    if (!cleanPhone) {
-      setUploadError(t.auth?.errors?.invalidPhone || 'Iltimos, to‘g‘ri telefon raqam kiriting (+998 90 123 45 67)');
       return;
     }
 
@@ -784,7 +892,7 @@ export const BuilderPage: React.FC = () => {
           planName: `${currentTemplate.name} (${formatPriceUZS(finalPrice, language)})`,
           price: finalPrice,
           customerName: invitationState.hostNames,
-          customerPhone: cleanPhone,
+          customerPhone: user?.phone || '',
           ownerUid: user?.id,
           invitationId: invitationState.id,
           invitationSlug: invitationState.slug,
@@ -849,7 +957,6 @@ export const BuilderPage: React.FC = () => {
           invitationId: savedInv.id,
           invitationSlug: savedInv.slug,
           customerName: savedInv.hostNames,
-          customerPhone: cleanPhone,
           templateId: resolvedTpl.templateId,
           templateSlug: resolvedTpl.templateSlug,
           templateName: currentTemplate.name,
@@ -1382,7 +1489,7 @@ export const BuilderPage: React.FC = () => {
             <button
               key={st.num}
               type="button"
-              onClick={() => setCurrentStep(st.num)}
+              onClick={() => goToStep(st.num)}
               aria-current={currentStep === st.num ? 'step' : undefined}
               className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer tabular-nums ${
                 currentStep === st.num
@@ -2826,171 +2933,167 @@ export const BuilderPage: React.FC = () => {
                           </div>
                         )}
 
-                        {authReady && !hasFirebaseSession && (
+                        {authReady && !hasFirebaseSession ? (
                           <ReceiptAuthPrompt
-                            onBeforeEmailNavigate={() => {
-                              try {
-                                if (!queryInvitationId) {
-                                  localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
-                                }
-                              } catch {}
-                            }}
+                            onBeforeEmailNavigate={() => saveDraftLocally()}
                           />
-                        )}
+                        ) : (
+                          <>
+                            <div className="space-y-2 min-w-0">
+                              <label className="text-xs font-bold text-[#1E1418] block">
+                                {t.builder.receiptUploadLabel}
+                              </label>
 
-                        <div className="space-y-2 min-w-0">
-                          <label className="text-xs font-bold text-[#1E1418] block">
-                            {t.builder.receiptUploadLabel}
-                          </label>
+                              <input
+                                ref={receiptInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                onChange={handleReceiptFileChange}
+                                disabled={isPreparingFile || isUploadingReceipt}
+                                className="sr-only"
+                              />
 
-                          <input
-                            ref={receiptInputRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,application/pdf"
-                            onChange={handleReceiptFileChange}
-                            disabled={isPreparingFile || isUploadingReceipt}
-                            className="sr-only"
-                          />
-
-                          <div
-                            onClick={() => {
-                              if (!isPreparingFile && !isUploadingReceipt && !selectedFile) {
-                                receiptInputRef.current?.click();
-                              }
-                            }}
-                            className={`glass-surface-subtle border-2 border-dashed border-[#C64873]/40 rounded-2xl p-4 sm:p-5 transition-colors overflow-hidden ${
-                              !selectedFile && !isPreparingFile ? 'hover:border-[#C64873] hover:bg-white/80 cursor-pointer' : ''
-                            }`}
-                          >
-                            {isPreparingFile ? (
-                              <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
-                                <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
-                                  <Upload className="w-5 h-5 animate-pulse" aria-hidden="true" />
-                                </div>
-                                <div>
-                                  <span className="text-xs font-bold text-[#1E1418] block">
-                                    {t.builder.compressingImage}
-                                  </span>
-                                  <span className="text-[10px] text-[#4A383F]">
-                                    {t.builder.compressingSub}
-                                  </span>
-                                </div>
-                              </div>
-                            ) : selectedFile ? (
-                              <div className="flex flex-col gap-3 w-full min-w-0">
-                                <div className="flex items-center gap-3 w-full min-w-0 max-w-full p-2.5 sm:p-3 rounded-xl bg-white/92 border border-emerald-200/90 shadow-xs">
-                                  <div className="flex-none w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
-                                    <FileText className="w-5 h-5" aria-hidden="true" />
-                                  </div>
-                                  <div className="flex-1 min-w-0 text-left">
-                                    <span
-                                      title={preparedFileName || selectedFile.name}
-                                      className="font-mono text-xs font-bold text-[#1E1418] block truncate"
-                                    >
-                                      {truncateFilenameMiddle(preparedFileName || selectedFile.name, 22)}
-                                    </span>
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] mt-0.5">
-                                      {selectedFile.size > 0 && (
-                                        <span className="text-[#4A383F] tabular-nums">
-                                          {formatFileSize(selectedFile.size, language)}
-                                        </span>
-                                      )}
-                                      <span className="text-emerald-700 font-semibold">
-                                        {t.builder.fileReadyText}
+                              <div
+                                onClick={() => {
+                                  if (!isPreparingFile && !isUploadingReceipt && !selectedFile) {
+                                    receiptInputRef.current?.click();
+                                  }
+                                }}
+                                className={`glass-surface-subtle border-2 border-dashed border-[#C64873]/40 rounded-2xl p-4 sm:p-5 transition-colors overflow-hidden ${
+                                  !selectedFile && !isPreparingFile ? 'hover:border-[#C64873] hover:bg-white/80 cursor-pointer' : ''
+                                }`}
+                              >
+                                {isPreparingFile ? (
+                                  <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
+                                    <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
+                                      <Upload className="w-5 h-5 animate-pulse" aria-hidden="true" />
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-bold text-[#1E1418] block">
+                                        {t.builder.compressingImage}
+                                      </span>
+                                      <span className="text-[10px] text-[#4A383F]">
+                                        {t.builder.compressingSub}
                                       </span>
                                     </div>
                                   </div>
-                                </div>
+                                ) : selectedFile ? (
+                                  <div className="flex flex-col gap-3 w-full min-w-0">
+                                    <div className="flex items-center gap-3 w-full min-w-0 max-w-full p-2.5 sm:p-3 rounded-xl bg-white/92 border border-emerald-200/90 shadow-xs">
+                                      <div className="flex-none w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+                                        <FileText className="w-5 h-5" aria-hidden="true" />
+                                      </div>
+                                      <div className="flex-1 min-w-0 text-left">
+                                        <span
+                                          title={preparedFileName || selectedFile.name}
+                                          className="font-mono text-xs font-bold text-[#1E1418] block truncate"
+                                        >
+                                          {truncateFilenameMiddle(preparedFileName || selectedFile.name, 22)}
+                                        </span>
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] mt-0.5">
+                                          {selectedFile.size > 0 && (
+                                            <span className="text-[#4A383F] tabular-nums">
+                                              {formatFileSize(selectedFile.size, language)}
+                                            </span>
+                                          )}
+                                          <span className="text-emerald-700 font-semibold">
+                                            {t.builder.fileReadyText}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
 
-                                <button
-                                  type="button"
-                                  disabled={isUploadingReceipt}
-                                  onClick={() => receiptInputRef.current?.click()}
-                                  className="min-h-[40px] w-full sm:w-auto sm:self-center px-4 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-black/10 text-xs font-bold text-[#9E3E60] transition-colors cursor-pointer disabled:opacity-50"
-                                >
-                                  {t.builder.replaceReceiptFileBtn}
-                                </button>
+                                    <button
+                                      type="button"
+                                      disabled={isUploadingReceipt}
+                                      onClick={() => receiptInputRef.current?.click()}
+                                      className="min-h-[40px] w-full sm:w-auto sm:self-center px-4 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-black/10 text-xs font-bold text-[#9E3E60] transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                      {t.builder.replaceReceiptFileBtn}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
+                                    <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
+                                      <Upload className="w-5 h-5" aria-hidden="true" />
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-bold text-[#1E1418] block">
+                                        {t.builder.clickToChooseFile}
+                                      </span>
+                                      <span className="text-[10px] text-[#4A383F]">
+                                        {t.builder.fileSizeRules}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center text-center gap-2 py-2">
-                                <div className="w-11 h-11 rounded-2xl glass-surface-tinted-pink text-[#9E3E60] flex items-center justify-center shadow-xs">
-                                  <Upload className="w-5 h-5" aria-hidden="true" />
+                            </div>
+
+                            {isUploadingReceipt && (
+                              <div
+                                role="status"
+                                aria-live="polite"
+                                className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 space-y-2"
+                              >
+                                <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
+                                  <span>{uploadAttemptMsg || t.builder.uploadingProgressLabel}</span>
                                 </div>
-                                <div>
-                                  <span className="text-xs font-bold text-[#1E1418] block">
-                                    {t.builder.clickToChooseFile}
-                                  </span>
-                                  <span className="text-[10px] text-[#4A383F]">
-                                    {t.builder.fileSizeRules}
-                                  </span>
+                                <div className="h-1.5 w-full rounded-full bg-amber-200/70 overflow-hidden">
+                                  <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#C64873] to-[#E27B9B] animate-pulse" />
                                 </div>
                               </div>
                             )}
-                          </div>
-                        </div>
 
-                        {isUploadingReceipt && (
-                          <div
-                            role="status"
-                            aria-live="polite"
-                            className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 space-y-2"
-                          >
-                            <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden="true" />
-                              <span>{uploadAttemptMsg || t.builder.uploadingProgressLabel}</span>
-                            </div>
-                            <div className="h-1.5 w-full rounded-full bg-amber-200/70 overflow-hidden">
-                              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#C64873] to-[#E27B9B] animate-pulse" />
-                            </div>
-                          </div>
-                        )}
+                            {uploadError && (
+                              <div
+                                role="alert"
+                                className="text-xs text-rose-700 font-semibold flex flex-col gap-2.5 bg-rose-50/90 p-3.5 rounded-xl border border-rose-200"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                                  <span className="leading-relaxed">
+                                    {uploadIsNetworkError ? t.builder.uploadNetworkError : uploadError}
+                                  </span>
+                                </div>
+                                {selectedFile && !isUploadingReceipt && (
+                                  <GlassButton
+                                    type="button"
+                                    tone="tinted"
+                                    size="sm"
+                                    onClick={handleSubmitReceiptUpload}
+                                    leftIcon={<RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
+                                    className="self-start"
+                                  >
+                                    {t.builder.retryUploadBtn}
+                                  </GlassButton>
+                                )}
+                              </div>
+                            )}
 
-                        {uploadError && (
-                          <div
-                            role="alert"
-                            className="text-xs text-rose-700 font-semibold flex flex-col gap-2.5 bg-rose-50/90 p-3.5 rounded-xl border border-rose-200"
-                          >
-                            <div className="flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-                              <span className="leading-relaxed">
-                                {uploadIsNetworkError ? t.builder.uploadNetworkError : uploadError}
-                              </span>
-                            </div>
-                            {selectedFile && !isUploadingReceipt && (
+                            <div className="space-y-1.5">
                               <GlassButton
                                 type="button"
                                 tone="tinted"
-                                size="sm"
+                                size="lg"
+                                multiline
+                                loading={isUploadingReceipt}
+                                disabled={!canSubmitReceipt || isUploadingReceipt}
                                 onClick={handleSubmitReceiptUpload}
-                                leftIcon={<RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
-                                className="self-start"
+                                leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
+                                className="w-full min-h-[52px]"
                               >
-                                {t.builder.retryUploadBtn}
+                                {isUploadingReceipt
+                                  ? t.builder.uploadingProgressLabel
+                                  : t.builder.submitReceiptPrimaryBtn}
                               </GlassButton>
-                            )}
-                          </div>
+                              <p className="text-[11px] font-medium text-[#4A383F] text-center">
+                                {t.builder.submitReceiptHelperCaption}
+                              </p>
+                            </div>
+                          </>
                         )}
-
-                        <div className="space-y-1.5">
-                          <GlassButton
-                            type="button"
-                            tone="tinted"
-                            size="lg"
-                            multiline
-                            loading={isUploadingReceipt}
-                            disabled={!canSubmitReceipt || isUploadingReceipt}
-                            onClick={handleSubmitReceiptUpload}
-                            leftIcon={!isUploadingReceipt ? <Upload className="w-4 h-4" aria-hidden="true" /> : undefined}
-                            className="w-full min-h-[52px]"
-                          >
-                            {isUploadingReceipt
-                              ? t.builder.uploadingProgressLabel
-                              : t.builder.submitReceiptPrimaryBtn}
-                          </GlassButton>
-                          <p className="text-[11px] font-medium text-[#4A383F] text-center">
-                            {t.builder.submitReceiptHelperCaption}
-                          </p>
-                        </div>
                       </GlassSurface>
                     )}
                   </div>
@@ -3019,42 +3122,7 @@ export const BuilderPage: React.FC = () => {
                   type="button"
                   tone="tinted"
                   size="sm"
-                  onClick={() => {
-                    setCurrentStep((p) => p + 1);
-                    try {
-                      if (!queryInvitationId) {
-                        localStorage.setItem('taklifim_builder_draft', JSON.stringify(invitationState));
-                      }
-                    } catch {}
-                    api
-                      .saveInvitation({
-                        ...invitationState,
-                        ownerId: user?.id || invitationState.ownerId,
-                        ownerUid: user?.id || invitationState.ownerUid,
-                      })
-                      .then((saved) => {
-                        if (
-                          saved.id !== invitationState.id ||
-                          saved.slug !== invitationState.slug ||
-                          saved.ownerId !== invitationState.ownerId ||
-                          saved.ownerUid !== invitationState.ownerUid
-                        ) {
-                          setInvitationState((prev) => ({
-                            ...prev,
-                            id: saved.id,
-                            slug: saved.slug,
-                            ownerId: saved.ownerId,
-                            ownerUid: saved.ownerUid,
-                          }));
-                          try {
-                            if (!queryInvitationId) {
-                              localStorage.setItem('taklifim_builder_draft', JSON.stringify(saved));
-                            }
-                          } catch {}
-                        }
-                      })
-                      .catch(() => {});
-                  }}
+                  onClick={() => goToStep(currentStep + 1)}
                   rightIcon={<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
                 >
                   {t.builder.nextStep}
@@ -3207,6 +3275,32 @@ export const BuilderPage: React.FC = () => {
               {t.builder.startOver}
             </button>
           </div>
+        </div>
+      </GlassModal>
+
+      {/* Step 11 Payment Gate — Telegram Login Modal */}
+      <GlassModal
+        isOpen={showStep11AuthModal}
+        onClose={() => setShowStep11AuthModal(false)}
+        size="md"
+        ariaLabel={t.auth.step11GateTitle}
+        closeLabel={t.common.close}
+      >
+        <div className="space-y-4 pt-1">
+          <div className="text-center space-y-1.5">
+            <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
+              {t.auth.step11GateTitle}
+            </h3>
+            <p className="text-xs text-[#4A383F] leading-relaxed">
+              {t.auth.step11GateDesc}
+            </p>
+          </div>
+          <TelegramLoginWidget
+            onSuccess={() => {
+              setShowStep11AuthModal(false);
+              setCurrentStep(11);
+            }}
+          />
         </div>
       </GlassModal>
     </div>

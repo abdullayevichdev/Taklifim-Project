@@ -11,6 +11,7 @@ import {
   LogOut,
   LogIn,
   Phone,
+  CheckCircle2,
 } from 'lucide-react';
 import { Language } from '../types';
 import { FlagIcon } from './FlagIcon';
@@ -321,11 +322,19 @@ export const Header: React.FC = () => {
                 <GlassActionMenu
                   ariaLabel={t.nav.profile}
                   header={
-                    <div className="text-xs text-[#5C4F48]">
+                    <div className="text-xs text-[#5C4F48] space-y-0.5">
                       <div className="font-semibold text-[#1E1418] truncate">{user?.name}</div>
-                      <div className="text-[11px] truncate opacity-80">
-                        {user?.phone ? user.phone : user?.email}
-                      </div>
+                      {user?.phone && (
+                        <div className="text-[11px] truncate opacity-85 inline-flex items-center gap-1 tabular-nums">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-hidden="true" />
+                          <span>{user.phone}</span>
+                        </div>
+                      )}
+                      {user?.username && (
+                        <div className="text-[11px] truncate text-[#229ED9] font-medium">
+                          @{user.username}
+                        </div>
+                      )}
                     </div>
                   }
                   items={userMenuItems}
@@ -416,11 +425,19 @@ export const Header: React.FC = () => {
             <GlassActionMenu
               ariaLabel={t.nav.profile}
               header={
-                <div className="text-xs text-[#5C4F48]">
+                <div className="text-xs text-[#5C4F48] space-y-0.5">
                   <div className="font-semibold text-[#1E1418] truncate">{user?.name}</div>
-                  <div className="text-[11px] truncate opacity-80">
-                    {user?.phone ? user.phone : user?.email}
-                  </div>
+                  {user?.phone && (
+                    <div className="text-[11px] truncate opacity-85 inline-flex items-center gap-1 tabular-nums">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-hidden="true" />
+                      <span>{user.phone}</span>
+                    </div>
+                  )}
+                  {user?.username && (
+                    <div className="text-[11px] truncate text-[#229ED9] font-medium">
+                      @{user.username}
+                    </div>
+                  )}
                 </div>
               }
               items={userMenuItems}

@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAuthorizedOrderForUser, verifyBearerToken } from '../../_lib/firebaseAdmin.js';
+import {
+  getAuthorizedOrderForUser,
+  getFirebaseAdminDiagnosticError,
+  hasFirebaseAdmin,
+  verifyBearerToken,
+} from '../../_lib/firebaseAdmin.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -8,6 +13,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (req.headers.authorization && !hasFirebaseAdmin()) {
+      return res.status(500).json({
+        success: false,
+        error:
+          getFirebaseAdminDiagnosticError() ||
+          'Server Firebase Admin configuration is incomplete.',
+      });
+    }
+
     const authUser = await verifyBearerToken(req.headers.authorization);
     if (!authUser) {
       return res.status(401).json({

@@ -3,12 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
+import { deleteApp, getApps } from 'firebase-admin/app';
 import {
   computeReceiptIdempotencyKey,
   processUploadReceipt,
   type UploadReceiptDeps,
 } from './uploadReceiptService.js';
 import {
+  getAdminApp,
+  getFirebaseAdminDiagnosticError,
+  getRtdb,
+  hasFirebaseAdmin,
   verifyBearerToken,
   type ReceiptAttemptRecord,
   type ServerOrder,
@@ -16,6 +22,30 @@ import {
 import uploadReceiptHandler from '../payment/upload-receipt.js';
 import paymentStatusHandler from '../payment/status/[orderId].js';
 import telegramWebhookHandler from '../telegram/webhook.js';
+import telegramLoginWebhookHandler from '../telegram/login-webhook.js';
+import telegramAuthStartHandler from '../auth/telegram/start.js';
+import telegramAuthClaimHandler from '../auth/telegram/claim.js';
+import {
+  cleanPrivateKey,
+  getPaymentTelegramConfig,
+  getTelegramAuthBotUsername,
+  getTelegramAuthConfig,
+  validatePrivateKeyPem,
+} from './env.js';
+import { formatUzPhoneForDisplay, normalizePhoneE164 } from './phone.js';
+import {
+  claimTelegramLogin,
+  handleTelegramCustomerMessage,
+  startTelegramLogin,
+  type TelegramAuthDeps,
+} from './telegramAuth.js';
+import {
+  handleLoginTelegramUpdate,
+  handlePaymentTelegramUpdate,
+  handleTelegramUpdate,
+  sanitizeTelegramErrorMessage,
+} from './telegram.js';
+import { checkExternalRateLimit, cleanupExpiredRateLimits } from './rateLimit.js';
 
 // ---------------------------------------------------------------------------
 // Minimal RTDB Security Rules Expression Evaluator (tests real database.rules.json)
@@ -1243,6 +1273,621 @@ test('upload-receipt: inherits templateSlug from invitations/{id} when omitted, 
   assert.equal(ctx.orders.has('ORD-NO-TPL'), false);
   assert.equal(ctx.getTgCount(), 1);
 });
+
+// ---------------------------------------------------------------------------
+// Telegram Auth & International E.164 Phone Tests (BOSQICH 1)
+// ---------------------------------------------------------------------------
+function makeInMemoryTelegramAuthDeps(options?: {
+  botUsername?: string;
+  adminChatId?: string;
+  now?: () => number;
+}) {
+  let tree: Record<string, any> = {};
+  const sentMessages: Array<Record<string, unknown>> = [];
+  const createdCustomTokens: Array<{ uid: string; claims?: Record<string, unknown> }> = [];
+  let currentNow = 1_770_000_000_000;
+
+  const getAtPath = (pathStr?: string): any => {
+    if (!pathStr) return tree;
+    const parts = pathStr.split('/').filter(Boolean);
+    let cur: any = tree;
+    for (const p of parts) {
+      if (!cur || typeof cur !== 'object' || !(p in cur)) return null;
+      cur = cur[p];
+    }
+    return cur === undefined ? null : cur;
+  };
+
+  const setAtRtdbPath = (pathStr: string, val: any) => {
+    const parts = pathStr.split('/').filter(Boolean);
+    if (parts.length === 0) {
+      tree = val || {};
+      return;
+    }
+    let cur: any = tree;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = parts[i];
+      if (!cur[key] || typeof cur[key] !== 'object') {
+        cur[key] = {};
+      }
+      cur = cur[key];
+    }
+    const last = parts[parts.length - 1];
+    if (val === null || val === undefined) {
+      delete cur[last];
+    } else {
+      cur[last] = structuredClone(val);
+    }
+  };
+
+  const makeRef = (pathStr = '') => ({
+    get: async () => {
+      const v = getAtPath(pathStr);
+      return {
+        exists: () => v !== null && v !== undefined,
+        val: () => (v === undefined ? null : structuredClone(v)),
+      };
+    },
+    set: async (val: any) => {
+      setAtRtdbPath(pathStr, val);
+    },
+    update: async (updates: Record<string, any>) => {
+      if (!pathStr) {
+        for (const [k, v] of Object.entries(updates || {})) {
+          setAtRtdbPath(k, v);
+        }
+      } else {
+        for (const [k, v] of Object.entries(updates || {})) {
+          setAtRtdbPath(`${pathStr}/${k}`, v);
+        }
+      }
+    },
+    transaction: async (updater: (cur: any) => any) => {
+      const cur = getAtPath(pathStr);
+      const next = updater(cur === undefined ? null : structuredClone(cur));
+      setAtRtdbPath(pathStr, next);
+      return {
+        committed: true,
+        snapshot: { val: () => structuredClone(next) },
+      };
+    },
+    limitToFirst: (n: number) => ({
+      get: async () => {
+        const obj = getAtPath(pathStr);
+        if (!obj || typeof obj !== 'object') {
+          return { exists: () => false, val: () => null };
+        }
+        const slice: Record<string, any> = {};
+        for (const k of Object.keys(obj).slice(0, n)) {
+          slice[k] = structuredClone(obj[k]);
+        }
+        return {
+          exists: () => Object.keys(slice).length > 0,
+          val: () => slice,
+        };
+      },
+    }),
+  });
+
+  const fakeRtdb = { ref: (p = '') => makeRef(p) } as any;
+
+  const deps: TelegramAuthDeps = {
+    hasFirebaseAdmin: () => true,
+    getRtdb: () => fakeRtdb,
+    getAdminAuth: () =>
+      ({
+        createCustomToken: async (uid: string, claims?: Record<string, unknown>) => {
+          createdCustomTokens.push({ uid, claims });
+          return `custom-token:${uid}:${claims ? JSON.stringify(claims) : 'no-claims'}`;
+        },
+      }) as any,
+    getBrandName: () => 'Tashrifim',
+    getTelegramBotUsername: () => options?.botUsername ?? 'tashrifim_bot',
+    getTelegramConfig: () => ({
+      botToken: 'TEST_TOKEN',
+      adminChatId: options?.adminChatId ?? '999000111',
+      webhookSecret: 'TEST_WEBHOOK_SECRET',
+    }),
+    getPublicSiteUrl: () => 'https://tashrifim.uz',
+    checkExternalRateLimit,
+    sendTelegramMessage: async (payload) => {
+      sentMessages.push(payload);
+      return { ok: true, result: { message_id: sentMessages.length } };
+    },
+    now: options?.now || (() => currentNow),
+  };
+
+  return {
+    deps,
+    fakeRtdb,
+    getTree: () => tree,
+    setRateLimitEntry: (k: string, val: any) => setAtRtdbPath(`rateLimits/${k}`, val),
+    sentMessages,
+    createdCustomTokens,
+    advanceTime: (ms: number) => {
+      currentNow += ms;
+    },
+  };
+}
+
+test('normalizePhoneE164 validates international numbers (8-15 digits) and rejects invalid formats', () => {
+  assert.equal(normalizePhoneE164('+998 90 123-45-67'), '+998901234567');
+  assert.equal(normalizePhoneE164('79161234567'), '+79161234567');
+  assert.equal(normalizePhoneE164('+1 (415) 555-2671'), '+14155552671');
+  assert.equal(normalizePhoneE164('+442079460958'), '+442079460958');
+  assert.equal(normalizePhoneE164('00123456'), null); // leading zero not valid E.164
+  assert.equal(normalizePhoneE164('1234567'), null); // too short (< 8 digits)
+  assert.equal(normalizePhoneE164('1234567890123456'), null); // too long (> 15 digits)
+  assert.equal(formatUzPhoneForDisplay('998901234567'), '+998901234567');
+});
+
+test('Telegram auth handlers return proper JSON on invalid methods and JSON parse errors', async () => {
+  const startGet = makeMockVercelRes();
+  await telegramAuthStartHandler({ method: 'GET', headers: {} } as any, startGet.res);
+  assert.equal(startGet.state.statusCode, 405);
+  assert.equal(startGet.state.body.success, false);
+
+  const claimGet = makeMockVercelRes();
+  await telegramAuthClaimHandler({ method: 'GET', headers: {} } as any, claimGet.res);
+  assert.equal(claimGet.state.statusCode, 405);
+  assert.equal(claimGet.state.body.status, 'error');
+
+  const startBadJson = makeMockVercelRes();
+  await telegramAuthStartHandler(
+    { method: 'POST', headers: {}, body: '{broken-json' } as any,
+    startBadJson.res
+  );
+  assert.equal(startBadJson.state.statusCode, 400);
+  assert.equal(startBadJson.state.body.success, false);
+});
+
+test('startTelegramLogin + Telegram bot /start + contact verification + claimTelegramLogin full lifecycle (user & admin)', async () => {
+  const ctx = makeInMemoryTelegramAuthDeps({
+    botUsername: 'tashrifim_auth_bot',
+    adminChatId: '777888999',
+  });
+
+  const claimSecret = 'a'.repeat(48);
+
+  // 1. Start session -> generates 2-digit verificationCode
+  const startRes = await startTelegramLogin(
+    { claimSecret, lang: 'ru', clientIp: '10.0.0.1' },
+    ctx.deps
+  );
+  assert.equal(startRes.statusCode, 200);
+  assert.equal(startRes.body.success, true);
+  const sessionId = String(startRes.body.sessionId);
+  const botUrl = String(startRes.body.botUrl);
+  const verificationCode = String(startRes.body.verificationCode);
+  assert.match(verificationCode, /^\d{2}$/);
+  assert.ok(botUrl.startsWith('https://t.me/tashrifim_auth_bot?start=login_'));
+  const startParam = botUrl.split('?start=')[1];
+  assert.ok(startParam.length <= 64, 'Telegram start parameter must stay <= 64 chars');
+
+  // Verify raw claimSecret is NEVER stored in RTDB, while verificationCode IS stored
+  const storedSession = ctx.getTree().loginSessions[sessionId];
+  assert.ok(storedSession.claimSecretHash);
+  assert.equal(storedSession.verificationCode, verificationCode);
+  assert.equal(storedSession.claimSecret, undefined);
+  assert.notEqual(storedSession.claimSecretHash, claimSecret);
+
+  // 2. Claim while still pending -> returns { status: 'pending' }
+  const pendingClaim = await claimTelegramLogin(
+    { sessionId, claimSecret, clientIp: '10.0.0.1' },
+    ctx.deps
+  );
+  assert.equal(pendingClaim.statusCode, 200);
+  assert.deepEqual(pendingClaim.body, { status: 'pending' });
+
+  // 3. Group chat /start is silently ignored (private-chat only)
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: -10012345, type: 'supergroup' },
+      from: { id: 123456, first_name: 'GroupUser' },
+      text: `/start ${startParam}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 0);
+
+  // 4. Customer opens bot in private chat -> shows phishing warning with brand + 2-digit code and request_contact in RU
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 123456, type: 'private' },
+      from: { id: 123456, first_name: 'Alisher', last_name: 'Karimov', username: 'alisher_k' },
+      text: `/start ${startParam}`,
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 1);
+  assert.equal((ctx.sentMessages[0].reply_markup as any).keyboard[0][0].request_contact, true);
+  assert.equal(ctx.sentMessages[0].parse_mode, 'HTML');
+  assert.match(String(ctx.sentMessages[0].text), /Tashrifim/);
+  assert.match(String(ctx.sentMessages[0].text), new RegExp(`<b>${verificationCode}</b>`));
+  assert.match(String(ctx.sentMessages[0].text), /Поделиться|поделитесь/i);
+
+  // 5. Manually typed text is rejected and prompts button again
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 123456, type: 'private' },
+      from: { id: 123456, first_name: 'Alisher' },
+      text: '+998901234567',
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 2);
+  assert.equal((ctx.sentMessages[1].reply_markup as any).keyboard[0][0].request_contact, true);
+
+  // 6. Forwarded someone else's contact is blocked!
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 123456, type: 'private' },
+      from: { id: 123456, first_name: 'Alisher' },
+      contact: { user_id: 999999999, phone_number: '+998901112233' },
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 3);
+  assert.equal(ctx.getTree().loginSessions[sessionId].status, 'awaiting_contact');
+
+  // 7. Wrong claimSecret rejected with 403
+  const wrongSecretClaim = await claimTelegramLogin(
+    { sessionId, claimSecret: 'b'.repeat(48), clientIp: '10.0.0.1' },
+    ctx.deps
+  );
+  assert.equal(wrongSecretClaim.statusCode, 403);
+
+  // 8. Own contact verified (international number e.g. US/RU +79991234567)
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 123456, type: 'private' },
+      from: { id: 123456, first_name: 'Alisher', last_name: 'Karimov', username: 'alisher_k' },
+      contact: { user_id: 123456, phone_number: '79991234567' },
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 4);
+  assert.equal((ctx.sentMessages[3].reply_markup as any).remove_keyboard, true);
+  assert.equal(ctx.getTree().loginSessions[sessionId].status, 'verified');
+  assert.equal(ctx.getTree().telegramPendingSessions?.['123456'], undefined);
+
+  // 9. Claim succeeds with Firebase Custom Token & saves verified user in RTDB (one-time)
+  const okClaim = await claimTelegramLogin(
+    { sessionId, claimSecret, clientIp: '10.0.0.1' },
+    ctx.deps
+  );
+  assert.equal(okClaim.statusCode, 200);
+  assert.equal(okClaim.body.status, 'ok');
+  assert.ok(typeof okClaim.body.customToken === 'string');
+  assert.equal(ctx.createdCustomTokens[0].uid, 'tg_123456');
+  assert.equal(ctx.createdCustomTokens[0].claims, undefined);
+
+  const savedUser = ctx.getTree().users['tg_123456'];
+  assert.equal(savedUser.id, 'tg_123456');
+  assert.equal(savedUser.phone, '+79991234567');
+  assert.equal(savedUser.phoneVerified, true);
+  assert.equal(savedUser.telegramUserId, '123456');
+  assert.equal(savedUser.lang, 'ru');
+  assert.equal(savedUser.isAdmin, undefined);
+
+  // Second claim attempt fails because session was deleted (one-time)
+  const secondClaim = await claimTelegramLogin(
+    { sessionId, claimSecret, clientIp: '10.0.0.1' },
+    ctx.deps
+  );
+  assert.deepEqual(secondClaim.body, { status: 'expired' });
+
+  // 10. Admin login assigns { admin: true } custom token claim ONLY for positive personal chat ID
+  const adminSecret = 'c'.repeat(48);
+  const adminStart = await startTelegramLogin(
+    { claimSecret: adminSecret, lang: 'uz', clientIp: '10.0.0.2' },
+    ctx.deps
+  );
+  const adminSid = String(adminStart.body.sessionId);
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 777888999, type: 'private' },
+      from: { id: 777888999, first_name: 'Admin' },
+      text: `/start login_${adminSid}`,
+    },
+    ctx.deps
+  );
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 777888999, type: 'private' },
+      from: { id: 777888999, first_name: 'Admin' },
+      contact: { user_id: 777888999, phone_number: '+998901234567' },
+    },
+    ctx.deps
+  );
+  const adminClaim = await claimTelegramLogin(
+    { sessionId: adminSid, claimSecret: adminSecret, clientIp: '10.0.0.2' },
+    ctx.deps
+  );
+  assert.equal(adminClaim.statusCode, 200);
+  assert.equal(ctx.createdCustomTokens[1].uid, 'tg_777888999');
+  assert.deepEqual(ctx.createdCustomTokens[1].claims, { admin: true });
+  assert.equal(ctx.getTree().users['tg_777888999'].isAdmin, true);
+});
+
+test('Telegram auth never grants admin claim when TELEGRAM_ADMIN_CHAT_ID is a negative group ID and cleans expired rateLimits', async () => {
+  const ctx = makeInMemoryTelegramAuthDeps({
+    botUsername: 'tashrifim_bot',
+    adminChatId: '-100123456789',
+  });
+
+  // Seed 2 stale rateLimits (> 1h old) and 1 fresh rateLimit (< 1h old)
+  const now = ctx.deps.now!();
+  ctx.setRateLimitEntry('stale_1', { count: 2, resetAt: now - 4_000_000, updatedAt: now - 3_700_000 });
+  ctx.setRateLimitEntry('stale_2', { count: 1, resetAt: now - 3_800_000 });
+  ctx.setRateLimitEntry('fresh_1', { count: 1, resetAt: now + 30_000, updatedAt: now - 60_000 });
+
+  const removed = await cleanupExpiredRateLimits(ctx.fakeRtdb, now, 3_600_000);
+  assert.equal(removed, 2);
+  assert.equal(ctx.getTree().rateLimits.stale_1, undefined);
+  assert.equal(ctx.getTree().rateLimits.stale_2, undefined);
+  assert.ok(ctx.getTree().rateLimits.fresh_1);
+
+  const secret = 'd'.repeat(48);
+  const startRes = await startTelegramLogin({ claimSecret: secret, lang: 'uz', clientIp: '10.0.0.5' }, ctx.deps);
+  const sid = String(startRes.body.sessionId);
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 555666, type: 'private' },
+      from: { id: 555666, first_name: 'User' },
+      text: `/start login_${sid}`,
+    },
+    ctx.deps
+  );
+  await handleTelegramCustomerMessage(
+    {
+      chat: { id: 555666, type: 'private' },
+      from: { id: 555666, first_name: 'User' },
+      contact: { user_id: 555666, phone_number: '+998901234567' },
+    },
+    ctx.deps
+  );
+  const claimRes = await claimTelegramLogin({ sessionId: sid, claimSecret: secret, clientIp: '10.0.0.5' }, ctx.deps);
+  assert.equal(claimRes.statusCode, 200);
+  assert.equal(ctx.createdCustomTokens[0].claims, undefined);
+  assert.equal(ctx.getTree().users['tg_555666'].isAdmin, undefined);
+});
+
+test('Telegram auth claim deletes session after 5 invalid secret attempts and handleTelegramUpdate routes customer messages without blocking', async () => {
+  const ctx = makeInMemoryTelegramAuthDeps({ botUsername: 'tashrifim_bot' });
+  const start = await startTelegramLogin(
+    { claimSecret: 'x'.repeat(48), lang: 'en', clientIp: '10.0.0.9' },
+    ctx.deps
+  );
+  const sessionId = String(start.body.sessionId);
+
+  // Customer message routed through handleTelegramUpdate (even though sender is NOT admin!)
+  await handleTelegramUpdate(
+    {
+      message: {
+        chat: { id: 555666, type: 'private' },
+        from: { id: 555666, first_name: 'Bob' },
+        text: `/start login_${sessionId}`,
+      },
+    },
+    ctx.deps
+  );
+  assert.equal(ctx.sentMessages.length, 1);
+  assert.match(String(ctx.sentMessages[0].text), /share your phone number/i);
+
+  // 5 invalid secret attempts wipe out session
+  for (let i = 1; i <= 5; i++) {
+    const res = await claimTelegramLogin(
+      { sessionId, claimSecret: 'z'.repeat(48), clientIp: '10.0.0.9' },
+      ctx.deps
+    );
+    assert.equal(res.statusCode, i < 5 ? 403 : 429);
+  }
+  assert.equal(ctx.getTree().loginSessions?.[sessionId], undefined);
+});
+
+test('Production vs Preview Telegram env selection keeps payment bot strictly on TELEGRAM_BOT_TOKEN and auth bot isolated in Preview', () => {
+  const keys = [
+    'VERCEL_ENV',
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_BOT_USERNAME',
+    'VITE_TELEGRAM_BOT_USERNAME',
+    'TELEGRAM_TEST_BOT_TOKEN',
+    'TELEGRAM_TEST_BOT_USERNAME',
+    'TELEGRAM_WEBHOOK_SECRET',
+    'TELEGRAM_TEST_WEBHOOK_SECRET',
+    'TELEGRAM_LOGIN_WEBHOOK_SECRET',
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const k of keys) saved[k] = process.env[k];
+
+  try {
+    process.env.TELEGRAM_BOT_TOKEN = '111111:PROD_PAY_TOKEN';
+    process.env.TELEGRAM_BOT_USERNAME = '@prod_pay_bot';
+    process.env.VITE_TELEGRAM_BOT_USERNAME = '@prod_vite_bot';
+    process.env.TELEGRAM_TEST_BOT_TOKEN = '222222:PREVIEW_LOGIN_TOKEN';
+    process.env.TELEGRAM_TEST_BOT_USERNAME = '@preview_login_bot';
+    process.env.TELEGRAM_WEBHOOK_SECRET = 'prod-webhook-secret';
+    process.env.TELEGRAM_TEST_WEBHOOK_SECRET = 'preview-login-secret';
+
+    // 1. Production: strictly ignores TELEGRAM_TEST_*
+    process.env.VERCEL_ENV = 'production';
+    assert.equal(getPaymentTelegramConfig().botToken, '111111:PROD_PAY_TOKEN');
+    assert.equal(getPaymentTelegramConfig().webhookSecret, 'prod-webhook-secret');
+    assert.equal(getTelegramAuthConfig().botToken, '111111:PROD_PAY_TOKEN');
+    assert.equal(getTelegramAuthConfig().webhookSecret, 'prod-webhook-secret');
+    assert.equal(getTelegramAuthBotUsername(), 'prod_pay_bot');
+
+    // 2. Preview: payment stays on TELEGRAM_BOT_TOKEN, auth switches strictly to TELEGRAM_TEST_*
+    process.env.VERCEL_ENV = 'preview';
+    assert.equal(getPaymentTelegramConfig().botToken, '111111:PROD_PAY_TOKEN');
+    assert.equal(getPaymentTelegramConfig().webhookSecret, 'prod-webhook-secret');
+    assert.equal(getTelegramAuthConfig().botToken, '222222:PREVIEW_LOGIN_TOKEN');
+    assert.equal(getTelegramAuthConfig().webhookSecret, 'preview-login-secret');
+    assert.equal(getTelegramAuthBotUsername(), 'preview_login_bot');
+
+    // Even if Preview is missing test username, it NEVER falls back to production bot username
+    delete process.env.TELEGRAM_TEST_BOT_USERNAME;
+    assert.equal(getTelegramAuthBotUsername(), '');
+  } finally {
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
+test('POST /api/telegram/login-webhook validates secret & method, isolates login messages from callback_query, and redacts bot tokens in errors', async () => {
+  const prevVercelEnv = process.env.VERCEL_ENV;
+  const prevWebhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const prevTestSecret = process.env.TELEGRAM_TEST_WEBHOOK_SECRET;
+  process.env.VERCEL_ENV = 'preview';
+  process.env.TELEGRAM_WEBHOOK_SECRET = 'payment-secret-123';
+  process.env.TELEGRAM_TEST_WEBHOOK_SECRET = 'login-preview-secret-456';
+
+  try {
+    const getMock = makeMockVercelRes();
+    await telegramLoginWebhookHandler({ method: 'GET', headers: {} } as any, getMock.res);
+    assert.equal(getMock.state.statusCode, 405);
+
+    // Payment webhook secret must NOT unlock Preview test login webhook when TELEGRAM_TEST_WEBHOOK_SECRET is set
+    const wrongSecretMock = makeMockVercelRes();
+    await telegramLoginWebhookHandler(
+      {
+        method: 'POST',
+        headers: { 'x-telegram-bot-api-secret-token': 'payment-secret-123' },
+        body: { update_id: 1 },
+      } as any,
+      wrongSecretMock.res
+    );
+    assert.equal(wrongSecretMock.state.statusCode, 403);
+
+    // Valid login secret accepts payload and cleanly ignores payment callback_query
+    const okMock = makeMockVercelRes();
+    await telegramLoginWebhookHandler(
+      {
+        method: 'POST',
+        headers: { 'x-telegram-bot-api-secret-token': 'login-preview-secret-456' },
+        body: {
+          update_id: 2,
+          callback_query: { id: 'cb-1', data: 'confirm_ORD-SHOULD-NOT-RUN' },
+        },
+      } as any,
+      okMock.res
+    );
+    assert.equal(okMock.state.statusCode, 200);
+    assert.deepEqual(okMock.state.body, { status: 'ok' });
+
+    // Separated helpers do not throw on mismatched update types
+    await handleLoginTelegramUpdate({ callback_query: { id: 'cb-ignored' } });
+    await handlePaymentTelegramUpdate({ message: { chat: { id: 1, type: 'private' }, text: '/start' } });
+
+    // Error sanitizer strips bot tokens
+    const leaked = new Error('request to https://api.telegram.org/bot123456:ABCdefSECRET/sendMessage failed');
+    const cleanMsg = sanitizeTelegramErrorMessage(leaked);
+    assert.equal(cleanMsg.includes('ABCdefSECRET'), false);
+    assert.match(cleanMsg, /\/bot\[REDACTED\]\/sendMessage/);
+  } finally {
+    if (prevVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = prevVercelEnv;
+    if (prevWebhookSecret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_WEBHOOK_SECRET = prevWebhookSecret;
+    if (prevTestSecret === undefined) delete process.env.TELEGRAM_TEST_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_TEST_WEBHOOK_SECRET = prevTestSecret;
+  }
+});
+
+test('cleanPrivateKey & validatePrivateKeyPem handle quotes, CRLF, escaped newlines, validate PKCS#8 PEM, and reuse single [DEFAULT] Firebase Admin app', async () => {
+  const { privateKey: generatedPem } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  });
+
+  // 1. Escaped \n + outer quotes + trailing comma (common JSON paste mistake)
+  const quotedEscaped = `"${generatedPem.replace(/\n/g, '\\n')}",`;
+  const cleaned1 = cleanPrivateKey(quotedEscaped);
+  assert.ok(cleaned1.trim().startsWith('-----BEGIN PRIVATE KEY-----'));
+  assert.ok(cleaned1.trim().endsWith('-----END PRIVATE KEY-----'));
+  assert.equal(validatePrivateKeyPem(cleaned1).ok, true);
+
+  // 2. Windows CRLF & double-escaped \\n
+  const crlfDoubleEscaped = `'${generatedPem.replace(/\n/g, '\\\\r\\\\n')}'`;
+  const cleaned2 = cleanPrivateKey(crlfDoubleEscaped);
+  assert.equal(cleaned2.includes('\r'), false);
+  assert.equal(validatePrivateKeyPem(cleaned2).ok, true);
+
+  // 3. Rejects invalid PEM formats clearly without exposing key contents
+  assert.equal(validatePrivateKeyPem('').ok, false);
+  const badHeader = validatePrivateKeyPem('-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----');
+  assert.equal(badHeader.ok, false);
+  const corruptBody = validatePrivateKeyPem('-----BEGIN PRIVATE KEY-----\nINVALID_KEY_DATA_NOT_BASE64_VALID_PKCS8\n-----END PRIVATE KEY-----');
+  assert.equal(corruptBody.ok, false);
+  if (!corruptBody.ok) {
+    assert.equal(corruptBody.reason.includes('INVALID_KEY_DATA_NOT_BASE64_VALID_PKCS8'), false);
+  }
+
+  // 4. Firebase Admin single initialization & no silent mock fallback on invalid key
+  const envKeys = [
+    'FIREBASE_SERVICE_ACCOUNT_JSON',
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_PRIVATE_KEY',
+    'FIREBASE_DATABASE_URL',
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const k of envKeys) saved[k] = process.env[k];
+
+  // Ensure clean slate for [DEFAULT] app
+  for (const existing of getApps()) {
+    if (existing.name === '[DEFAULT]') await deleteApp(existing);
+  }
+
+  try {
+    // 4a. Invalid key returns null + safe diagnostic and getRtdb throws instead of silent mock
+    delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    process.env.FIREBASE_PROJECT_ID = 'teklifim-9dae7';
+    process.env.FIREBASE_CLIENT_EMAIL = 'firebase-adminsdk@teklifim-9dae7.iam.gserviceaccount.com';
+    process.env.FIREBASE_PRIVATE_KEY = 'corrupt-key-value-never-log-me';
+
+    assert.equal(hasFirebaseAdmin(), false);
+    const diag = getFirebaseAdminDiagnosticError() || '';
+    assert.match(diag, /BEGIN PRIVATE KEY/);
+    assert.equal(diag.includes('corrupt-key-value-never-log-me'), false);
+    assert.throws(() => getRtdb(), /BEGIN PRIVATE KEY/);
+
+    // Signed-in API callers receive 500 diagnostic instead of silent 401/mock
+    const statusMock = makeMockVercelRes();
+    await paymentStatusHandler(
+      {
+        method: 'GET',
+        headers: { authorization: 'Bearer some-id-token' },
+        query: { orderId: 'ORD-1' },
+      } as any,
+      statusMock.res
+    );
+    assert.equal(statusMock.state.statusCode, 500);
+    assert.match(String(statusMock.state.body.error), /BEGIN PRIVATE KEY/);
+
+    // 4b. Valid escaped key initializes [DEFAULT] once and reuses exact same instance
+    process.env.FIREBASE_PRIVATE_KEY = quotedEscaped;
+    const app1 = getAdminApp();
+    const app2 = getAdminApp();
+    assert.ok(app1 !== null);
+    assert.equal(app1, app2);
+    assert.equal(app1?.options.databaseURL, 'https://teklifim-9dae7-default-rtdb.firebaseio.com');
+    assert.equal(getFirebaseAdminDiagnosticError(), null);
+  } finally {
+    for (const existing of getApps()) {
+      if (existing.name === '[DEFAULT]') await deleteApp(existing);
+    }
+    for (const k of envKeys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
 
 
 

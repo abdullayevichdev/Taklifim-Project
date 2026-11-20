@@ -18,7 +18,6 @@ import {
 } from '../utils/logic';
 import { generateInvitationSlug } from '../utils/slug';
 import { ShareModal } from '../components/ShareModal';
-import { PhoneInput } from '../components/PhoneInput';
 import { CustomDropdown } from '../components/CustomDropdown';
 import {
   GlassSurface,
@@ -88,17 +87,13 @@ export const CustomerDashboard: React.FC = () => {
   const [guestSearch, setGuestSearch] = useState('');
   const [guestFilterStatus, setGuestFilterStatus] = useState<'all' | 'attending' | 'declined'>('all');
 
-  // Settings form - Real user data
+  // Settings form - only { name, lang } are editable client-side
   const [profileName, setProfileName] = useState(user?.name || '');
-  const [profilePhone, setProfilePhone] = useState(user?.phone || '');
-  const [profileEmail, setProfileEmail] = useState(user?.email || '');
 
-  // Synchronize fields when user logs in or profile changes
+  // Synchronize name when user logs in or profile changes
   useEffect(() => {
     if (user) {
       setProfileName(user.name || '');
-      setProfilePhone(user.phone || '');
-      setProfileEmail(user.email || '');
     }
   }, [user]);
 
@@ -334,8 +329,7 @@ export const CustomerDashboard: React.FC = () => {
     if (user && updateUserProfile) {
       await updateUserProfile({
         name: profileName.trim() || user.name,
-        email: profileEmail.trim() || user.email,
-        phone: profilePhone.trim(),
+        lang: language,
       });
       showToast(t.dashboard.toastProfileSaved, 'success');
     }
@@ -1170,19 +1164,30 @@ export const CustomerDashboard: React.FC = () => {
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-[#3A2D28]">{t.dashboard.phoneLabel}</label>
-                <PhoneInput
-                  value={profilePhone}
-                  onChange={(fullVal) => setProfilePhone(fullVal)}
-                  language={language}
-                />
+                <GlassSurface
+                  variant="subtle"
+                  rounded="xl"
+                  className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-white/65 border border-black/8"
+                >
+                  <span className="font-mono text-sm font-bold text-[#1E1418] tabular-nums">
+                    {user?.phone || '—'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {user?.username && (
+                      <span className="text-[11px] font-semibold text-[#229ED9]">
+                        @{user.username}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                      <span>{t.dashboard.verifiedPhoneBadge}</span>
+                    </span>
+                  </div>
+                </GlassSurface>
+                <p className="text-[11px] text-[#5C4F48] leading-snug">
+                  {t.dashboard.phoneReadonlyHint}
+                </p>
               </div>
-
-              <GlassInput
-                type="email"
-                label={t.dashboard.emailLabel}
-                value={profileEmail}
-                onChange={(e) => setProfileEmail(e.target.value)}
-              />
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-[#3A2D28]">{t.dashboard.settingsUiLangLabel}</label>

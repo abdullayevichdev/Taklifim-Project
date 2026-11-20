@@ -1,7 +1,13 @@
-import { cert, getApps, getApp, initializeApp, type App } from 'firebase-admin/app';
+import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
-import { cleanEnvString, cleanPrivateKey, getFirebaseDatabaseUrl } from './env.js';
+import {
+  cleanEnvString,
+  cleanPrivateKey,
+  getFirebaseDatabaseUrl,
+  validatePrivateKeyPem,
+} from './env.js';
+import { normalizePhoneE164 } from './phone.js';
 import {
   enrichOrderWithLegacyTemplate,
   resolveServerOrderTemplate,
@@ -57,11 +63,23 @@ function sanitizeRtdbKeySegment(raw?: string): string {
     .replace(/[.#$\[\]/\\]+/g, '-');
 }
 
-function parseServiceAccount(): {
-  projectId: string;
-  clientEmail: string;
-  privateKey: string;
-} | null {
+let lastFirebaseInitError: string | null = null;
+let loggedInitDiagnosticKey: string | null = null;
+
+function sanitizeFirebaseError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || 'Unknown Firebase Admin error');
+  return raw
+    .replace(/-----BEGIN[\s\S]*?END[^-]*-----/g, '[REDACTED_PRIVATE_KEY]')
+    .replace(/"private_key"\s*:\s*"[^"]*"/gi, '"private_key":"[REDACTED]"');
+}
+
+export function getFirebaseAdminDiagnosticError(): string | null {
+  return lastFirebaseInitError;
+}
+
+function parseServiceAccount():
+  | { ok: true; credentials: { projectId: string; clientEmail: string; privateKey: string } }
+  | { ok: false; reason: string } {
   const jsonRaw = cleanEnvString(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (jsonRaw) {
     const candidates = [
@@ -83,24 +101,45 @@ function parseServiceAccount(): {
         const clientEmail = cleanEnvString(parsed.client_email || parsed.clientEmail);
         const privateKey = cleanPrivateKey(parsed.private_key || parsed.privateKey);
         if (projectId && clientEmail && privateKey) {
-          return { projectId, clientEmail, privateKey };
+          const pemCheck = validatePrivateKeyPem(privateKey);
+          if (!pemCheck.ok) {
+            return { ok: false, reason: `FIREBASE_SERVICE_ACCOUNT_JSON: ${pemCheck.reason}` };
+          }
+          return { ok: true, credentials: { projectId, clientEmail, privateKey } };
         }
       } catch {
         // try next candidate
       }
     }
-    console.error('FIREBASE_SERVICE_ACCOUNT_JSON parse error: invalid JSON or missing project_id/client_email/private_key');
+    return {
+      ok: false,
+      reason:
+        'FIREBASE_SERVICE_ACCOUNT_JSON parse error: invalid JSON or missing project_id/client_email/private_key.',
+    };
   }
 
   const projectId = cleanEnvString(process.env.FIREBASE_PROJECT_ID);
   const clientEmail = cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL);
   const privateKey = cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
-  if (projectId && clientEmail && privateKey) {
-    return { projectId, clientEmail, privateKey };
+  const missing: string[] = [];
+  if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+  if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+  if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      reason: `Firebase Admin credentials incomplete (missing: ${missing.join(', ')}).`,
+    };
   }
 
-  return null;
+  const pemCheck = validatePrivateKeyPem(privateKey);
+  if (!pemCheck.ok) {
+    return { ok: false, reason: pemCheck.reason };
+  }
+
+  return { ok: true, credentials: { projectId, clientEmail, privateKey } };
 }
 
 export function hasFirebaseAdmin(): boolean {
@@ -108,23 +147,37 @@ export function hasFirebaseAdmin(): boolean {
 }
 
 export function getAdminApp(): App | null {
-  if (getApps().length > 0) {
-    return getApp();
+  const existingDefault = getApps().find((a) => a.name === '[DEFAULT]');
+  if (existingDefault) {
+    lastFirebaseInitError = null;
+    return existingDefault;
   }
 
-  const serviceAccount = parseServiceAccount();
-  if (!serviceAccount) {
-    console.warn('[TASHRIFIM] Firebase Admin credentials missing; server-side database sync running in memory/mock fallback mode.');
+  const parsed = parseServiceAccount();
+  if (!parsed.ok) {
+    lastFirebaseInitError = parsed.reason;
+    if (loggedInitDiagnosticKey !== parsed.reason) {
+      loggedInitDiagnosticKey = parsed.reason;
+      console.error('[TASHRIFIM] Firebase Admin configuration error:', parsed.reason);
+    }
     return null;
   }
 
   try {
-    return initializeApp({
-      credential: cert(serviceAccount),
+    const app = initializeApp({
+      credential: cert(parsed.credentials),
       databaseURL: getFirebaseDatabaseUrl(),
     });
+    lastFirebaseInitError = null;
+    loggedInitDiagnosticKey = null;
+    return app;
   } catch (err) {
-    console.error('[TASHRIFIM] Firebase Admin initializeApp failed:', (err as Error)?.message || err);
+    const safeMsg = sanitizeFirebaseError(err);
+    lastFirebaseInitError = `Firebase Admin initializeApp failed: ${safeMsg}`;
+    if (loggedInitDiagnosticKey !== lastFirebaseInitError) {
+      loggedInitDiagnosticKey = lastFirebaseInitError;
+      console.error('[TASHRIFIM] Firebase Admin initializeApp failed:', safeMsg);
+    }
     return null;
   }
 }
@@ -132,15 +185,51 @@ export function getAdminApp(): App | null {
 export function getRtdb() {
   const app = getAdminApp();
   if (!app) {
-    return {
-      ref: (_path?: string) => ({
-        get: async () => ({ exists: () => false, val: () => null }),
-        update: async () => {},
-        set: async () => {},
-      }),
-    } as any;
+    throw new Error(
+      lastFirebaseInitError ||
+        'Firebase Admin is not initialized. Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.'
+    );
   }
   return getDatabase(app);
+}
+
+export function getAdminAuth() {
+  const app = getAdminApp();
+  if (!app) return null;
+  return getAuth(app);
+}
+
+export interface ServerUserRecord {
+  id: string;
+  name?: string;
+  phone?: string;
+  phoneVerified?: boolean;
+  telegramUserId?: string;
+  telegramChatId?: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  lang?: 'uz' | 'ru' | 'en';
+  notifications?: boolean;
+  isAdmin?: boolean;
+  createdAt?: string;
+  lastLoginAt?: string;
+  [key: string]: unknown;
+}
+
+export async function getUserRecord(uid: string): Promise<ServerUserRecord | null> {
+  if (!uid) return null;
+  const snap = await getRtdb().ref(`users/${uid}`).get();
+  if (!snap.exists()) return null;
+  return snap.val() as ServerUserRecord;
+}
+
+export async function getVerifiedUserPhone(uid: string): Promise<string | null> {
+  const user = await getUserRecord(uid);
+  if (!user || user.phoneVerified !== true || !user.phone) {
+    return null;
+  }
+  return normalizePhoneE164(String(user.phone));
 }
 
 /**

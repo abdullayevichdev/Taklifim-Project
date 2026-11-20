@@ -87,7 +87,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       <div className="taklifim-page-top taklifim-page-bottom min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin w-8 h-8 border-4 border-[#E27B9B] border-t-transparent rounded-full mx-auto" />
-          <p className="text-sm text-[#5C4F48]">{t.auth.googleConnecting}</p>
+          <p className="text-sm text-[#5C4F48]">{t.auth.connecting}</p>
         </div>
       </div>
     );
@@ -131,9 +131,9 @@ const AppContent: React.FC = () => {
       return <HomePage />;
     }
 
-    // Builder
+    // Builder (Steps 1-10 guest-accessible; Step 11 payment requires Telegram sign-in)
     if (routePath.startsWith('/create/')) {
-      return <ProtectedRoute><BuilderPage /></ProtectedRoute>;
+      return <BuilderPage />;
     }
 
     // Pricing

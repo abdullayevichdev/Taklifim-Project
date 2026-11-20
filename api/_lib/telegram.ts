@@ -1,8 +1,23 @@
-import { getTelegramConfig } from './env.js';
+import {
+  getBrandName,
+  getPaymentTelegramConfig,
+  getPublicSiteUrl,
+  getTelegramAuthBotUsername,
+  getTelegramAuthConfig,
+  getTelegramRuntimeEnv,
+} from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
 import {
   decideOrderPayment,
+  getAdminAuth,
+  getRtdb,
+  hasFirebaseAdmin,
 } from './firebaseAdmin.js';
+import { checkExternalRateLimit } from './rateLimit.js';
+import {
+  handleTelegramCustomerMessage,
+  type TelegramAuthDeps,
+} from './telegramAuth.js';
 
 function escapeTelegramHtml(value?: string | number | null): string {
   if (value === undefined || value === null) return '';
@@ -12,35 +27,80 @@ function escapeTelegramHtml(value?: string | number | null): string {
     .replace(/>/g, '&gt;');
 }
 
-async function tgApi(method: string, body: Record<string, unknown> | FormData) {
-  const { botToken } = getTelegramConfig();
-  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
-    method: 'POST',
-    ...(isForm
-      ? { body: body as FormData }
-      : {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-  });
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
+export function sanitizeTelegramErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || 'Unknown Telegram error');
+  return raw.replace(/\/bot[^/\s]+/gi, '/bot[REDACTED]');
+}
+
+async function tgApiWithToken(
+  botToken: string,
+  method: string,
+  body: Record<string, unknown> | FormData
+) {
+  if (!botToken || botToken === 'MOCK_BOT_TOKEN') {
     return {
       ok: false,
-      error_code: res.status,
-      description: text.slice(0, 200) || `HTTP ${res.status}`,
+      error_code: 500,
+      description: 'Telegram bot token is not configured.',
+    };
+  }
+
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+      method: 'POST',
+      ...(isForm
+        ? { body: body as FormData }
+        : {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }),
+    });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {
+        ok: false,
+        error_code: res.status,
+        description: text.slice(0, 200) || `HTTP ${res.status}`,
+      };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error_code: 502,
+      description: sanitizeTelegramErrorMessage(err),
     };
   }
 }
 
-export async function handleTelegramUpdate(update: any): Promise<void> {
-  if (!update?.callback_query) return;
+async function tgPaymentApi(method: string, body: Record<string, unknown> | FormData) {
+  const { botToken } = getPaymentTelegramConfig();
+  return tgApiWithToken(botToken, method, body);
+}
 
-  const { adminChatId } = getTelegramConfig();
-  const callback = update.callback_query;
+export async function sendTelegramMessage(payload: Record<string, unknown>) {
+  const { botToken } = getTelegramAuthConfig();
+  return tgApiWithToken(botToken, 'sendMessage', payload);
+}
+
+export function getDefaultTelegramAuthDeps(): TelegramAuthDeps {
+  return {
+    hasFirebaseAdmin,
+    getRtdb,
+    getAdminAuth,
+    getBrandName,
+    getTelegramBotUsername: getTelegramAuthBotUsername,
+    getTelegramConfig: getTelegramAuthConfig,
+    getPublicSiteUrl,
+    checkExternalRateLimit,
+    sendTelegramMessage,
+  };
+}
+
+async function handleAdminCallbackQuery(callback: any): Promise<void> {
+  const { adminChatId } = getPaymentTelegramConfig();
   const callbackId = callback.id;
   const callbackData = callback.data || '';
   const message = callback.message;
@@ -48,7 +108,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
 
   if (adminChatId && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && adminChatId !== 'MOCK_ADMIN_CHAT_ID' && fromChatId !== String(adminChatId)) {
     try {
-      await tgApi('answerCallbackQuery', {
+      await tgPaymentApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: '⛔ Faqat admin tasdiqlashi mumkin',
         show_alert: true,
@@ -72,7 +132,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
 
   if (!action || !orderId) {
     try {
-      await tgApi('answerCallbackQuery', {
+      await tgPaymentApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: "Noma'lum buyurtma formati",
       });
@@ -96,7 +156,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
     if (decisionResult.alreadyDecided) {
       const statusText =
         decisionResult.existingStatus === 'paid' ? 'TASDIQLANGAN ✅' : 'RAD ETILGAN ❌';
-      await tgApi('answerCallbackQuery', {
+      await tgPaymentApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: `⚠️ Ushbu buyurtma allaqachon ${statusText}!`,
         show_alert: true,
@@ -111,7 +171,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
     const updatedCaption = originalCaption + statusBadge;
 
     if (message?.caption !== undefined) {
-      await tgApi('editMessageCaption', {
+      await tgPaymentApi('editMessageCaption', {
         chat_id: message.chat.id,
         message_id: message.message_id,
         caption: updatedCaption,
@@ -119,7 +179,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
         reply_markup: { inline_keyboard: [] },
       });
     } else if (message?.message_id) {
-      await tgApi('editMessageText', {
+      await tgPaymentApi('editMessageText', {
         chat_id: message.chat.id,
         message_id: message.message_id,
         text: updatedCaption,
@@ -128,7 +188,7 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
       });
     }
 
-    await tgApi('answerCallbackQuery', {
+    await tgPaymentApi('answerCallbackQuery', {
       callback_query_id: callbackId,
       text:
         action === 'confirm'
@@ -137,9 +197,9 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
       show_alert: true,
     });
   } catch (err) {
-    console.error('Telegram callback handler error:', err);
+    console.error('Telegram callback handler error:', sanitizeTelegramErrorMessage(err));
     try {
-      await tgApi('answerCallbackQuery', {
+      await tgPaymentApi('answerCallbackQuery', {
         callback_query_id: callbackId,
         text: 'Xatolik yuz berdi. Qayta urinib ko‘ring.',
         show_alert: true,
@@ -148,6 +208,70 @@ export async function handleTelegramUpdate(update: any): Promise<void> {
       /* ignore */
     }
   }
+}
+
+/**
+ * Payment & admin webhook processor (handles payment receipt confirm/reject callbacks only).
+ */
+export async function handlePaymentTelegramUpdate(update: any): Promise<void> {
+  if (!update || typeof update !== 'object') return;
+  if (update.callback_query) {
+    await handleAdminCallbackQuery(update.callback_query);
+  }
+}
+
+/**
+ * Customer login webhook processor (handles private-chat login & contact verification messages only).
+ */
+export async function handleLoginTelegramUpdate(
+  update: any,
+  authDepsOverride?: TelegramAuthDeps
+): Promise<void> {
+  if (!update || typeof update !== 'object') return;
+  if (update.message) {
+    await handleTelegramCustomerMessage(
+      update.message,
+      authDepsOverride || getDefaultTelegramAuthDeps()
+    );
+  }
+}
+
+/**
+ * Primary webhook handler (/api/telegram/webhook):
+ * - Always handles payment/admin callbacks via the payment bot token (TELEGRAM_BOT_TOKEN).
+ * - In Production (or when auth and payment share the same bot token), also forwards login messages.
+ * - In Preview when a separate TELEGRAM_TEST_BOT_TOKEN is active, login messages are isolated to /api/telegram/login-webhook.
+ */
+export async function handlePaymentBotWebhookUpdate(
+  update: any,
+  authDepsOverride?: TelegramAuthDeps
+): Promise<void> {
+  if (!update || typeof update !== 'object') return;
+
+  if (update.callback_query) {
+    await handlePaymentTelegramUpdate(update);
+    return;
+  }
+
+  if (update.message) {
+    const runtimeEnv = getTelegramRuntimeEnv();
+    const paymentBot = getPaymentTelegramConfig();
+    const authBot = getTelegramAuthConfig();
+    const sharesPrimaryBot =
+      runtimeEnv === 'production' ||
+      (authBot.botToken !== 'MOCK_BOT_TOKEN' && authBot.botToken === paymentBot.botToken);
+
+    if (sharesPrimaryBot || authDepsOverride) {
+      await handleLoginTelegramUpdate(update, authDepsOverride);
+    }
+  }
+}
+
+export async function handleTelegramUpdate(
+  update: any,
+  authDepsOverride?: TelegramAuthDeps
+): Promise<void> {
+  await handlePaymentBotWebhookUpdate(update, authDepsOverride);
 }
 
 export async function sendReceiptToTelegram(params: {
@@ -164,7 +288,7 @@ export async function sendReceiptToTelegram(params: {
   fileBuffer?: Buffer;
   fileUrl?: string;
 }): Promise<{ ok: boolean; messageId?: number; error?: string }> {
-  const { botToken, adminChatId } = getTelegramConfig();
+  const { botToken, adminChatId } = getPaymentTelegramConfig();
 
   if (!botToken || botToken === 'MOCK_BOT_TOKEN' || !adminChatId || adminChatId === 'MOCK_ADMIN_CHAT_ID') {
     console.error('Telegram configuration missing:', {
@@ -233,13 +357,13 @@ export async function sendReceiptToTelegram(params: {
       params.fileName || `receipt_${params.orderId}${fileExt}`
     );
 
-    return tgApi(tgMethod, formData);
+    return tgPaymentApi(tgMethod, formData);
   };
 
   let tgData: any;
 
   if (params.fileUrl) {
-    tgData = await tgApi(tgMethod, {
+    tgData = await tgPaymentApi(tgMethod, {
       chat_id: adminChatId,
       [fieldName]: params.fileUrl,
       caption: captionHtml,
@@ -288,7 +412,7 @@ export async function sendTemplateErrorAlertToTelegram(params: {
   invitationSlug?: string;
   routePath?: string;
 }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
-  const { botToken, adminChatId } = getTelegramConfig();
+  const { botToken, adminChatId } = getPaymentTelegramConfig();
 
   if (
     !botToken ||
@@ -311,7 +435,7 @@ export async function sendTemplateErrorAlertToTelegram(params: {
     `⏱ <b>Vaqt:</b> ${escapeTelegramHtml(timestamp)}`;
 
   try {
-    const tgData = await tgApi('sendMessage', {
+    const tgData = await tgPaymentApi('sendMessage', {
       chat_id: adminChatId,
       text,
       parse_mode: 'HTML',
@@ -322,6 +446,6 @@ export async function sendTemplateErrorAlertToTelegram(params: {
     }
     return { ok: true };
   } catch (err: any) {
-    return { ok: false, error: err?.message || 'Telegram alert exception' };
+    return { ok: false, error: sanitizeTelegramErrorMessage(err) };
   }
 }

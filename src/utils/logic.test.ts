@@ -402,6 +402,6 @@ test('uploadReceiptWithRetry uses 45s timeout, 2s/5s backoff retries, same UUID 
   assert.equal(unauthRes.success, false);
   assert.equal(unauthRes.statusCode, 401);
   assert.equal(unauthFetchCalls, 0);
-  assert.match(unauthRes.error || '', /Google|Apple|Email/i);
+  assert.match(unauthRes.error || '', /Telegram/i);
 });
 
