@@ -126,7 +126,7 @@ export const GlassNavbar: React.FC<GlassNavbarProps> = ({
               e.preventDefault();
               onNavigate(item.to);
             }}
-            className={`inline-flex items-center gap-1.5 h-9 px-3 xl:px-3.5 rounded-full text-xs xl:text-[13px] font-medium whitespace-nowrap transition-all duration-200 ${
+            className={`inline-flex items-center gap-1.5 h-8 xl:h-9 px-2.5 xl:px-3 2xl:px-3.5 rounded-full text-[12.5px] xl:text-[13.5px] 2xl:text-[14.5px] font-medium whitespace-nowrap transition-all duration-200 ${
               isActive
                 ? 'bg-white text-[#1E1418] font-semibold shadow-sm'
                 : 'text-[#5C4F48] hover:text-[#1E1418] hover:bg-white/60'

@@ -234,11 +234,11 @@ export const Header: React.FC = () => {
         }}
       />
 
-      <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-2 xl:gap-3">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2.5 lg:gap-4 xl:gap-5">
         {/* Brand Logo Pill — always visible, never clipped */}
         <Link
           to="/"
-          className={`pointer-events-auto inline-flex items-center gap-2 shrink-0 min-h-[42px] px-2.5 sm:px-3.5 py-1 rounded-full transition-all duration-300 ${
+          className={`pointer-events-auto inline-flex items-center gap-2 shrink-0 min-h-[42px] px-2.5 sm:px-3 py-1 rounded-full transition-all duration-300 ${
             isScrolled ? 'glass-surface-elevated' : 'glass-surface'
           }`}
         >
@@ -249,7 +249,7 @@ export const Header: React.FC = () => {
               className="w-full h-full object-cover rounded-[10px]"
             />
           </div>
-          <span className="font-playfair text-base sm:text-lg xl:text-xl font-bold tracking-wider uppercase text-[#1E1418] whitespace-nowrap pr-0.5">
+          <span className="font-playfair text-[15px] sm:text-base xl:text-[17px] 2xl:text-[19px] font-bold tracking-[0.06em] uppercase text-[#1E1418] whitespace-nowrap pr-0.5">
             Tashrifim
           </span>
         </Link>
@@ -257,7 +257,7 @@ export const Header: React.FC = () => {
         {/* Desktop Center Floating Capsule Navigation & Controls (unmounted on mobile/tablet so hidden <lg-*> never runs) */}
         {isDesktopViewport && (
           <>
-            <div className="pointer-events-auto flex items-center justify-center min-w-0">
+            <div className="pointer-events-auto flex-1 min-w-0 flex items-center justify-center overflow-x-auto no-scrollbar py-3 -my-3 px-1">
               <GlassNavbar
                 items={navItems}
                 currentPath={path}
@@ -267,11 +267,23 @@ export const Header: React.FC = () => {
             </div>
 
             <div className="pointer-events-auto flex items-center gap-1.5 xl:gap-2 shrink-0">
-              {/* Liquid Glass VIP Contact Pill */}
+              {/* Compact phone icon button on medium desktops (1240px–1419px) to prevent navbar crowding */}
               <a
                 href="tel:+998933223580"
                 aria-label="+998 933223580 — Avazxanov Abdulhay"
-                className={`hidden min-[1160px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+                title="+998 933223580 — Avazxanov Abdulhay"
+                className={`hidden min-[1240px]:inline-flex min-[1420px]:hidden items-center justify-center shrink-0 w-9 h-9 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+                  isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
+                }`}
+              >
+                <Phone className="w-3.5 h-3.5 text-[#B23864]" aria-hidden="true" />
+              </a>
+
+              {/* Liquid Glass VIP Contact Pill (1420px+ where full header has generous horizontal room) */}
+              <a
+                href="tel:+998933223580"
+                aria-label="+998 933223580 — Avazxanov Abdulhay"
+                className={`hidden min-[1420px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
                   isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
                 }`}
               >

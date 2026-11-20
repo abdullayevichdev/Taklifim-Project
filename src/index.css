@@ -796,15 +796,23 @@ lg-button[tone="clear"] .lg-button__el:hover .lg-surface__tint {
   border-color: rgba(30, 20, 24, 0.24);
 }
 
-/* Header CTA compact sizing at 1024px–1279px so Brand + Navbar + Controls fit comfortably */
+/* Header CTA compact sizing at 1024px–1399px so Brand + Navbar + Controls fit comfortably */
 lg-button.taklifim-nav-cta .lg-button__el {
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 14px;
+  min-height: 36px;
+  padding: 0 11px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 
 @media (min-width: 1280px) {
+  lg-button.taklifim-nav-cta .lg-button__el {
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 14.5px;
+  }
+}
+
+@media (min-width: 1440px) {
   lg-button.taklifim-nav-cta .lg-button__el {
     min-height: 40px;
     padding: 0 16px;
@@ -812,19 +820,20 @@ lg-button.taklifim-nav-cta .lg-button__el {
   }
 }
 
-/* Top capsule navbar sizing so long Russian/Uzbek/English labels fit cleanly from 1024px+ */
+/* Top capsule navbar sizing so long Russian/Uzbek/English labels fit cleanly without crowding TASHRIFIM */
 lg-navbar.taklifim-top-navbar {
   gap: 1px;
   padding: 4px;
+  max-width: 100%;
 }
 
 lg-navbar.taklifim-top-navbar > a,
 lg-navbar.taklifim-top-navbar > button,
 lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
-  height: 34px;
-  line-height: 34px;
-  padding: 0 8px;
-  font-size: 13.5px;
+  height: 32px;
+  line-height: 32px;
+  padding: 0 7px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -832,14 +841,29 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   lg-navbar.taklifim-top-navbar > a,
   lg-navbar.taklifim-top-navbar > button,
   lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
-    height: 36px;
-    line-height: 36px;
+    height: 34px;
+    line-height: 34px;
+    padding: 0 9px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1280px) {
+  lg-navbar.taklifim-top-navbar {
+    gap: 2px;
+  }
+
+  lg-navbar.taklifim-top-navbar > a,
+  lg-navbar.taklifim-top-navbar > button,
+  lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+    height: 35px;
+    line-height: 35px;
     padding: 0 11px;
     font-size: 14.5px;
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1440px) {
   lg-navbar.taklifim-top-navbar {
     gap: 3px;
   }
@@ -847,6 +871,8 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   lg-navbar.taklifim-top-navbar > a,
   lg-navbar.taklifim-top-navbar > button,
   lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
+    height: 36px;
+    line-height: 36px;
     padding: 0 13px;
     font-size: 15.5px;
   }
