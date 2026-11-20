@@ -1,23 +1,6 @@
-import {
-  getBrandName,
-  getPaymentTelegramConfig,
-  getPublicSiteUrl,
-  getTelegramAuthBotUsername,
-  getTelegramAuthConfig,
-  getTelegramRuntimeEnv,
-} from './env.js';
+import { getPaymentTelegramConfig } from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
-import {
-  decideOrderPayment,
-  getAdminAuth,
-  getRtdb,
-  hasFirebaseAdmin,
-} from './firebaseAdmin.js';
-import { checkExternalRateLimit } from './rateLimit.js';
-import {
-  handleTelegramCustomerMessage,
-  type TelegramAuthDeps,
-} from './telegramAuth.js';
+import { decideOrderPayment } from './firebaseAdmin.js';
 
 function escapeTelegramHtml(value?: string | number | null): string {
   if (value === undefined || value === null) return '';
@@ -120,30 +103,6 @@ export async function sendTelegramBotMessage(
       description: sanitizeTelegramErrorMessage(err),
     };
   }
-}
-
-export async function sendTelegramMessage(payload: Record<string, unknown>) {
-  const { botToken } = getTelegramAuthConfig();
-  return tgApiWithToken(botToken, 'sendMessage', payload);
-}
-
-export async function sendPaymentBotTelegramMessage(payload: Record<string, unknown>) {
-  const { botToken } = getPaymentTelegramConfig();
-  return tgApiWithToken(botToken, 'sendMessage', payload);
-}
-
-export function getDefaultTelegramAuthDeps(): TelegramAuthDeps {
-  return {
-    hasFirebaseAdmin,
-    getRtdb,
-    getAdminAuth,
-    getBrandName,
-    getTelegramBotUsername: getTelegramAuthBotUsername,
-    getTelegramConfig: getTelegramAuthConfig,
-    getPublicSiteUrl,
-    checkExternalRateLimit,
-    sendTelegramMessage,
-  };
 }
 
 async function handleAdminCallbackQuery(callback: any): Promise<void> {
@@ -268,56 +227,19 @@ export async function handlePaymentTelegramUpdate(update: any): Promise<void> {
 }
 
 /**
- * Customer login webhook processor (handles private-chat login & contact verification messages only).
- */
-export async function handleLoginTelegramUpdate(
-  update: any,
-  authDepsOverride?: TelegramAuthDeps
-): Promise<void> {
-  if (!update || typeof update !== 'object') return;
-  if (update.message) {
-    await handleTelegramCustomerMessage(
-      update.message,
-      authDepsOverride || getDefaultTelegramAuthDeps()
-    );
-  }
-}
-
-/**
  * Primary webhook handler (/api/telegram/webhook):
- * - Always handles payment/admin callbacks via the payment bot token (TELEGRAM_BOT_TOKEN).
- * - In Production (or when auth and payment share the same bot token), also forwards login messages.
- * - In Preview when a separate TELEGRAM_TEST_BOT_TOKEN is active, login messages are isolated to /api/telegram/login-webhook.
+ * handles only payment receipt confirm/reject callbacks via the payment bot token (TELEGRAM_BOT_TOKEN).
+ * Any other update type (e.g. private chat messages) is ignored.
  */
-export async function handlePaymentBotWebhookUpdate(
-  update: any,
-  authDepsOverride?: TelegramAuthDeps
-): Promise<void> {
+export async function handlePaymentBotWebhookUpdate(update: any): Promise<void> {
   if (!update || typeof update !== 'object') return;
-
   if (update.callback_query) {
     await handlePaymentTelegramUpdate(update);
-    return;
-  }
-
-  if (update.message) {
-    const deps: TelegramAuthDeps = authDepsOverride || {
-      ...getDefaultTelegramAuthDeps(),
-      getTelegramConfig: () => ({
-        ...getPaymentTelegramConfig(),
-        env: getTelegramRuntimeEnv(),
-      }),
-      sendTelegramMessage: sendPaymentBotTelegramMessage,
-    };
-    await handleLoginTelegramUpdate(update, deps);
   }
 }
 
-export async function handleTelegramUpdate(
-  update: any,
-  authDepsOverride?: TelegramAuthDeps
-): Promise<void> {
-  await handlePaymentBotWebhookUpdate(update, authDepsOverride);
+export async function handleTelegramUpdate(update: any): Promise<void> {
+  await handlePaymentBotWebhookUpdate(update);
 }
 
 export async function sendReceiptToTelegram(params: {

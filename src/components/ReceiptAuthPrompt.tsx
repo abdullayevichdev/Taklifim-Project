@@ -1,27 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Lock } from 'lucide-react';
 import { useLanguage } from '../locales';
 import { GlassSurface } from './glass';
-import { TelegramLoginWidget } from './TelegramLoginWidget';
+import { SocialLoginButtons } from './SocialLoginButtons';
 
 interface ReceiptAuthPromptProps {
-  onBeforeEmailNavigate?: () => void;
+  onBeforeSignIn?: () => void;
   onSuccess?: () => void;
 }
 
 export const ReceiptAuthPrompt: React.FC<ReceiptAuthPromptProps> = ({
-  onBeforeEmailNavigate,
+  onBeforeSignIn,
   onSuccess,
 }) => {
   const { t } = useLanguage();
-  const savedBeforeAuthRef = useRef(false);
-
-  useEffect(() => {
-    if (!savedBeforeAuthRef.current) {
-      savedBeforeAuthRef.current = true;
-      onBeforeEmailNavigate?.();
-    }
-  }, [onBeforeEmailNavigate]);
 
   return (
     <GlassSurface
@@ -43,7 +35,7 @@ export const ReceiptAuthPrompt: React.FC<ReceiptAuthPromptProps> = ({
         </div>
       </div>
 
-      <TelegramLoginWidget compact onSuccess={onSuccess} />
+      <SocialLoginButtons compact onBeforeSignIn={onBeforeSignIn} onSuccess={onSuccess} />
     </GlassSurface>
   );
 };

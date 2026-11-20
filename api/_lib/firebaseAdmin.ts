@@ -263,11 +263,7 @@ export interface ServerUserRecord {
   name?: string;
   phone?: string;
   phoneVerified?: boolean;
-  telegramUserId?: string;
-  telegramChatId?: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
+  email?: string;
   lang?: 'uz' | 'ru' | 'en';
   notifications?: boolean;
   isAdmin?: boolean;

@@ -40,8 +40,10 @@ import {
   generateIdempotencyKey,
   isNetworkOrTimeoutError,
 } from '../utils/receiptUpload';
+import { cleanAndValidateUzPhone } from '../utils/phone.js';
+import { PhoneInput } from '../components/PhoneInput';
 import { isFirebaseConfigured, storage } from '../services/firebase';
-import { TelegramLoginWidget } from '../components/TelegramLoginWidget';
+import { SocialLoginButtons } from '../components/SocialLoginButtons';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
 import {
@@ -134,7 +136,7 @@ function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | n
 export const BuilderPage: React.FC = () => {
   const { params, navigate } = useRouter();
   const { t, language } = useLanguage();
-  const { showToast, isLoggedIn, authReady, hasFirebaseSession, user } = useAuth();
+  const { showToast, isLoggedIn, authReady, hasFirebaseSession, user, updateUserProfile } = useAuth();
   const paymentCopy = getPaymentCopy(language);
 
   const [availableTemplates, setAvailableTemplates] = useState<Template[]>(mockTemplates);
@@ -201,6 +203,7 @@ export const BuilderPage: React.FC = () => {
   const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<string>('');
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
   const [showStep11AuthModal, setShowStep11AuthModal] = useState<boolean>(false);
+  const [contactPhone, setContactPhone] = useState<string>('');
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const receiptSubmitLockRef = useRef<boolean>(false);
   const existingSlugsRef = useRef<Set<string>>(new Set());
@@ -471,7 +474,7 @@ export const BuilderPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [invitationState, isLoadingInvitation, queryInvitationId, saveDraftLocally]);
 
-  // Bind any guest draft to the newly authenticated Telegram user and persist to RTDB
+  // Bind any guest draft to the newly authenticated user and persist to RTDB
   const draftClaimedForUidRef = useRef<string>('');
   useEffect(() => {
     if (!authReady || !hasFirebaseSession || !user?.id || queryInvitationId || isLoadingInvitation) {
@@ -835,7 +838,7 @@ export const BuilderPage: React.FC = () => {
     if (!hasFirebaseSession) {
       setUploadError(
         t.auth?.errors?.receiptAuthRequiredDesc ||
-          'Chek yuborish uchun Telegram orqali hisobingizga kirilgan bo‘lishi kerak.'
+          'Chek yuborish uchun Google yoki Apple ID orqali hisobingizga kirilgan bo‘lishi kerak.'
       );
       return;
     }
@@ -847,6 +850,14 @@ export const BuilderPage: React.FC = () => {
 
     if (!selectedFile || (!fileBase64 && !isPdf)) {
       setUploadError(t.builder.toasts.uploadReceiptFirst);
+      return;
+    }
+
+    const cleanPhone = cleanAndValidateUzPhone(
+      contactPhone || invitationState.socialLinks?.phone || user?.phone || ''
+    );
+    if (!cleanPhone) {
+      setUploadError(t.auth.errors.invalidPhone);
       return;
     }
 
@@ -892,7 +903,7 @@ export const BuilderPage: React.FC = () => {
           planName: `${currentTemplate.name} (${formatPriceUZS(finalPrice, language)})`,
           price: finalPrice,
           customerName: invitationState.hostNames,
-          customerPhone: user?.phone || '',
+          customerPhone: cleanPhone,
           ownerUid: user?.id,
           invitationId: invitationState.id,
           invitationSlug: invitationState.slug,
@@ -957,6 +968,7 @@ export const BuilderPage: React.FC = () => {
           invitationId: savedInv.id,
           invitationSlug: savedInv.slug,
           customerName: savedInv.hostNames,
+          customerPhone: cleanPhone,
           templateId: resolvedTpl.templateId,
           templateSlug: resolvedTpl.templateSlug,
           templateName: currentTemplate.name,
@@ -982,6 +994,9 @@ export const BuilderPage: React.FC = () => {
       );
 
       if (res.success === true) {
+        if (user && cleanAndValidateUzPhone(user.phone || '') !== cleanPhone) {
+          updateUserProfile({ phone: cleanPhone }).catch(() => {});
+        }
         const nowSentAt = res.receiptSentAt || new Date().toISOString();
         orderTransitionBaselineRef.current = 'pending_review';
         setActiveOrderId(orderId);
@@ -2782,6 +2797,11 @@ export const BuilderPage: React.FC = () => {
               const currentTemplate = stateTemplateResolution?.template || routeTemplateResolution?.template;
               if (!currentTemplate) return null;
               const templatePrice = currentTemplate.price || 60000;
+              const receiptPhoneValid = Boolean(
+                cleanAndValidateUzPhone(
+                  contactPhone || invitationState.socialLinks?.phone || user?.phone || ''
+                )
+              );
               const canSubmitReceipt =
                 !isUploadingReceipt &&
                 !isPreparingFile &&
@@ -2935,10 +2955,23 @@ export const BuilderPage: React.FC = () => {
 
                         {authReady && !hasFirebaseSession ? (
                           <ReceiptAuthPrompt
-                            onBeforeEmailNavigate={() => saveDraftLocally()}
+                            onBeforeSignIn={() => saveDraftLocally()}
                           />
                         ) : (
                           <>
+                            {(!receiptPhoneValid || contactPhone) && (
+                              <div className="space-y-1.5 min-w-0">
+                                <label className="block text-xs font-bold text-[#1E1418]">
+                                  {t.orderStatusPage.phoneNeededHint}
+                                </label>
+                                <PhoneInput
+                                  value={contactPhone}
+                                  onChange={(val) => setContactPhone(val)}
+                                  language={language}
+                                />
+                              </div>
+                            )}
+
                             <div className="space-y-2 min-w-0">
                               <label className="text-xs font-bold text-[#1E1418] block">
                                 {t.builder.receiptUploadLabel}
@@ -3278,7 +3311,7 @@ export const BuilderPage: React.FC = () => {
         </div>
       </GlassModal>
 
-      {/* Step 11 Payment Gate — Telegram Login Modal */}
+      {/* Step 11 Payment Gate — Google / Apple Login Modal */}
       <GlassModal
         isOpen={showStep11AuthModal}
         onClose={() => setShowStep11AuthModal(false)}
@@ -3295,7 +3328,8 @@ export const BuilderPage: React.FC = () => {
               {t.auth.step11GateDesc}
             </p>
           </div>
-          <TelegramLoginWidget
+          <SocialLoginButtons
+            onBeforeSignIn={() => saveDraftLocally()}
             onSuccess={() => {
               setShowStep11AuthModal(false);
               setCurrentStep(11);

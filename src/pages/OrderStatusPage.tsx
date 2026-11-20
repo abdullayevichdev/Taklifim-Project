@@ -22,11 +22,13 @@ import {
   isNetworkOrTimeoutError,
 } from '../utils/receiptUpload';
 import { resolveLegacyOrderTemplate } from '../utils/templateResolver';
+import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
 import { isFirebaseConfigured, storage } from '../services/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ShareModal } from '../components/ShareModal';
 import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
+import { PhoneInput } from '../components/PhoneInput';
 import { GlassSurface, GlassButton } from '../components/glass';
 import confetti from 'canvas-confetti';
 import {
@@ -94,6 +96,7 @@ export const OrderStatusPage: React.FC = () => {
   const [uploadIsNetworkError, setUploadIsNetworkError] = useState<boolean>(false);
   const [uploadAttemptMsg, setUploadAttemptMsg] = useState<string>('');
   const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<string>('');
+  const [contactPhone, setContactPhone] = useState<string>('');
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const receiptSubmitLockRef = useRef<boolean>(false);
 
@@ -417,7 +420,7 @@ export const OrderStatusPage: React.FC = () => {
     if (!hasFirebaseSession) {
       setUploadError(
         t.auth?.errors?.receiptAuthRequiredDesc ||
-          'Chek yuborish uchun Telegram orqali hisobingizga kirilgan bo‘lishi kerak.'
+          'Chek yuborish uchun Google yoki Apple ID orqali hisobingizga kirilgan bo‘lishi kerak.'
       );
       return;
     }
@@ -429,6 +432,14 @@ export const OrderStatusPage: React.FC = () => {
 
     if (!selectedFile || (!fileBase64 && !isPdf)) {
       setUploadError(t.builder.toasts.uploadReceiptFirst);
+      return;
+    }
+
+    const cleanPhone = cleanAndValidateUzPhone(
+      contactPhone || order.customerPhone || user?.phone || ''
+    );
+    if (!cleanPhone) {
+      setUploadError(t.auth.errors.invalidPhone);
       return;
     }
 
@@ -475,6 +486,7 @@ export const OrderStatusPage: React.FC = () => {
           invitationId: order.invitationId,
           invitationSlug: order.invitationSlug,
           customerName: order.customerName || user?.name || 'Mijoz',
+          customerPhone: cleanPhone,
           templateId: order.templateId || legacyTplMeta?.templateId,
           templateSlug: order.templateSlug || legacyTplMeta?.templateSlug,
           templateName: order.templateName || legacyTplMeta?.templateName,
@@ -602,6 +614,9 @@ export const OrderStatusPage: React.FC = () => {
   const relativeSent = formatRelativeTimeLocalized(sentIso, language);
   const formattedSent = sentIso ? new Date(sentIso).toLocaleString(language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ', { dateStyle: 'medium', timeStyle: 'short' }) : '';
   const overdue = canonical === 'pending_review' && isReviewOverdue(sentIso, 2);
+  const existingPhoneValid = Boolean(
+    cleanAndValidateUzPhone(contactPhone || order.customerPhone || user?.phone || '')
+  );
   const canSubmitReceipt =
     !isUploadingReceipt &&
     !isPreparingFile &&
@@ -858,6 +873,19 @@ export const OrderStatusPage: React.FC = () => {
               </h2>
 
               {authReady && !hasFirebaseSession && <ReceiptAuthPrompt />}
+
+              {(!existingPhoneValid || contactPhone) && (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-[#1E1418]">
+                    {t.orderStatusPage.phoneNeededHint}
+                  </label>
+                  <PhoneInput
+                    value={contactPhone}
+                    onChange={(val) => setContactPhone(val)}
+                    language={language}
+                  />
+                </div>
+              )}
 
               <input
                 ref={receiptInputRef}

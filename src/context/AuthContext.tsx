@@ -1,10 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { auth, isFirebaseConfigured, rtdb } from '../services/firebase';
 import {
-  signInWithCustomToken,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
+  GoogleAuthProvider,
+  OAuthProvider,
+  AuthProvider as FirebaseAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
 } from 'firebase/auth';
@@ -16,6 +21,8 @@ const getAuthT = () => translations[getStoredLanguage()]?.auth || translations.u
 
 const ACTIVE_USER_STORAGE_KEY = 'taklifim_active_user';
 
+export type AuthProviderId = 'google' | 'apple';
+
 export interface ToastMessage {
   id: string;
   type: 'success' | 'info' | 'error';
@@ -25,14 +32,11 @@ export interface ToastMessage {
 export interface UserProfile {
   id: string;
   name: string;
+  email: string;
   phone: string;
-  phoneVerified?: boolean;
-  telegramUserId?: string;
-  telegramChatId?: string;
-  username?: string;
   lang?: Language;
   photoURL?: string;
-  authProvider: 'telegram';
+  authProvider?: AuthProviderId;
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -47,9 +51,10 @@ interface AuthContextType {
   authReady: boolean;
   hasFirebaseSession: boolean;
   user: UserProfile | null;
-  completeTelegramLogin: (customToken: string) => Promise<AuthActionResult>;
+  loginWithGoogle: () => Promise<AuthActionResult>;
+  loginWithApple: () => Promise<AuthActionResult>;
   logout: () => Promise<void>;
-  updateUserProfile: (updates: { name?: string; lang?: Language }) => Promise<void>;
+  updateUserProfile: (updates: { name?: string; phone?: string; lang?: Language }) => Promise<void>;
   canUseFreePlan: () => boolean;
   markFreePlanUsed: () => void;
   toasts: ToastMessage[];
@@ -57,48 +62,93 @@ interface AuthContextType {
   removeToast: (id: string) => void;
 }
 
-function isValidTelegramProfile(parsed: Partial<UserProfile> | null | undefined): boolean {
-  if (!parsed || typeof parsed.id !== 'string') return false;
-  return parsed.id.startsWith('tg_') && (!parsed.authProvider || parsed.authProvider === 'telegram');
+function translateAuthError(errCode: string): string {
+  const errT = getAuthT().errors;
+  switch (errCode) {
+    case 'auth/user-disabled':
+      return errT.userDisabled;
+    case 'auth/too-many-requests':
+      return errT.tooManyRequests;
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+    case 'auth/user-cancelled':
+      return errT.popupClosed;
+    case 'auth/popup-blocked':
+      return errT.popupBlocked;
+    case 'auth/network-request-failed':
+      return errT.networkFailed;
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+    case 'auth/invalid-oauth-provider':
+    case 'auth/invalid-oauth-client-id':
+      return errT.providerNotEnabled;
+    case 'auth/unauthorized-domain':
+      return errT.unauthorizedDomain;
+    case 'auth/account-exists-with-different-credential':
+      return errT.accountExistsDifferentCredential;
+    default:
+      return errT.generic;
+  }
 }
 
-function purgeLegacyAuthStorage(): void {
-  try {
-    sessionStorage.removeItem('taklifim_admin_unlocked');
-    sessionStorage.removeItem('taklifim_auth_redirect_provider');
-    const otpKeys: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith('taklifim_otp_')) {
-        otpKeys.push(k);
-      }
-    }
-    otpKeys.forEach((k) => sessionStorage.removeItem(k));
-  } catch {
-    // ignore storage errors
-  }
+function isSilentAuthError(errCode: string): boolean {
+  return (
+    errCode === 'auth/popup-closed-by-user' ||
+    errCode === 'auth/cancelled-popup-request' ||
+    errCode === 'auth/user-cancelled'
+  );
+}
 
+function inferProvider(fbUser: FirebaseUser): AuthProviderId | undefined {
+  const providerIds = (fbUser.providerData || []).map((p) => p?.providerId).filter(Boolean);
+  if (providerIds.includes('google.com')) return 'google';
+  if (providerIds.includes('apple.com')) return 'apple';
+  return undefined;
+}
+
+function readStoredUser(): UserProfile | null {
   try {
     const saved = localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved) as Partial<UserProfile>;
-      if (!isValidTelegramProfile(parsed)) {
-        localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
-      }
+    if (!saved) return null;
+    const parsed = JSON.parse(saved) as Partial<UserProfile>;
+    if (!parsed || typeof parsed.id !== 'string' || !parsed.id) {
+      localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
+      return null;
     }
+    return {
+      id: parsed.id,
+      name: typeof parsed.name === 'string' ? parsed.name : '',
+      email: typeof parsed.email === 'string' ? parsed.email : '',
+      phone: typeof parsed.phone === 'string' ? parsed.phone : '',
+      lang: parsed.lang,
+      photoURL: parsed.photoURL,
+      authProvider:
+        parsed.authProvider === 'google' || parsed.authProvider === 'apple'
+          ? parsed.authProvider
+          : undefined,
+      createdAt: typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString(),
+      lastLoginAt: parsed.lastLoginAt,
+    };
   } catch {
     try {
       localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
     } catch {}
+    return null;
   }
 }
 
-function translateFirebaseError(errCode: string): string {
-  const errT = getAuthT().errors;
-  if (errCode === 'auth/network-request-failed') {
-    return errT.networkFailed;
-  }
-  return errT.generic;
+function writeStoredUser(profile: UserProfile | null): void {
+  try {
+    if (profile) {
+      localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(profile));
+    } else {
+      localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
+    }
+  } catch {}
+}
+
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -106,7 +156,8 @@ const AuthContext = createContext<AuthContextType>({
   authReady: false,
   hasFirebaseSession: false,
   user: null,
-  completeTelegramLogin: async () => ({ success: false }),
+  loginWithGoogle: async () => ({ success: false }),
+  loginWithApple: async () => ({ success: false }),
   logout: async () => {},
   updateUserProfile: async () => {},
   canUseFreePlan: () => false,
@@ -117,22 +168,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    purgeLegacyAuthStorage();
-    try {
-      const saved = localStorage.getItem(ACTIVE_USER_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as UserProfile;
-        if (isValidTelegramProfile(parsed)) {
-          return { ...parsed, authProvider: 'telegram' };
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
-
+  const [user, setUser] = useState<UserProfile | null>(() => readStoredUser());
   const [authReady, setAuthReady] = useState<boolean>(() => !isFirebaseConfigured() || !auth);
   const [hasFirebaseSession, setHasFirebaseSession] = useState<boolean>(() => Boolean(auth?.currentUser));
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -154,7 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [removeToast]
   );
 
-  // Read-only profile sync from Firebase RTDB users/{uid}; server creates/updates restricted fields.
+  // Merge Firebase Auth user with the RTDB users/{uid} profile (keeps user-edited name/phone).
   const syncFirebaseUserProfile = useCallback(async (fbUser: FirebaseUser): Promise<UserProfile> => {
     let profileData: Partial<UserProfile> = {};
 
@@ -169,6 +205,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    const provider = inferProvider(fbUser) || profileData.authProvider;
+    const defaultName =
+      provider === 'apple' ? getAuthT().appleUserDefault : getAuthT().alreadyLoggedUser;
+
     const resolvedLang: Language | undefined =
       profileData.lang === 'uz' || profileData.lang === 'ru' || profileData.lang === 'en'
         ? profileData.lang
@@ -179,109 +219,158 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name:
         (typeof profileData.name === 'string' && profileData.name.trim()) ||
         fbUser.displayName ||
-        getAuthT().alreadyLoggedUser,
-      phone: typeof profileData.phone === 'string' ? profileData.phone : fbUser.phoneNumber || '',
-      phoneVerified: Boolean(profileData.phoneVerified ?? profileData.phone),
-      telegramUserId:
-        typeof profileData.telegramUserId === 'string'
-          ? profileData.telegramUserId
-          : fbUser.uid.startsWith('tg_')
-          ? fbUser.uid.slice(3)
-          : undefined,
-      telegramChatId:
-        typeof profileData.telegramChatId === 'string' ? profileData.telegramChatId : undefined,
-      username: typeof profileData.username === 'string' && profileData.username ? profileData.username : undefined,
+        fbUser.email?.split('@')[0] ||
+        defaultName,
+      email: fbUser.email || (typeof profileData.email === 'string' ? profileData.email : ''),
+      phone:
+        (typeof profileData.phone === 'string' && profileData.phone) || fbUser.phoneNumber || '',
       lang: resolvedLang,
       photoURL: fbUser.photoURL || profileData.photoURL,
-      authProvider: 'telegram',
+      authProvider: provider,
       createdAt:
         typeof profileData.createdAt === 'string'
           ? profileData.createdAt
           : fbUser.metadata?.creationTime || new Date().toISOString(),
-      lastLoginAt:
-        typeof profileData.lastLoginAt === 'string' ? profileData.lastLoginAt : undefined,
+      lastLoginAt: new Date().toISOString(),
     };
 
     setUser(resolvedUser);
-    try {
-      localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(resolvedUser));
-    } catch {}
+    writeStoredUser(resolvedUser);
+
+    if (rtdb && auth?.currentUser?.uid === fbUser.uid) {
+      try {
+        await rtdbUpdate(
+          rtdbRef(rtdb, `users/${fbUser.uid}`),
+          stripUndefined({
+            id: resolvedUser.id,
+            name: resolvedUser.name,
+            email: resolvedUser.email,
+            phone: resolvedUser.phone,
+            photoURL: resolvedUser.photoURL,
+            authProvider: resolvedUser.authProvider,
+            createdAt: resolvedUser.createdAt,
+            lastLoginAt: resolvedUser.lastLoginAt,
+          })
+        );
+      } catch (err) {
+        console.warn('RTDB user profile write note:', err);
+      }
+    }
 
     return resolvedUser;
   }, []);
 
   useEffect(() => {
     let isMounted = true;
-    purgeLegacyAuthStorage();
-
     const authInstance = auth;
-    if (isFirebaseConfigured() && authInstance) {
-      setPersistence(authInstance, browserLocalPersistence).catch(() => {});
 
-      const unsub = onAuthStateChanged(authInstance, async (fbUser) => {
-        if (!isMounted) return;
-        if (fbUser && fbUser.uid.startsWith('tg_')) {
-          setHasFirebaseSession(true);
-          try {
-            await syncFirebaseUserProfile(fbUser);
-          } finally {
-            if (isMounted) setAuthReady(true);
-          }
-        } else {
-          if (fbUser && !fbUser.uid.startsWith('tg_')) {
-            // Legacy non-Telegram Firebase session (Google/Apple/Email) is no longer supported
-            signOut(authInstance).catch(() => {});
-          }
-          setHasFirebaseSession(false);
-          setUser(null);
-          try {
-            localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
-          } catch {}
-          setAuthReady(true);
-        }
-      });
-
-      return () => {
-        isMounted = false;
-        unsub();
-      };
-    } else {
+    if (!isFirebaseConfigured() || !authInstance) {
       setAuthReady(true);
       return () => {
         isMounted = false;
       };
     }
-  }, [syncFirebaseUserProfile]);
 
-  const completeTelegramLogin = useCallback(
-    async (customToken: string): Promise<AuthActionResult> => {
+    setPersistence(authInstance, browserLocalPersistence).catch(() => {});
+
+    // Completes a redirect-based sign-in (used when the browser blocks popups).
+    getRedirectResult(authInstance).catch((err: any) => {
+      const code = err?.code || '';
+      if (code && !isSilentAuthError(code)) {
+        showToast(translateAuthError(code), 'error');
+      }
+    });
+
+    const unsub = onAuthStateChanged(authInstance, async (fbUser) => {
+      if (!isMounted) return;
+      if (fbUser) {
+        setHasFirebaseSession(true);
+        try {
+          await syncFirebaseUserProfile(fbUser);
+        } finally {
+          if (isMounted) setAuthReady(true);
+        }
+      } else {
+        setHasFirebaseSession(false);
+        setUser(null);
+        writeStoredUser(null);
+        setAuthReady(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsub();
+    };
+  }, [syncFirebaseUserProfile, showToast]);
+
+  const signInWithProvider = useCallback(
+    async (provider: FirebaseAuthProvider, providerId: AuthProviderId): Promise<AuthActionResult> => {
       if (!isFirebaseConfigured() || !auth) {
-        const msg = getAuthT().errors.generic;
+        const msg = getAuthT().errors.providerNotEnabled;
         showToast(msg, 'error');
         return { success: false, message: msg };
       }
 
       try {
         await setPersistence(auth, browserLocalPersistence).catch(() => {});
-        const cred = await signInWithCustomToken(auth, customToken);
-        if (!cred.user?.uid) {
+        const res = await signInWithPopup(auth, provider);
+        if (!res.user?.uid) {
           const msg = getAuthT().errors.generic;
           showToast(msg, 'error');
           return { success: false, message: msg };
         }
 
         setHasFirebaseSession(true);
-        await syncFirebaseUserProfile(cred.user);
-        showToast(getAuthT().toastTelegramSuccess, 'success');
+        const resolvedUser = await syncFirebaseUserProfile(res.user);
+        showToast(
+          providerId === 'google'
+            ? `${getAuthT().toastGoogleWelcomePrefix} ${resolvedUser.name}!`
+            : getAuthT().toastAppleSuccess,
+          'success'
+        );
         return { success: true };
       } catch (err: any) {
-        const msg = translateFirebaseError(err?.code || '');
-        showToast(msg, 'error');
+        const code = err?.code || '';
+        console.warn(`Firebase ${providerId} auth error:`, code || err?.message);
+
+        // Popup blocked (e.g. in-app browsers) → fall back to full-page redirect sign-in.
+        if (
+          code === 'auth/popup-blocked' ||
+          code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          try {
+            await signInWithRedirect(auth, provider);
+            return { success: false };
+          } catch (redirectErr: any) {
+            const msg = translateAuthError(redirectErr?.code || code);
+            showToast(msg, 'error');
+            return { success: false, message: msg };
+          }
+        }
+
+        const msg = translateAuthError(code);
+        if (!isSilentAuthError(code)) {
+          showToast(msg, 'error');
+        }
         return { success: false, message: msg };
       }
     },
     [showToast, syncFirebaseUserProfile]
   );
+
+  const loginWithGoogle = useCallback(() => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    return signInWithProvider(provider, 'google');
+  }, [signInWithProvider]);
+
+  const loginWithApple = useCallback(() => {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    return signInWithProvider(provider, 'apple');
+  }, [signInWithProvider]);
 
   const logout = useCallback(async () => {
     if (isFirebaseConfigured() && auth) {
@@ -291,23 +380,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setHasFirebaseSession(false);
     setUser(null);
-    try {
-      localStorage.removeItem(ACTIVE_USER_STORAGE_KEY);
-    } catch {}
+    writeStoredUser(null);
     showToast(getAuthT().toastLoggedOut, 'info');
   }, [showToast]);
 
-  // Client is allowed to update ONLY { name, lang } in users/{uid}
   const updateUserProfile = useCallback(
-    async (updates: { name?: string; lang?: Language }) => {
+    async (updates: { name?: string; phone?: string; lang?: Language }) => {
       if (!user) return;
 
-      const allowedPatch: { name?: string; lang?: Language } = {};
+      const allowedPatch: { name?: string; phone?: string; lang?: Language } = {};
       if (typeof updates.name === 'string') {
         const cleanName = updates.name.trim().slice(0, 120);
-        if (cleanName) {
-          allowedPatch.name = cleanName;
-        }
+        if (cleanName) allowedPatch.name = cleanName;
+      }
+      if (typeof updates.phone === 'string') {
+        allowedPatch.phone = updates.phone.trim().slice(0, 32);
       }
       if (updates.lang === 'uz' || updates.lang === 'ru' || updates.lang === 'en') {
         allowedPatch.lang = updates.lang;
@@ -315,15 +402,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (Object.keys(allowedPatch).length === 0) return;
 
-      const updated: UserProfile = {
-        ...user,
-        ...allowedPatch,
-      };
-
+      const updated: UserProfile = { ...user, ...allowedPatch };
       setUser(updated);
-      try {
-        localStorage.setItem(ACTIVE_USER_STORAGE_KEY, JSON.stringify(updated));
-      } catch {}
+      writeStoredUser(updated);
 
       if (isFirebaseConfigured() && rtdb && auth?.currentUser?.uid === user.id) {
         await rtdbUpdate(rtdbRef(rtdb, `users/${user.id}`), allowedPatch);
@@ -342,7 +423,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authReady,
         hasFirebaseSession,
         user,
-        completeTelegramLogin,
+        loginWithGoogle,
+        loginWithApple,
         logout,
         updateUserProfile,
         canUseFreePlan,

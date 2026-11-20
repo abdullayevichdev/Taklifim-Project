@@ -3,7 +3,7 @@ import { useRouter, Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
 import { GlassSurface, GlassButton } from '../components/glass';
-import { TelegramLoginWidget } from '../components/TelegramLoginWidget';
+import { SocialLoginButtons } from '../components/SocialLoginButtons';
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 
 export const AuthPages: React.FC = () => {
@@ -58,7 +58,7 @@ export const AuthPages: React.FC = () => {
             <h1 className="font-playfair text-2xl sm:text-3xl font-bold text-[#1E1418]">
               {t.auth.alreadyLoggedWelcomePrefix} {user.name}!
             </h1>
-            <p className="text-xs text-[#5C4F48] tabular-nums">{user.phone}</p>
+            <p className="text-xs text-[#5C4F48] tabular-nums">{user.email || user.phone}</p>
           </div>
           <div className="pt-2">
             <GlassButton
@@ -106,7 +106,7 @@ export const AuthPages: React.FC = () => {
           rounded="2xl"
           className="p-3.5 flex items-center gap-3"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#2AABEE] to-[#229ED9] text-white flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#F5C9D8] to-[#C94F79] text-white flex items-center justify-center shrink-0 shadow-xs">
             <Sparkles className="w-5 h-5" aria-hidden="true" />
           </div>
           <div className="text-xs min-w-0">
@@ -117,8 +117,8 @@ export const AuthPages: React.FC = () => {
           </div>
         </GlassSurface>
 
-        {/* Telegram Bot Login Widget */}
-        <TelegramLoginWidget onSuccess={() => navigate(redirectTarget)} />
+        {/* Google / Apple sign-in */}
+        <SocialLoginButtons onSuccess={() => navigate(redirectTarget)} />
 
         {/* Benefits */}
         <GlassSurface

@@ -6,6 +6,7 @@ import {
   hasFirebaseAdmin,
   verifyBearerToken,
 } from '../_lib/firebaseAdmin.js';
+import { cleanAndValidateUzPhone } from '../_lib/phone.js';
 import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
@@ -55,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       templateId,
       templateSlug,
       customerName,
+      customerPhone,
       templateName,
       planName,
       weddingDate,
@@ -74,19 +76,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    let verifiedContact = await getVerifiedUserPhone(authUser.uid);
-    if (!verifiedContact && authUser.uid.startsWith('tg_')) {
+    // Contact phone: client-entered number first, then the phone saved on the user's profile.
+    let contactPhone =
+      cleanAndValidateUzPhone(customerPhone ? String(customerPhone) : '') ||
+      (await getVerifiedUserPhone(authUser.uid));
+    if (!contactPhone) {
       const userRecord = await getUserRecord(authUser.uid);
-      if (userRecord?.telegramUserId) {
-        verifiedContact = userRecord.username
-          ? `@${String(userRecord.username).replace(/^@+/, '')}`
-          : `tg:${userRecord.telegramUserId}`;
-      }
+      contactPhone = cleanAndValidateUzPhone(userRecord?.phone ? String(userRecord.phone) : '');
     }
-    if (!verifiedContact) {
+    if (!contactPhone) {
       return res.status(400).json({
         success: false,
-        error: "Chek yuborish uchun Telegram orqali tasdiqlangan hisob talab qilinadi.",
+        error: "Iltimos, to'g'ri O'zbekiston telefon raqamini kiriting (+998 XX XXX XX XX).",
       });
     }
 
@@ -136,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       templateId: templateId ? String(templateId) : undefined,
       templateSlug: templateSlug ? String(templateSlug) : undefined,
       customerName: customerName ? String(customerName) : '',
-      customerPhone: verifiedContact,
+      customerPhone: contactPhone,
       templateName: templateName ? String(templateName) : '',
       planName: planName ? String(planName) : undefined,
       weddingDate: weddingDate ? String(weddingDate) : '',
