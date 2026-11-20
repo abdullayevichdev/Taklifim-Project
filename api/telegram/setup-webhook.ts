@@ -14,6 +14,7 @@ function safeEqual(a: string, b: string): boolean {
  *
  * Usage (open in a browser once after deploy):
  *   https://<your-domain>/api/telegram/setup-webhook?key=<TELEGRAM_WEBHOOK_SECRET>
+ * The webhook is registered on the domain you open this URL from (override with &base=https://domain).
  * Add &check=1 to only read the current webhook status without changing it.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -67,12 +68,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, webhook: before });
   }
 
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const base = getPublicSiteUrl() || (host ? `${proto}://${Array.isArray(host) ? host[0] : host}` : '');
+  // Register the webhook on the exact domain this page was opened from (it is reachable by definition).
+  // ?base=https://example.com overrides it; PUBLIC_SITE_URL is only a last resort.
+  const firstHeader = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || '';
+  const proto = firstHeader(req.headers['x-forwarded-proto']).split(',')[0].trim() || 'https';
+  const host = firstHeader(req.headers['x-forwarded-host']).split(',')[0].trim() || firstHeader(req.headers.host);
+  const requestBase = host && !/^(localhost|127\.|0\.0\.0\.0)/i.test(host) ? `https://${host}` : '';
+  const overrideBase =
+    typeof req.query.base === 'string' && /^https:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(req.query.base)
+      ? req.query.base
+      : '';
+  const base = overrideBase || requestBase || getPublicSiteUrl() || (host ? `${proto}://${host}` : '');
   if (!base) {
-    return res.status(500).json({ ok: false, error: 'Could not determine site URL. Set PUBLIC_SITE_URL.' });
+    return res.status(500).json({ ok: false, error: 'Could not determine site URL. Add ?base=https://your-domain' });
   }
   const webhookUrl = `${base.replace(/\/+$/, '')}/api/telegram/webhook`;
 

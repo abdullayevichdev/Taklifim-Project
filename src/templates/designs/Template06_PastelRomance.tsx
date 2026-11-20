@@ -1,6 +1,7 @@
 import React from 'react';
 import { TemplateRenderProps } from '../types';
 import { SharedCountdown } from '../components/SharedCountdown';
+import { SharedPoem } from '../components/SharedPoem';
 import { SharedLocation } from '../components/SharedLocation';
 import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
@@ -56,6 +57,13 @@ export const Template06_PastelRomance: React.FC<TemplateRenderProps> = (props) =
         </div>
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor={primary} />
+
+        <SharedPoem
+          templateSlug={props.template.slug}
+          language={props.language}
+          primaryColor={props.template.colorStyle.primary}
+          headingFont={props.headingFont}
+        />
         {invitation.invitationMessage && (
           <div className="taklifim-tpl-card rounded-3xl text-center space-y-3 bg-white/90 border border-pink-100 shadow-xs">
             <p className="text-xs sm:text-sm leading-relaxed text-[#4A3E39] font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>

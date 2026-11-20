@@ -1,6 +1,7 @@
 import React from 'react';
 import { TemplateRenderProps } from '../types';
 import { SharedCountdown } from '../components/SharedCountdown';
+import { SharedPoem } from '../components/SharedPoem';
 import { SharedLocation } from '../components/SharedLocation';
 import { SharedSchedule } from '../components/SharedSchedule';
 import { SharedGallery } from '../components/SharedGallery';
@@ -66,6 +67,14 @@ export const Template19_ModernNoir: React.FC<TemplateRenderProps> = (props) => {
         </div>
 
         <SharedCountdown eventDate={invitation.eventDate} startTime={invitation.startTime} language={language} primaryColor="#D4AF37" isDarkTheme={true} />
+
+        <SharedPoem
+          templateSlug={props.template.slug}
+          language={props.language}
+          primaryColor={props.template.colorStyle.primary}
+          headingFont={props.headingFont}
+          isDarkTheme
+        />
         {invitation.invitationMessage && (
           <div className="taklifim-tpl-card rounded-2xl text-center space-y-3 bg-black/80 border border-white/10 shadow-xs">
             <p className="text-xs sm:text-sm leading-relaxed text-white/90 font-medium max-w-md mx-auto break-words">"{invitation.invitationMessage}"</p>

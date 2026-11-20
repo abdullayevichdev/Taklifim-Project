@@ -93,6 +93,8 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const coverTheme = getCoverTheme(coverTemplate);
+  // Animated envelopes play their own opening sequence (flaps, doors, curtains, ribbons).
+  const effectiveOpenMs = coverTheme ? Math.max(openTransitionMs, 1300) : openTransitionMs;
   const [isClosingCover, setIsClosingCover] = useState(false);
   const openTimerRef = useRef<number | null>(null);
 
@@ -170,7 +172,7 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
       }
       setIsClosingCover(false);
       onOpen?.();
-    }, openTransitionMs);
+    }, effectiveOpenMs);
   };
 
   // Unmount cover & CoverVideo completely once opened and fade-out completes
@@ -184,7 +186,11 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
         {shouldMountCover && (
           <div
             className={`fixed inset-0 z-50 flex items-center justify-center sm:p-6 overflow-hidden transition-opacity duration-400 ease-out ${
-              isClosingCover ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              isClosingCover
+              ? coverTheme
+                ? 'tk-shell-exit pointer-events-none'
+                : 'opacity-0 pointer-events-none'
+              : 'opacity-100'
             }`}
             style={{ backgroundColor: fallbackBgColor }}
           >
@@ -229,7 +235,7 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
                   type="button"
                   disabled={isClosingCover}
                   onClick={handleOpenClick}
-                  className="taklifim-cover-cta min-h-[48px] w-full max-w-[290px] px-6 py-3 rounded-full font-extrabold text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 group disabled:opacity-75"
+                  className={`${isClosingCover ? '!opacity-0' : ''} taklifim-cover-cta min-h-[48px] w-full max-w-[290px] px-6 py-3 rounded-full font-extrabold text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 group disabled:opacity-75`}
                 >
                   <Heart className="w-4 h-4 text-[#C64873] fill-[#C64873] shrink-0" aria-hidden="true" />
                   <span className="truncate">{openButtonLabel}</span>
@@ -257,7 +263,11 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
       {shouldMountCover && (
         <div
           className={`absolute inset-0 w-full h-full ${frameRadiusClass} overflow-hidden flex flex-col justify-end z-20 transition-opacity duration-400 ease-out ${
-            isClosingCover ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            isClosingCover
+              ? coverTheme
+                ? 'tk-shell-exit pointer-events-none'
+                : 'opacity-0 pointer-events-none'
+              : 'opacity-100'
           }`}
           style={{ backgroundColor: fallbackBgColor }}
         >
@@ -286,7 +296,7 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
               type="button"
               disabled={isClosingCover}
               onClick={handleOpenClick}
-              className="taklifim-cover-cta min-h-[44px] px-5 py-2.5 rounded-full font-extrabold text-xs tracking-wide flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all duration-300 group disabled:opacity-75"
+              className={`${isClosingCover ? '!opacity-0' : ''} taklifim-cover-cta min-h-[44px] px-5 py-2.5 rounded-full font-extrabold text-xs tracking-wide flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all duration-300 group disabled:opacity-75`}
             >
               <Heart className="w-3.5 h-3.5 text-[#C64873] fill-[#C64873] shrink-0" aria-hidden="true" />
               <span className="truncate">{openButtonLabel}</span>
