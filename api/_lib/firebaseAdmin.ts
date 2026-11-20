@@ -63,7 +63,20 @@ function sanitizeRtdbKeySegment(raw?: string): string {
     .replace(/[.#$\[\]/\\]+/g, '-');
 }
 
+export type FirebaseAdminErrorCode =
+  | 'ENV_MISSING'
+  | 'JSON_INVALID'
+  | 'PEM_INVALID'
+  | 'INIT_ERROR';
+
+export interface FirebaseAdminDiagnosticInfo {
+  code: FirebaseAdminErrorCode;
+  message: string;
+  missingEnv?: string[];
+}
+
 let lastFirebaseInitError: string | null = null;
+let lastFirebaseInitInfo: FirebaseAdminDiagnosticInfo | null = null;
 let loggedInitDiagnosticKey: string | null = null;
 
 function sanitizeFirebaseError(err: unknown): string {
@@ -77,9 +90,37 @@ export function getFirebaseAdminDiagnosticError(): string | null {
   return lastFirebaseInitError;
 }
 
+export function getFirebaseAdminDiagnosticInfo(): FirebaseAdminDiagnosticInfo | null {
+  return lastFirebaseInitInfo;
+}
+
+export function getFirebaseAdminEnvStatus() {
+  const hasServiceAccountJson = Boolean(cleanEnvString(process.env.FIREBASE_SERVICE_ACCOUNT_JSON));
+  const hasProjectId = Boolean(cleanEnvString(process.env.FIREBASE_PROJECT_ID));
+  const hasClientEmail = Boolean(cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL));
+  const hasPrivateKey = Boolean(cleanEnvString(process.env.FIREBASE_PRIVATE_KEY));
+  const hasDatabaseUrl = Boolean(cleanEnvString(process.env.FIREBASE_DATABASE_URL));
+
+  const missingEnv: string[] = [];
+  if (!hasServiceAccountJson) {
+    if (!hasProjectId) missingEnv.push('FIREBASE_PROJECT_ID');
+    if (!hasClientEmail) missingEnv.push('FIREBASE_CLIENT_EMAIL');
+    if (!hasPrivateKey) missingEnv.push('FIREBASE_PRIVATE_KEY');
+  }
+
+  return {
+    hasServiceAccountJson,
+    hasProjectId,
+    hasClientEmail,
+    hasPrivateKey,
+    hasDatabaseUrl,
+    missingEnv,
+  };
+}
+
 function parseServiceAccount():
   | { ok: true; credentials: { projectId: string; clientEmail: string; privateKey: string } }
-  | { ok: false; reason: string } {
+  | { ok: false; code: FirebaseAdminErrorCode; reason: string; missingEnv?: string[] } {
   const jsonRaw = cleanEnvString(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (jsonRaw) {
     const candidates = [
@@ -103,7 +144,11 @@ function parseServiceAccount():
         if (projectId && clientEmail && privateKey) {
           const pemCheck = validatePrivateKeyPem(privateKey);
           if (!pemCheck.ok) {
-            return { ok: false, reason: `FIREBASE_SERVICE_ACCOUNT_JSON: ${pemCheck.reason}` };
+            return {
+              ok: false,
+              code: 'PEM_INVALID',
+              reason: `FIREBASE_SERVICE_ACCOUNT_JSON: ${pemCheck.reason}`,
+            };
           }
           return { ok: true, credentials: { projectId, clientEmail, privateKey } };
         }
@@ -113,6 +158,7 @@ function parseServiceAccount():
     }
     return {
       ok: false,
+      code: 'JSON_INVALID',
       reason:
         'FIREBASE_SERVICE_ACCOUNT_JSON parse error: invalid JSON or missing project_id/client_email/private_key.',
     };
@@ -130,13 +176,15 @@ function parseServiceAccount():
   if (missing.length > 0) {
     return {
       ok: false,
+      code: 'ENV_MISSING',
+      missingEnv: missing,
       reason: `Firebase Admin credentials incomplete (missing: ${missing.join(', ')}).`,
     };
   }
 
   const pemCheck = validatePrivateKeyPem(privateKey);
   if (!pemCheck.ok) {
-    return { ok: false, reason: pemCheck.reason };
+    return { ok: false, code: 'PEM_INVALID', reason: pemCheck.reason };
   }
 
   return { ok: true, credentials: { projectId, clientEmail, privateKey } };
@@ -150,12 +198,18 @@ export function getAdminApp(): App | null {
   const existingDefault = getApps().find((a) => a.name === '[DEFAULT]');
   if (existingDefault) {
     lastFirebaseInitError = null;
+    lastFirebaseInitInfo = null;
     return existingDefault;
   }
 
   const parsed = parseServiceAccount();
   if (!parsed.ok) {
     lastFirebaseInitError = parsed.reason;
+    lastFirebaseInitInfo = {
+      code: parsed.code,
+      message: parsed.reason,
+      missingEnv: parsed.missingEnv,
+    };
     if (loggedInitDiagnosticKey !== parsed.reason) {
       loggedInitDiagnosticKey = parsed.reason;
       console.error('[TASHRIFIM] Firebase Admin configuration error:', parsed.reason);
@@ -169,11 +223,16 @@ export function getAdminApp(): App | null {
       databaseURL: getFirebaseDatabaseUrl(),
     });
     lastFirebaseInitError = null;
+    lastFirebaseInitInfo = null;
     loggedInitDiagnosticKey = null;
     return app;
   } catch (err) {
     const safeMsg = sanitizeFirebaseError(err);
     lastFirebaseInitError = `Firebase Admin initializeApp failed: ${safeMsg}`;
+    lastFirebaseInitInfo = {
+      code: 'INIT_ERROR',
+      message: lastFirebaseInitError,
+    };
     if (loggedInitDiagnosticKey !== lastFirebaseInitError) {
       loggedInitDiagnosticKey = lastFirebaseInitError;
       console.error('[TASHRIFIM] Firebase Admin initializeApp failed:', safeMsg);

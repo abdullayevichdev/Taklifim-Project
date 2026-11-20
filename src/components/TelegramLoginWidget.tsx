@@ -3,7 +3,6 @@ import QRCode from 'qrcode';
 import { RefreshCw, AlertCircle, ShieldCheck, ExternalLink, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
-import { getTelegramBotUsername } from '../config/app';
 import { GlassSurface, GlassButton } from './glass';
 
 interface TelegramLoginWidgetProps {
@@ -46,6 +45,88 @@ function formatCountdown(msLeft: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function formatStartErrorMessage(
+  data: any,
+  lang: 'uz' | 'ru' | 'en',
+  fallbackBotError: string,
+  httpStatus?: number
+): string {
+  const rawCode = typeof data?.code === 'string' ? data.code.trim() : '';
+  const code = rawCode || (httpStatus ? `HTTP_${httpStatus}` : '');
+  const missingEnv = Array.isArray(data?.missingEnv)
+    ? data.missingEnv.filter((item: unknown): item is string => typeof item === 'string' && Boolean(item.trim()))
+    : [];
+  const missingSuffix = missingEnv.length > 0 ? ` (${missingEnv.join(', ')})` : '';
+  const codeSuffix = code ? ` [${code}]` : '';
+
+  if (lang === 'ru') {
+    switch (rawCode) {
+      case 'ENV_MISSING':
+        return `На сервере не настроены обязательные переменные окружения${missingSuffix}.${codeSuffix}`;
+      case 'TELEGRAM_CONFIG_MISSING':
+        return `На сервере не настроен Telegram-бот для входа${missingSuffix}.${codeSuffix}`;
+      case 'FIREBASE_INIT_FAILED':
+        return `Ошибка инициализации серверного подключения к Firebase.${codeSuffix}`;
+      case 'RTDB_WRITE_FAILED':
+        return `Не удалось сохранить сессию входа в базе данных.${codeSuffix}`;
+      case 'RATE_LIMITED':
+        return `Слишком много попыток входа. Попробуйте через минуту.${codeSuffix}`;
+      case 'MODULE_LOAD_FAILED':
+      case 'START_HANDLER_FAILED':
+        return `Внутренняя ошибка сервера при запуске входа через Telegram.${codeSuffix}`;
+      case 'INVALID_REQUEST':
+      case 'INVALID_JSON':
+        return `Неверный формат запроса.${codeSuffix}`;
+      default:
+        return `${data?.message || data?.error || fallbackBotError}${codeSuffix}`;
+    }
+  }
+
+  if (lang === 'en') {
+    switch (rawCode) {
+      case 'ENV_MISSING':
+        return `Server environment configuration is incomplete${missingSuffix}.${codeSuffix}`;
+      case 'TELEGRAM_CONFIG_MISSING':
+        return `Telegram sign-in bot configuration is missing on the server${missingSuffix}.${codeSuffix}`;
+      case 'FIREBASE_INIT_FAILED':
+        return `Server Firebase Admin initialization failed.${codeSuffix}`;
+      case 'RTDB_WRITE_FAILED':
+        return `Failed to save login session to the database.${codeSuffix}`;
+      case 'RATE_LIMITED':
+        return `Too many sign-in attempts. Please try again in a minute.${codeSuffix}`;
+      case 'MODULE_LOAD_FAILED':
+      case 'START_HANDLER_FAILED':
+        return `Server error while initializing Telegram sign-in.${codeSuffix}`;
+      case 'INVALID_REQUEST':
+      case 'INVALID_JSON':
+        return `Invalid sign-in request payload.${codeSuffix}`;
+      default:
+        return `${data?.message || data?.error || fallbackBotError}${codeSuffix}`;
+    }
+  }
+
+  switch (rawCode) {
+    case 'ENV_MISSING':
+      return `Server sozlamalari to‘liq emas${missingSuffix}.${codeSuffix}`;
+    case 'TELEGRAM_CONFIG_MISSING':
+      return `Serverda Telegram kirish boti sozlanmagan${missingSuffix}.${codeSuffix}`;
+    case 'FIREBASE_INIT_FAILED':
+      return `Serverda Firebase Admin ulanishida xatolik yuz berdi.${codeSuffix}`;
+    case 'RTDB_WRITE_FAILED':
+      return `Kirish sessiyasini ma’lumotlar bazasiga yozib bo‘lmadi.${codeSuffix}`;
+    case 'RATE_LIMITED':
+      return `Juda ko‘p kirish urinishi. Bir daqiqadan so‘ng qayta urinib ko‘ring.${codeSuffix}`;
+    case 'MODULE_LOAD_FAILED':
+    case 'START_HANDLER_FAILED':
+      return `Telegram kirishni ishga tushirishda server xatoligi yuz berdi.${codeSuffix}`;
+    case 'INVALID_REQUEST':
+    case 'INVALID_JSON':
+      return `So‘rov ma’lumotlari noto‘g‘ri.${codeSuffix}`;
+    default:
+      return `${data?.message || data?.error || fallbackBotError}${codeSuffix}`;
+  }
+}
+
 export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
   onSuccess,
   compact = false,
@@ -63,10 +144,19 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
   const [msLeft, setMsLeft] = useState<number>(0);
 
   const pollInFlightRef = useRef<boolean>(false);
+  const startInFlightRef = useRef<boolean>(false);
+  const hasAutoStartedRef = useRef<boolean>(false);
   const completedRef = useRef<boolean>(false);
   const mountedRef = useRef<boolean>(true);
   const onSuccessRef = useRef(onSuccess);
+  const languageRef = useRef(language);
+  const botUnavailableErrorRef = useRef(t.auth.botUnavailableError);
+  const networkFailedErrorRef = useRef(t.auth.errors.networkFailed);
+
   onSuccessRef.current = onSuccess;
+  languageRef.current = language;
+  botUnavailableErrorRef.current = t.auth.botUnavailableError;
+  networkFailedErrorRef.current = t.auth.errors.networkFailed;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -76,6 +166,9 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
   }, []);
 
   const startSession = useCallback(async () => {
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
+
     setLoading(true);
     setErrorMsg('');
     setIsExpired(false);
@@ -84,6 +177,7 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
     completedRef.current = false;
 
     const claimSecret = generateClaimSecret();
+    const activeLang = languageRef.current;
 
     try {
       const res = await fetch('/api/auth/telegram/start', {
@@ -91,16 +185,28 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           claimSecret,
-          lang: language,
+          lang: activeLang,
         }),
       });
 
       const data = await res.json().catch(() => null);
       if (!mountedRef.current) return;
 
-      if (!res.ok || !data?.success || !data?.sessionId || !data?.botUrl) {
+      const normalizedBotUsername = String(data?.botUsername || '')
+        .replace(/\s+/g, '')
+        .replace(/^@+/, '');
+
+      if (
+        !res.ok ||
+        (!data?.ok && !data?.success) ||
+        !data?.sessionId ||
+        !data?.botUrl ||
+        !normalizedBotUsername
+      ) {
         setSession(null);
-        setErrorMsg(data?.error || t.auth.botUnavailableError);
+        setErrorMsg(
+          formatStartErrorMessage(data, activeLang, botUnavailableErrorRef.current, res.status)
+        );
         setLoading(false);
         return;
       }
@@ -108,7 +214,7 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
       const nextSession: TelegramSessionState = {
         sessionId: String(data.sessionId),
         claimSecret,
-        botUsername: String(data.botUsername || '').replace(/^@+/, '').trim(),
+        botUsername: normalizedBotUsername,
         botUrl: String(data.botUrl),
         verificationCode: String(data.verificationCode || ''),
         expiresAt: Number(data.expiresAt) || Date.now() + 5 * 60 * 1000,
@@ -135,12 +241,16 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
     } catch {
       if (!mountedRef.current) return;
       setSession(null);
-      setErrorMsg(t.auth.errors.networkFailed);
+      setErrorMsg(`${networkFailedErrorRef.current} [NETWORK_ERROR]`);
       setLoading(false);
+    } finally {
+      startInFlightRef.current = false;
     }
-  }, [compact, language, t.auth.botUnavailableError, t.auth.errors.networkFailed]);
+  }, [compact]);
 
   useEffect(() => {
+    if (hasAutoStartedRef.current) return;
+    hasAutoStartedRef.current = true;
     startSession();
   }, [startSession]);
 
@@ -261,7 +371,7 @@ export const TelegramLoginWidget: React.FC<TelegramLoginWidgetProps> = ({
     };
   }, [session, isExpired, isCompleting, pollClaim]);
 
-  const botHandle = session?.botUsername || getTelegramBotUsername();
+  const botHandle = session?.botUsername || '';
 
   if (loading) {
     return (

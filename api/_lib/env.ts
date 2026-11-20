@@ -42,6 +42,23 @@ export function cleanPrivateKey(val?: string): string {
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
 
+  const BEGIN = '-----BEGIN PRIVATE KEY-----';
+  const END = '-----END PRIVATE KEY-----';
+
+  // If Vercel/dashboard pasted the PEM onto a single line with spaces instead of newlines,
+  // reconstruct a valid multi-line 64-char-wrapped PKCS#8 PEM block cleanly.
+  if (str.includes(BEGIN) && str.includes(END)) {
+    const startIdx = str.indexOf(BEGIN) + BEGIN.length;
+    const endIdx = str.indexOf(END, startIdx);
+    if (endIdx > startIdx) {
+      const compactBody = str.slice(startIdx, endIdx).replace(/\s+/g, '');
+      if (compactBody.length > 0) {
+        const wrappedBody = compactBody.match(/.{1,64}/g)?.join('\n') || compactBody;
+        return `${BEGIN}\n${wrappedBody}\n${END}\n`;
+      }
+    }
+  }
+
   const lines = str
     .split('\n')
     .map((line) => line.trim())
@@ -126,7 +143,7 @@ export function getTelegramRuntimeEnv(): TelegramRuntimeEnv {
 }
 
 function stripLeadingAt(raw: string): string {
-  return raw.replace(/^@+/, '').trim();
+  return raw.replace(/\s+/g, '').replace(/^@+/, '');
 }
 
 /**

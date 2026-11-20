@@ -8,6 +8,7 @@ import {
 import {
   getAdminAuth,
   getFirebaseAdminDiagnosticError,
+  getFirebaseAdminDiagnosticInfo,
   getRtdb,
   hasFirebaseAdmin,
   stripUndefined,
@@ -241,6 +242,14 @@ async function cleanupExpiredSessions(rtdb: ReturnType<typeof getRtdb>, now: num
   }
 }
 
+function sanitizeAuthError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || 'Unknown server error');
+  return raw
+    .replace(/-----BEGIN[\s\S]*?END[^-]*-----/g, '[REDACTED]')
+    .replace(/"private_key"\s*:\s*"[^"]*"/gi, '"private_key":"[REDACTED]"')
+    .replace(/\/bot[^/\s]+/gi, '/bot[REDACTED]');
+}
+
 export async function startTelegramLogin(
   params: {
     claimSecret?: unknown;
@@ -253,56 +262,111 @@ export async function startTelegramLogin(
   const lang = normalizeLang(params.lang, 'uz');
 
   if (!validateClaimSecret(params.claimSecret)) {
+    const message = 'Invalid claimSecret (must be 32+ non-whitespace characters).';
     return {
       statusCode: 400,
       body: {
+        ok: false,
         success: false,
-        error: 'Invalid claimSecret (must be 32+ non-whitespace characters).',
+        code: 'INVALID_REQUEST',
+        message,
+        error: message,
       },
     };
   }
+
+  // Check Telegram bot config & Firebase Admin config cleanly with distinct error codes
+  const runtimeEnv = process.env.VERCEL_ENV === 'preview' ? 'preview' : 'default';
+  const usernameVarHint =
+    runtimeEnv === 'preview' ? 'TELEGRAM_TEST_BOT_USERNAME' : 'TELEGRAM_BOT_USERNAME';
+  const tokenVarHint =
+    runtimeEnv === 'preview' ? 'TELEGRAM_TEST_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN';
 
   if (!deps.hasFirebaseAdmin()) {
+    const diagInfo = getFirebaseAdminDiagnosticInfo();
+    const legacyDiag = getFirebaseAdminDiagnosticError();
+    if (diagInfo?.code === 'ENV_MISSING') {
+      const message =
+        diagInfo.message ||
+        'Server Firebase Admin credentials (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are missing.';
+      return {
+        statusCode: 500,
+        body: {
+          ok: false,
+          success: false,
+          code: 'ENV_MISSING',
+          missingEnv: diagInfo.missingEnv || [
+            'FIREBASE_PROJECT_ID',
+            'FIREBASE_CLIENT_EMAIL',
+            'FIREBASE_PRIVATE_KEY',
+          ],
+          message,
+          error: message,
+        },
+      };
+    }
+
+    const message =
+      diagInfo?.message ||
+      legacyDiag ||
+      'Server Firebase Admin configuration is incomplete or invalid.';
     return {
       statusCode: 500,
       body: {
+        ok: false,
         success: false,
-        error:
-          getFirebaseAdminDiagnosticError() ||
-          'Server Firebase Admin configuration is incomplete.',
+        code: 'FIREBASE_INIT_FAILED',
+        ...(diagInfo?.code ? { reasonCode: diagInfo.code } : {}),
+        message,
+        error: message,
       },
     };
   }
 
-  const runtimeEnv = process.env.VERCEL_ENV === 'preview' ? 'preview' : 'default';
   const authConfig = deps.getTelegramConfig();
-  const botUsername = deps.getTelegramBotUsername();
+  const rawBotUsername = String(deps.getTelegramBotUsername() || '');
+  const botUsername = rawBotUsername.replace(/\s+/g, '').replace(/^@+/, '');
+  const hasBotToken = Boolean(authConfig?.botToken && authConfig.botToken !== 'MOCK_BOT_TOKEN');
 
-  if (!botUsername) {
-    const varHint =
-      runtimeEnv === 'preview' ? 'TELEGRAM_TEST_BOT_USERNAME' : 'TELEGRAM_BOT_USERNAME';
+  if (!botUsername || !hasBotToken) {
+    const missingEnv: string[] = [];
+    if (!botUsername) missingEnv.push(usernameVarHint);
+    if (!hasBotToken) missingEnv.push(tokenVarHint);
+
+    const message = !botUsername
+      ? `Telegram bot username (${usernameVarHint}) is not configured.`
+      : `Telegram bot token (${tokenVarHint}) is not configured.`;
+
     return {
       statusCode: 500,
       body: {
+        ok: false,
         success: false,
-        error: `Telegram bot username (${varHint}) is not configured.`,
+        code: 'TELEGRAM_CONFIG_MISSING',
+        missingEnv,
+        message,
+        error: message,
       },
     };
   }
 
-  if (!authConfig?.botToken || authConfig.botToken === 'MOCK_BOT_TOKEN') {
-    const tokenHint =
-      runtimeEnv === 'preview' ? 'TELEGRAM_TEST_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN';
+  let rtdb: ReturnType<typeof getRtdb>;
+  try {
+    rtdb = deps.getRtdb();
+  } catch (rtdbInitErr) {
+    const message = sanitizeAuthError(rtdbInitErr);
     return {
       statusCode: 500,
       body: {
+        ok: false,
         success: false,
-        error: `Telegram bot token (${tokenHint}) is not configured.`,
+        code: 'FIREBASE_INIT_FAILED',
+        message,
+        error: message,
       },
     };
   }
 
-  const rtdb = deps.getRtdb();
   const rateLimit = await deps.checkExternalRateLimit({
     key: `tg_auth_start:${params.clientIp || 'unknown'}`,
     limit: 10,
@@ -311,11 +375,15 @@ export async function startTelegramLogin(
   });
 
   if (!rateLimit.allowed) {
+    const message = "Juda ko'p kirish urinishi. Bir daqiqadan so'ng qayta urinib ko'ring.";
     return {
       statusCode: 429,
       body: {
+        ok: false,
         success: false,
-        error: "Juda ko'p kirish urinishi. Bir daqiqadan so'ng qayta urinib ko'ring.",
+        code: 'RATE_LIMITED',
+        message,
+        error: message,
       },
     };
   }
@@ -340,11 +408,28 @@ export async function startTelegramLogin(
     failedClaimAttempts: 0,
   };
 
-  await rtdb.ref(`loginSessions/${sessionId}`).set(sessionRecord);
+  try {
+    await rtdb.ref(`loginSessions/${sessionId}`).set(sessionRecord);
+  } catch (writeErr) {
+    const safeMsg = sanitizeAuthError(writeErr);
+    console.error('[TASHRIFIM] RTDB write failed in startTelegramLogin:', safeMsg);
+    const message = `Failed to save Telegram login session to RTDB: ${safeMsg}`;
+    return {
+      statusCode: 500,
+      body: {
+        ok: false,
+        success: false,
+        code: 'RTDB_WRITE_FAILED',
+        message,
+        error: message,
+      },
+    };
+  }
 
   return {
     statusCode: 200,
     body: {
+      ok: true,
       success: true,
       sessionId,
       botUsername,

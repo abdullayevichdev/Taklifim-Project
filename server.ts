@@ -50,6 +50,18 @@ async function startServer() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+  app.all('/api/health/config', async (req: Request, res: Response) => {
+    try {
+      const { default: healthHandler } = await import('./api/health/config.js');
+      return await healthHandler(req as any, res as any);
+    } catch {
+      return res.status(500).json({
+        ok: false,
+        code: 'HEALTH_CHECK_FAILED',
+      });
+    }
+  });
+
   app.post('/api/auth/telegram/start', async (req: Request, res: Response) => {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -63,13 +75,17 @@ async function startServer() {
       );
       return res.status(result.statusCode).json(result.body);
     } catch (err: any) {
+      const safeMsg = sanitizeTelegramErrorMessage(err);
       console.error('Telegram auth start handler error:', {
-        message: err?.message,
+        message: safeMsg,
         code: err?.code,
       });
       return res.status(500).json({
+        ok: false,
         success: false,
-        error: 'Internal server error while starting Telegram login.',
+        code: 'START_HANDLER_FAILED',
+        message: safeMsg || 'Internal server error while starting Telegram login.',
+        error: safeMsg || 'Internal server error while starting Telegram login.',
       });
     }
   });

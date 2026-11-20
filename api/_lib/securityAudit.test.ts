@@ -25,6 +25,7 @@ import telegramWebhookHandler from '../telegram/webhook.js';
 import telegramLoginWebhookHandler from '../telegram/login-webhook.js';
 import telegramAuthStartHandler from '../auth/telegram/start.js';
 import telegramAuthClaimHandler from '../auth/telegram/claim.js';
+import healthConfigHandler from '../health/config.js';
 import {
   cleanPrivateKey,
   getPaymentTelegramConfig,
@@ -1887,6 +1888,276 @@ test('cleanPrivateKey & validatePrivateKeyPem handle quotes, CRLF, escaped newli
     }
   }
 });
+
+test('cleanPrivateKey repairs single-line space-collapsed PKCS#8 PEM keys', () => {
+  const { privateKey: generatedPem } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  });
+
+  const singleLineSpaced = generatedPem.replace(/\r?\n/g, ' ').trim();
+  const repaired = cleanPrivateKey(singleLineSpaced);
+  assert.equal(validatePrivateKeyPem(repaired).ok, true);
+  assert.ok(repaired.split('\n').length > 10);
+});
+
+test('startTelegramLogin returns distinct error codes for every failure step and normalizes botUsername', async () => {
+  const envKeys = [
+    'VERCEL_ENV',
+    'FIREBASE_SERVICE_ACCOUNT_JSON',
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_PRIVATE_KEY',
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_BOT_USERNAME',
+    'VITE_TELEGRAM_BOT_USERNAME',
+    'TELEGRAM_TEST_BOT_TOKEN',
+    'TELEGRAM_TEST_BOT_USERNAME',
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const k of envKeys) saved[k] = process.env[k];
+
+  for (const existing of getApps()) {
+    if (existing.name === '[DEFAULT]') await deleteApp(existing);
+  }
+
+  try {
+    const ctx = makeInMemoryTelegramAuthDeps({ botUsername: ' @TashrifimBot ' });
+
+    // 1. INVALID_REQUEST on short/whitespace claimSecret
+    const invalidRes = await startTelegramLogin(
+      { claimSecret: 'too-short', lang: 'uz', clientIp: '10.0.0.1' },
+      ctx.deps
+    );
+    assert.equal(invalidRes.statusCode, 400);
+    assert.equal(invalidRes.body.ok, false);
+    assert.equal(invalidRes.body.code, 'INVALID_REQUEST');
+
+    // 2. ENV_MISSING when Firebase Admin env vars are absent
+    delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    delete process.env.FIREBASE_PROJECT_ID;
+    delete process.env.FIREBASE_CLIENT_EMAIL;
+    delete process.env.FIREBASE_PRIVATE_KEY;
+
+    const envMissingRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      { ...ctx.deps, hasFirebaseAdmin }
+    );
+    assert.equal(envMissingRes.statusCode, 500);
+    assert.equal(envMissingRes.body.ok, false);
+    assert.equal(envMissingRes.body.code, 'ENV_MISSING');
+    assert.deepEqual(envMissingRes.body.missingEnv, [
+      'FIREBASE_PROJECT_ID',
+      'FIREBASE_CLIENT_EMAIL',
+      'FIREBASE_PRIVATE_KEY',
+    ]);
+
+    // 3. FIREBASE_INIT_FAILED when PEM key is malformed
+    process.env.FIREBASE_PROJECT_ID = 'teklifim-9dae7';
+    process.env.FIREBASE_CLIENT_EMAIL = 'firebase-adminsdk@teklifim-9dae7.iam.gserviceaccount.com';
+    process.env.FIREBASE_PRIVATE_KEY = 'bad-pem-secret-do-not-expose';
+
+    const fbInitFailRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      { ...ctx.deps, hasFirebaseAdmin }
+    );
+    assert.equal(fbInitFailRes.statusCode, 500);
+    assert.equal(fbInitFailRes.body.ok, false);
+    assert.equal(fbInitFailRes.body.code, 'FIREBASE_INIT_FAILED');
+    assert.equal(String(fbInitFailRes.body.message).includes('bad-pem-secret-do-not-expose'), false);
+
+    // 4. TELEGRAM_CONFIG_MISSING when bot username or token is missing
+    process.env.VERCEL_ENV = 'production';
+    const noBotUserRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      { ...ctx.deps, getTelegramBotUsername: () => '' }
+    );
+    assert.equal(noBotUserRes.statusCode, 500);
+    assert.equal(noBotUserRes.body.code, 'TELEGRAM_CONFIG_MISSING');
+    assert.deepEqual(noBotUserRes.body.missingEnv, ['TELEGRAM_BOT_USERNAME']);
+
+    const noBotTokenRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      {
+        ...ctx.deps,
+        getTelegramConfig: () => ({
+          botToken: 'MOCK_BOT_TOKEN',
+          adminChatId: 'MOCK_ADMIN_CHAT_ID',
+          webhookSecret: '',
+        }),
+      }
+    );
+    assert.equal(noBotTokenRes.statusCode, 500);
+    assert.equal(noBotTokenRes.body.code, 'TELEGRAM_CONFIG_MISSING');
+    assert.deepEqual(noBotTokenRes.body.missingEnv, ['TELEGRAM_BOT_TOKEN']);
+
+    // 5. RATE_LIMITED when IP exceeds 10 attempts in 60s
+    const rateLimitedRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      {
+        ...ctx.deps,
+        checkExternalRateLimit: async () => ({ allowed: false, count: 11, resetAt: Date.now() + 60_000 }),
+      }
+    );
+    assert.equal(rateLimitedRes.statusCode, 429);
+    assert.equal(rateLimitedRes.body.code, 'RATE_LIMITED');
+
+    // 6. RTDB_WRITE_FAILED when rtdb set throws
+    const failingRtdb = {
+      ref: () => ({
+        limitToFirst: () => ({ get: async () => ({ exists: () => false, val: () => null }) }),
+        set: async () => {
+          throw new Error('Permission denied at /loginSessions');
+        },
+      }),
+    } as any;
+    const rtdbFailRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      { ...ctx.deps, getRtdb: () => failingRtdb }
+    );
+    assert.equal(rtdbFailRes.statusCode, 500);
+    assert.equal(rtdbFailRes.body.ok, false);
+    assert.equal(rtdbFailRes.body.code, 'RTDB_WRITE_FAILED');
+
+    // 7. Success normalizes botUsername (strips @ and whitespace)
+    const okRes = await startTelegramLogin(
+      { claimSecret: 'a'.repeat(48), lang: 'uz', clientIp: '10.0.0.1' },
+      ctx.deps
+    );
+    assert.equal(okRes.statusCode, 200);
+    assert.equal(okRes.body.ok, true);
+    assert.equal(okRes.body.success, true);
+    assert.equal(okRes.body.botUsername, 'TashrifimBot');
+    assert.ok(String(okRes.body.botUrl).startsWith('https://t.me/TashrifimBot?start=login_'));
+  } finally {
+    for (const existing of getApps()) {
+      if (existing.name === '[DEFAULT]') await deleteApp(existing);
+    }
+    for (const k of envKeys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
+test('POST /api/auth/telegram/start lazy handler & GET /api/health/config return structured codes without leaking secrets', async () => {
+  const envKeys = [
+    'VERCEL_ENV',
+    'FIREBASE_SERVICE_ACCOUNT_JSON',
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_PRIVATE_KEY',
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_BOT_USERNAME',
+    'VITE_TELEGRAM_BOT_USERNAME',
+    'TELEGRAM_WEBHOOK_SECRET',
+    'TELEGRAM_ADMIN_CHAT_ID',
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const k of envKeys) saved[k] = process.env[k];
+
+  for (const existing of getApps()) {
+    if (existing.name === '[DEFAULT]') await deleteApp(existing);
+  }
+
+  try {
+    const { privateKey: generatedPem } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    });
+
+    const dummyBotToken = '999888777:SUPER_SECRET_BOT_TOKEN_DO_NOT_LEAK';
+    const dummyBotUsername = 'super_secret_handle_bot';
+    const dummyWebhookSecret = 'ULTRA_SECRET_WEBHOOK_TOKEN';
+
+    // /api/health/config rejects POST with 405
+    const postHealthMock = makeMockVercelRes();
+    await healthConfigHandler({ method: 'POST', headers: {} } as any, postHealthMock.res);
+    assert.equal(postHealthMock.state.statusCode, 405);
+    assert.equal(postHealthMock.state.headers.Allow, 'GET');
+
+    // Test start.ts ENV_MISSING end-to-end via lazy handler
+    delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    delete process.env.FIREBASE_PROJECT_ID;
+    delete process.env.FIREBASE_CLIENT_EMAIL;
+    delete process.env.FIREBASE_PRIVATE_KEY;
+
+    const startMissingMock = makeMockVercelRes();
+    await telegramAuthStartHandler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { claimSecret: 's'.repeat(48), lang: 'uz' },
+      } as any,
+      startMissingMock.res
+    );
+    assert.equal(startMissingMock.state.statusCode, 500);
+    assert.equal(startMissingMock.state.body.code, 'ENV_MISSING');
+    assert.equal(startMissingMock.state.body.ok, false);
+
+    // Populate Firebase + Telegram secrets and test /api/health/config zero-secret output
+    process.env.VERCEL_ENV = 'production';
+    process.env.FIREBASE_PROJECT_ID = 'teklifim-9dae7';
+    process.env.FIREBASE_CLIENT_EMAIL = 'firebase-adminsdk@teklifim-9dae7.iam.gserviceaccount.com';
+    process.env.FIREBASE_PRIVATE_KEY = generatedPem;
+    process.env.TELEGRAM_BOT_TOKEN = dummyBotToken;
+    process.env.TELEGRAM_BOT_USERNAME = `@${dummyBotUsername}`;
+    process.env.TELEGRAM_WEBHOOK_SECRET = dummyWebhookSecret;
+    process.env.TELEGRAM_ADMIN_CHAT_ID = '123456789';
+
+    // Verify start.ts rejects TELEGRAM_CONFIG_MISSING cleanly if username cleared
+    delete process.env.TELEGRAM_BOT_USERNAME;
+    delete process.env.VITE_TELEGRAM_BOT_USERNAME;
+    const startNoBotMock = makeMockVercelRes();
+    await telegramAuthStartHandler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { claimSecret: 's'.repeat(48), lang: 'uz' },
+      } as any,
+      startNoBotMock.res
+    );
+    assert.equal(startNoBotMock.state.statusCode, 500);
+    assert.equal(startNoBotMock.state.body.code, 'TELEGRAM_CONFIG_MISSING');
+    assert.deepEqual(startNoBotMock.state.body.missingEnv, ['TELEGRAM_BOT_USERNAME']);
+
+    process.env.TELEGRAM_BOT_USERNAME = `@${dummyBotUsername}`;
+
+    // Verify /api/health/config returns booleans & safe codes ONLY, never secrets
+    const healthMock = makeMockVercelRes();
+    await healthConfigHandler({ method: 'GET', headers: {} } as any, healthMock.res);
+    assert.equal(healthMock.state.statusCode, 200);
+    assert.equal(healthMock.state.body.firebaseAdminInit, 'ok');
+    assert.equal(healthMock.state.body.hasFirebaseProjectId, true);
+    assert.equal(healthMock.state.body.hasFirebaseClientEmail, true);
+    assert.equal(healthMock.state.body.hasFirebasePrivateKey, true);
+    assert.equal(healthMock.state.body.hasTelegramBotToken, true);
+    assert.equal(healthMock.state.body.hasTelegramBotUsername, true);
+    assert.equal(healthMock.state.body.hasActiveAuthBotToken, true);
+    assert.equal(healthMock.state.body.hasActiveAuthBotUsername, true);
+    assert.equal(healthMock.state.body.vercelEnv, 'production');
+    assert.equal(typeof healthMock.state.body.nodeVersion, 'string');
+
+    const serialized = JSON.stringify(healthMock.state.body);
+    assert.equal(serialized.includes('BEGIN PRIVATE KEY'), false);
+    assert.equal(serialized.includes(dummyBotToken), false);
+    assert.equal(serialized.includes(dummyBotUsername), false);
+    assert.equal(serialized.includes(dummyWebhookSecret), false);
+    assert.equal(serialized.includes('firebase-adminsdk@'), false);
+    assert.equal(serialized.includes('teklifim-9dae7'), false);
+  } finally {
+    for (const existing of getApps()) {
+      if (existing.name === '[DEFAULT]') await deleteApp(existing);
+    }
+    for (const k of envKeys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
 
 
 
