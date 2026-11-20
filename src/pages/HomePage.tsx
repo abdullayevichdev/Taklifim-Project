@@ -179,11 +179,11 @@ export const HomePage: React.FC = () => {
                 </span>
               </GlassSurface>
 
-              <div className="font-script text-[34px] sm:text-[44px] lg:text-[48px] font-semibold text-[#A8325B] tracking-wide leading-[1.15] -mb-3 drop-shadow-[0_1px_1px_rgba(255,255,255,0.88)]">
+              <div className="font-script text-[34px] sm:text-[44px] lg:text-[48px] font-semibold text-[#A8325B] tracking-wide leading-[1.15] -mb-2 drop-shadow-[0_1px_1px_rgba(255,255,255,0.88)]">
                 {t.hero.script}
               </div>
 
-              <h1 className="font-playfair text-4xl sm:text-[54px] lg:text-[60px] font-extrabold text-[#1E1418] tracking-tight leading-[1.08] [text-wrap:balance] drop-shadow-[0_1px_1px_rgba(255,255,255,0.68)]">
+              <h1 className="font-playfair text-4xl sm:text-[54px] lg:text-[60px] font-bold text-[#1E1418] tracking-tight leading-[1.14] [text-wrap:balance] drop-shadow-[0_1px_1px_rgba(255,255,255,0.68)]">
                 {t.hero.title}
               </h1>
 

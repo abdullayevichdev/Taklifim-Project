@@ -125,7 +125,7 @@ export const ContactPage: React.FC = () => {
                       {t.contact.telegramLabel}
                     </span>
                     <a
-                      href="https://t.me/taklifim_support"
+                      href="https://t.me/avazxanovvv_700"
                       target="_blank"
                       rel="noreferrer"
                       className="font-bold text-[#1E1418] hover:text-[#C94F79] transition-colors mt-0.5 block"

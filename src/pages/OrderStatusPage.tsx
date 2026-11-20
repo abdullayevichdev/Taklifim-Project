@@ -68,7 +68,7 @@ interface OrderViewState {
   updatedAt?: string;
 }
 
-const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/taklifim_support';
+const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/avazxanovvv_700';
 
 export const OrderStatusPage: React.FC = () => {
   const { params, navigate } = useRouter();

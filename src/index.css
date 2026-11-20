@@ -1,14 +1,17 @@
+@import "./fonts/ui-fonts.css";
 @import "./fonts/cormorant-garamond.css";
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
-  --font-serif: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
-  --font-mono: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-sans: "Manrope", "ManropeFallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-serif: "Playfair Display", "Cormorant Garamond", "CormorantFallback", Georgia, serif;
+  --font-mono: "Manrope", "ManropeFallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 :root {
-  --font-ui: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
+  --font-ui: "Manrope", "ManropeFallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Playfair Display", "Cormorant Garamond", "CormorantFallback", Georgia, serif;
+  --font-script: "Cormorant Garamond", "CormorantFallback", "Times New Roman", Georgia, serif;
   --font-primary: var(--font-ui);
 
   /* Taklifim Brand Palette */
@@ -61,18 +64,14 @@
 }
 
 @layer base {
-  *, *::before, *::after {
-    font-family: var(--font-ui);
-  }
-
   html {
     background-color: #FCEEF4;
     color: #1E1418;
     font-family: var(--font-ui);
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "lnum" 1, "tnum" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     overflow-x: hidden;
   }
 
@@ -80,75 +79,98 @@
     background-color: #FCEEF4;
     color: #1E1418;
     font-family: var(--font-ui);
-    font-size: 1.0625rem;
-    font-weight: 500;
-    line-height: 1.55;
-    letter-spacing: 0;
+    font-size: 1rem;
+    font-weight: 450;
+    line-height: 1.6;
+    letter-spacing: -0.005em;
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "lnum" 1, "tnum" 1;
     overflow-x: hidden;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-ui);
-    letter-spacing: -0.015em;
+  h1, h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
     font-weight: 700;
-    font-feature-settings: "lnum" 1;
+    line-height: 1.2;
     font-variant-numeric: lining-nums;
   }
 
-  p, span, div, label, a {
-    font-family: var(--font-ui);
+  h3, h4, h5, h6 {
+    font-family: inherit;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+    line-height: 1.3;
   }
 
   input, textarea, select, button, optgroup {
     font-family: inherit;
-    font-feature-settings: "lnum" 1, "tnum" 1;
     font-variant-numeric: lining-nums tabular-nums;
   }
 
   input::placeholder, textarea::placeholder {
     font-family: inherit;
-    opacity: 0.78;
+    opacity: 0.7;
   }
 
-  /* Unified Cormorant Garamond Typography Utilities */
+  /* Display (headings) */
   .font-playfair,
   .font-cinzel,
-  .font-jakarta,
-  .font-sans,
   .font-serif {
+    font-family: var(--font-display) !important;
+    letter-spacing: -0.01em;
+  }
+
+  /* UI sans */
+  .font-jakarta,
+  .font-sans {
     font-family: var(--font-ui) !important;
   }
 
+  /* Decorative script accents */
   .font-script,
   .font-alex,
   .font-great-vibes {
-    font-family: var(--font-ui) !important;
+    font-family: var(--font-script) !important;
     font-style: italic;
+    font-weight: 600;
   }
 
   .font-mono {
     font-family: var(--font-ui) !important;
     font-variant-numeric: lining-nums tabular-nums;
-    font-feature-settings: "lnum" 1, "tnum" 1;
+    letter-spacing: 0.01em;
+  }
+
+  /* Invitation templates keep their elegant serif body typography */
+  .taklifim-template-root {
+    font-family: var(--font-script);
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .taklifim-template-root h1,
+  .taklifim-template-root h2,
+  .taklifim-template-root .font-playfair,
+  .taklifim-template-root .font-cinzel,
+  .taklifim-template-root .font-serif {
+    font-family: var(--font-script) !important;
   }
 }
 
-/* Cormorant Garamond has a compact x-height (~0.386em); lift .text-xs/.text-sm cleanly so all UI copy remains >=14px–16px without altering Tailwind rem spacing */
+/* Slightly larger small text for comfortable reading on mobile */
 @layer utilities {
   .text-xs {
-    font-size: 0.875rem;
-    line-height: 1.45;
-  }
-
-  .text-sm {
-    font-size: 1rem;
+    font-size: 0.8125rem;
     line-height: 1.5;
   }
 
+  .text-sm {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+
   .uppercase:not([class*="tracking-"]) {
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
   }
 }
 
@@ -878,7 +900,7 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   }
 }
 
-/* Leaflet map container and popups inherit Cormorant Garamond */
+/* Leaflet map container and popups use the UI font */
 .leaflet-container,
 .leaflet-popup-content,
 .leaflet-popup-content-wrapper,
@@ -1310,3 +1332,121 @@ html.taklifim-modal-open .taklifim-bottom-nav {
 }
 
 
+
+/* ============================================================================
+ * Animated envelope covers (per-template, SVG + CSS)
+ * ============================================================================ */
+.tk-cover .tk-cover-fill {
+  fill: var(--tk-ornament, currentColor);
+}
+
+.tk-cover .tk-cover-ornament-center {
+  fill: rgba(255, 255, 255, 0.55);
+}
+
+.tk-cover-glow {
+  animation: tk-cover-glow 4.2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@keyframes tk-cover-glow {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.tk-cover-runner {
+  stroke-dasharray: 9 100;
+  stroke-dashoffset: 9;
+  animation: tk-cover-runner 4.2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+.tk-cover-runner--late {
+  animation-delay: 0.35s;
+}
+
+@keyframes tk-cover-runner {
+  0% { stroke-dashoffset: 9; opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 1; }
+  85%, 100% { stroke-dashoffset: -100; opacity: 0; }
+}
+
+.tk-cover-seal {
+  animation: tk-cover-seal 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes tk-cover-seal {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.035); }
+}
+
+.tk-cover-seal-shine {
+  animation: tk-cover-seal-shine 4.2s ease-in-out infinite;
+}
+
+@keyframes tk-cover-seal-shine {
+  0%, 55% { transform: rotate(20deg) translateX(0); }
+  85%, 100% { transform: rotate(20deg) translateX(240px); }
+}
+
+.tk-cover-particle {
+  opacity: 0;
+  animation-name: tk-cover-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes tk-cover-float {
+  0% { transform: translate3d(0, 24px, 0) rotate(0deg); opacity: 0; }
+  15% { opacity: 0.95; }
+  50% { transform: translate3d(var(--tk-drift, 10px), -40px, 0) rotate(160deg); opacity: 0.85; }
+  85% { opacity: 0.6; }
+  100% { transform: translate3d(calc(var(--tk-drift, 10px) * -0.5), -110px, 0) rotate(320deg); opacity: 0; }
+}
+
+.tk-cover-particle--twinkle {
+  animation-name: tk-cover-twinkle;
+}
+
+@keyframes tk-cover-twinkle {
+  0%, 100% { transform: scale(0.4) rotate(0deg); opacity: 0; }
+  40% { transform: scale(1) rotate(45deg); opacity: 1; }
+  60% { transform: scale(0.85) rotate(60deg); opacity: 0.9; }
+}
+
+.tk-cover-flap-wings path {
+  transform-box: fill-box;
+  animation: tk-cover-wings 0.9s ease-in-out infinite alternate;
+}
+
+.tk-cover-flap-wings path:first-child {
+  transform-origin: right center;
+}
+
+.tk-cover-flap-wings path:nth-child(2) {
+  transform-origin: left center;
+}
+
+@keyframes tk-cover-wings {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-cover-glow,
+  .tk-cover-runner,
+  .tk-cover-seal,
+  .tk-cover-seal-shine,
+  .tk-cover-particle,
+  .tk-cover-flap-wings path {
+    animation: none !important;
+  }
+  .tk-cover-particle {
+    opacity: 0.6;
+  }
+  .tk-cover-glow {
+    opacity: 0.8;
+  }
+}
