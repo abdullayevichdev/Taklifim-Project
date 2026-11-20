@@ -45,7 +45,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
-const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/taklifim_support';
+const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/avazxanovvv_700';
 
 export const MyInvitationsPage: React.FC = () => {
   const { navigate } = useRouter();

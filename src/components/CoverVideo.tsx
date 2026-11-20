@@ -32,9 +32,9 @@ export interface CoverVideoProps {
   onReady?: () => void;
 }
 
-const DEFAULT_POSTER = '/video/invitation-poster.jpg?v=2';
-const WEBM_SOURCE = '/video/invitation-loop.webm?v=2';
-const MP4_SOURCE = '/video/invitation-loop.mp4?v=2';
+const DEFAULT_POSTER = '/video/invitation-poster.jpg?v=3';
+const WEBM_SOURCE = '/video/invitation-loop.webm?v=3';
+const MP4_SOURCE = '/video/invitation-loop.mp4?v=3';
 
 const VIDEO_STYLE: React.CSSProperties = {
   transform: 'translateZ(0)',

@@ -2902,7 +2902,7 @@ export const BuilderPage: React.FC = () => {
                           <div className="p-3 rounded-2xl bg-white/80 border border-amber-200 text-xs text-amber-950 space-y-2">
                             <p className="font-medium">{t.myInvitations.overdueHint}</p>
                             <a
-                              href="https://t.me/taklifim_support"
+                              href="https://t.me/avazxanovvv_700"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1E1418] text-white text-xs font-bold hover:bg-black transition-colors"
@@ -3205,6 +3205,7 @@ export const BuilderPage: React.FC = () => {
 
                   <div className="w-full h-[620px] rounded-[36px] overflow-hidden border border-black/10 select-none shadow-inner relative bg-white">
                     <InvitationShell
+                      coverTemplate={stateTemplateResolution?.template.slug || invitationState.templateSlug}
                       isOpened={isPreviewCoverOpened}
                       onOpen={() => setIsPreviewCoverOpened(true)}
                       enableConfetti={true}
@@ -3243,6 +3244,7 @@ export const BuilderPage: React.FC = () => {
 
                   <div className="w-full h-[600px] overflow-hidden select-none shadow-inner relative bg-white">
                     <InvitationShell
+                      coverTemplate={stateTemplateResolution?.template.slug || invitationState.templateSlug}
                       isOpened={isPreviewCoverOpened}
                       onOpen={() => setIsPreviewCoverOpened(true)}
                       enableConfetti={true}

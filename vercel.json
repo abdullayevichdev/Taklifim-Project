@@ -16,6 +16,12 @@
     "api/telegram/webhook.ts": {
       "maxDuration": 20
     },
+    "api/telegram/login-webhook.ts": {
+      "maxDuration": 20
+    },
+    "api/telegram/setup-webhook.ts": {
+      "maxDuration": 15
+    },
     "api/telegram/template-alert.ts": {
       "maxDuration": 10
     },

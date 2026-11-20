@@ -818,6 +818,7 @@ export const InvitationGuestPage: React.FC = () => {
   return (
     <InvitationShell
       isOpened={isCoverOpened}
+      coverTemplate={templateDef.slug}
       onOpenStart={fireOpeningConfetti}
       onOpen={() => setIsCoverOpened(true)}
       enableConfetti={false}

@@ -155,6 +155,19 @@ export function getPaymentTelegramConfig() {
 }
 
 /**
+ * Webhook secrets accepted on /api/telegram/webhook.
+ * TELEGRAM_WEBHOOK_SECRET is primary; TELEGRAM_LOGIN_WEBHOOK_SECRET is still accepted so a bot
+ * webhook that was registered earlier with the (removed) login secret keeps delivering button presses.
+ */
+export function getAcceptedTelegramWebhookSecrets(): string[] {
+  const secrets = [
+    cleanEnvString(process.env.TELEGRAM_WEBHOOK_SECRET),
+    cleanEnvString(process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET),
+  ].filter(Boolean);
+  return Array.from(new Set(secrets));
+}
+
+/**
  * Backwards-compatible alias for payment/shared Telegram configuration.
  */
 export function getTelegramConfig() {

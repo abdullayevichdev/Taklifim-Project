@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { ArrowRight, Heart } from 'lucide-react';
 import { CoverVideo } from './CoverVideo';
+import { AnimatedEnvelopeCover } from './cover/AnimatedEnvelopeCover';
+import { getCoverTheme } from './cover/coverThemes';
 
 export interface InvitationShellProps {
   /** Controlled opened state. When omitted, InvitationShell manages open state internally. */
@@ -41,6 +43,11 @@ export interface InvitationShellProps {
   coverTopOverlay?: React.ReactNode;
   /** Optional footer badge below CTA (e.g. "Taklifim platformasida yaratildi") */
   coverFooterOverlay?: React.ReactNode;
+  /**
+   * Template slug or id (e.g. "template-5" / "tpl-5"). Selects the template's own animated
+   * envelope cover; templates without a theme (and template-1) use the cinematic cover video.
+   */
+  coverTemplate?: string;
   /** Background fallback behind poster */
   fallbackBgColor?: string;
   /** Backdrop behind desktop portrait stage in fullscreen mode */
@@ -78,12 +85,14 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
   hintText,
   coverTopOverlay,
   coverFooterOverlay,
+  coverTemplate,
   fallbackBgColor = '#FAF6F0',
   backdropImage,
   className = '',
   children,
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const coverTheme = getCoverTheme(coverTemplate);
   const [isClosingCover, setIsClosingCover] = useState(false);
   const openTimerRef = useRef<number | null>(null);
 
@@ -199,11 +208,20 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
               className="relative w-full h-[100dvh] sm:h-[min(88vh,780px)] sm:max-w-[420px] sm:rounded-[38px] overflow-hidden shadow-2xl sm:ring-1 sm:ring-white/80 flex flex-col justify-end"
               style={{ backgroundColor: fallbackBgColor }}
             >
-              <CoverVideo
-                active={!isClosingCover}
-                fadingOut={isClosingCover}
-                className="sm:rounded-[38px]"
-              />
+              {coverTheme ? (
+                <AnimatedEnvelopeCover
+                  theme={coverTheme}
+                  hostNames={hostNames}
+                  fadingOut={isClosingCover}
+                  className="sm:rounded-[38px]"
+                />
+              ) : (
+                <CoverVideo
+                  active={!isClosingCover}
+                  fadingOut={isClosingCover}
+                  className="sm:rounded-[38px]"
+                />
+              )}
 
               {/* Bottom CTA Area — only "Taklifnomani ochish" button over video */}
               <div className="relative z-30 pb-8 sm:pb-7 px-5 flex flex-col items-center">
@@ -243,11 +261,20 @@ export const InvitationShell: React.FC<InvitationShellProps> = ({
           }`}
           style={{ backgroundColor: fallbackBgColor }}
         >
-          <CoverVideo
-            active={!isClosingCover}
-            fadingOut={isClosingCover}
-            className={frameRadiusClass}
-          />
+          {coverTheme ? (
+            <AnimatedEnvelopeCover
+              theme={coverTheme}
+              hostNames={hostNames}
+              fadingOut={isClosingCover}
+              className={frameRadiusClass}
+            />
+          ) : (
+            <CoverVideo
+              active={!isClosingCover}
+              fadingOut={isClosingCover}
+              className={frameRadiusClass}
+            />
+          )}
 
           {/* Bottom Floating "Taklifnomani ochish" Liquid Glass CTA */}
           <div

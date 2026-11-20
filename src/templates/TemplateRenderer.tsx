@@ -130,7 +130,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
   const localizedInvitation = getLocalizedInvitation(invitation, language);
 
   return (
-    <div style={{ fontStyle: undefined }}>
+    <div className="taklifim-template-root" style={{ fontStyle: undefined }}>
       <Component
         invitation={localizedInvitation}
         template={templateDef}

@@ -14,10 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let webhookSecret = '';
+  let acceptedSecrets: string[] = [];
   try {
     const envMod = await import('../_lib/env.js');
-    webhookSecret = envMod.getPaymentTelegramConfig().webhookSecret;
+    acceptedSecrets = envMod.getAcceptedTelegramWebhookSecrets();
   } catch (err: any) {
     console.error('Telegram webhook config load error:', { code: err?.code || 'ENV_LOAD_ERROR' });
     return res.status(401).json({ error: 'Unauthorized' });
@@ -25,10 +25,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const secretHeader = req.headers['x-telegram-bot-api-secret-token'];
   if (
-    !webhookSecret ||
+    acceptedSecrets.length === 0 ||
     typeof secretHeader !== 'string' ||
-    !timingSafeSecretEqual(webhookSecret, secretHeader)
+    !acceptedSecrets.some((secret) => timingSafeSecretEqual(secret, secretHeader))
   ) {
+    console.warn('Telegram webhook rejected: secret token mismatch. Open /api/telegram/setup-webhook to re-register.');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

@@ -237,12 +237,21 @@ async function startServer() {
     }
   });
 
-  app.post('/api/telegram/webhook', async (req: Request, res: Response) => {
+  app.post(['/api/telegram/webhook', '/api/telegram/login-webhook'], async (req: Request, res: Response) => {
     try {
       const { default: webhookHandler } = await import('./api/telegram/webhook.js');
       return await webhookHandler(req as any, res as any);
     } catch {
       return res.status(200).json({ status: 'ok' });
+    }
+  });
+
+  app.all('/api/telegram/setup-webhook', async (req: Request, res: Response) => {
+    try {
+      const { default: setupHandler } = await import('./api/telegram/setup-webhook.js');
+      return await setupHandler(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'Setup webhook failed' });
     }
   });
 

@@ -146,6 +146,7 @@ export const TemplateDetailPage: React.FC = () => {
                     style={{ backgroundColor: template.colorStyle.background }}
                   >
                     <InvitationShell
+                      coverTemplate={template.slug}
                       isOpened={isCoverOpened}
                       onOpen={() => setIsCoverOpened(true)}
                       enableConfetti={true}
@@ -241,6 +242,7 @@ export const TemplateDetailPage: React.FC = () => {
                     style={{ backgroundColor: template.colorStyle.background }}
                   >
                     <InvitationShell
+                      coverTemplate={template.slug}
                       isOpened={isCoverOpened}
                       onOpen={() => setIsCoverOpened(true)}
                       enableConfetti={true}
