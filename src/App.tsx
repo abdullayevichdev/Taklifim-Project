@@ -101,7 +101,9 @@ const AppContent: React.FC = () => {
   const { language } = useLanguage();
   const enableLgBackdrop = useCanUseLiquidGlass();
 
-  const routePath = path.split('?')[0];
+  // Ignore a trailing slash (/templates/ must open the catalog, not an empty template detail).
+  const rawRoutePath = path.split('?')[0].split('#')[0];
+  const routePath = rawRoutePath.length > 1 ? rawRoutePath.replace(/\/+$/, '') || '/' : rawRoutePath;
 
   // Determine if this is a dedicated guest-facing invitation page
   const isGuestInvitation = routePath.startsWith('/i/');

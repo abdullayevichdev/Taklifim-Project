@@ -32,9 +32,40 @@ export interface CoverVideoProps {
   onReady?: () => void;
 }
 
-const DEFAULT_POSTER = '/video/invitation-poster.jpg?v=4';
-const WEBM_SOURCE = '/video/invitation-loop.webm?v=4';
-const MP4_SOURCE = '/video/invitation-loop.mp4?v=4';
+// Phones get a ~1 MB 480p variant instead of the ~3.5 MB 720p one.
+const IS_SMALL_SCREEN =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(max-width: 767px)').matches;
+const DEFAULT_POSTER = IS_SMALL_SCREEN
+  ? '/video/invitation-poster-mobile.jpg?v=5'
+  : '/video/invitation-poster.jpg?v=4';
+const WEBM_SOURCE = IS_SMALL_SCREEN ? '/video/invitation-loop-mobile.webm?v=5' : '/video/invitation-loop.webm?v=4';
+const MP4_SOURCE = IS_SMALL_SCREEN ? '/video/invitation-loop-mobile.mp4?v=5' : '/video/invitation-loop.mp4?v=4';
+
+/** Slow mobile networks (2G/3G) keep the still poster only. */
+function isSlowConnection(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
+  return Boolean(conn?.effectiveType && /(^|-)(2g|3g)$/.test(conn.effectiveType));
+}
+
+/** Resolves once the page has loaded and the browser is idle, so the video never competes with first paint. */
+let pageReadyPromise: Promise<void> | null = null;
+function whenPageReady(): Promise<void> {
+  if (pageReadyPromise) return pageReadyPromise;
+  pageReadyPromise = new Promise<void>((resolve) => {
+    if (typeof window === 'undefined') return resolve();
+    const idle = () => {
+      const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+      if (w.requestIdleCallback) w.requestIdleCallback(() => resolve(), { timeout: 2500 });
+      else window.setTimeout(resolve, 800);
+    };
+    if (document.readyState === 'complete') idle();
+    else window.addEventListener('load', idle, { once: true });
+  });
+  return pageReadyPromise;
+}
 
 const VIDEO_STYLE: React.CSSProperties = {
   transform: 'translateZ(0)',
@@ -94,8 +125,19 @@ export const CoverVideo: React.FC<CoverVideoProps> = ({
   saveDataRef.current = saveData;
   autoplayBlockedRef.current = autoplayBlocked;
 
-  const isDisabledByEnv = reducedMotion || saveData;
-  const shouldMountVideo = hasIntersected && !isDisabledByEnv;
+  const [pageReady, setPageReady] = useState<boolean>(false);
+  useEffect(() => {
+    let cancelled = false;
+    whenPageReady().then(() => {
+      if (!cancelled) setPageReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isDisabledByEnv = reducedMotion || saveData || isSlowConnection();
+  const shouldMountVideo = pageReady && hasIntersected && !isDisabledByEnv;
 
   const releaseActiveController = () => {
     if (activeVideoController?.id === instanceIdRef.current) {
@@ -405,7 +447,7 @@ export const CoverVideo: React.FC<CoverVideoProps> = ({
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           poster={poster}
           controls={false}
           controlsList="nodownload noplaybackrate noremoteplayback"

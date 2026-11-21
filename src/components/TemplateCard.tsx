@@ -9,6 +9,8 @@ import { resolveCormorantFont } from '../utils/typography';
 interface TemplateCardProps {
   template: Template;
   priority?: boolean;
+  /** Compact 2-column layout on phones (catalog grid). */
+  compact?: boolean;
 }
 
 interface OverlayTheme {
@@ -84,7 +86,9 @@ function getOverlayTheme(template: Template): OverlayTheme {
   };
 }
 
-export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority = false }) => {
+export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority = false, compact = false }) => {
+  // Classes applied only on phones (< 640px) when the card sits in the 2-column catalog grid.
+  const m = (phoneClass: string) => (compact ? phoneClass : '');
   const { t, language } = useLanguage();
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -151,9 +155,9 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
         {/* Inner Typographic Sample Invitation Overlay */}
         <div
           aria-hidden="true"
-          className="absolute inset-x-[15%] inset-y-[18%] flex items-center justify-center pointer-events-none select-none z-[3]"
+          className={`absolute inset-x-[15%] inset-y-[18%] flex items-center justify-center pointer-events-none select-none z-[3] ${m('max-sm:inset-x-[12%]')}`}
         >
-          <div className={`w-full rounded-2xl px-3 py-3 text-center ${overlay.boxClass}`}>
+          <div className={`w-full rounded-2xl px-3 py-3 text-center ${overlay.boxClass} ${m('max-sm:px-1.5 max-sm:py-2 max-sm:rounded-xl')}`}>
             <span
               className="block text-[8.5px] sm:text-[9px] font-extrabold uppercase tracking-[0.16em] truncate"
               style={{ color: overlay.eyebrowColor }}
@@ -162,7 +166,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
             </span>
 
             <p
-              className="mt-1.5 text-[16px] sm:text-[17px] font-bold leading-snug tracking-tight"
+              className={`mt-1.5 text-[16px] sm:text-[17px] font-bold leading-snug tracking-tight ${m('max-sm:text-[12px] max-sm:mt-1')}`}
               style={{
                 fontFamily: resolveCormorantFont(template.typography.headingFont),
                 color: overlay.headingColor,
@@ -171,7 +175,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
               {t.hero.sampleGroomBride}
             </p>
 
-            <div className="my-2 flex items-center justify-center gap-1.5">
+            <div className={`my-2 flex items-center justify-center gap-1.5 ${m('max-sm:my-1')}`}>
               <span className="w-5 h-px" style={{ backgroundColor: overlay.dividerColor }} />
               <span
                 className="w-1 h-1 rounded-full"
@@ -187,7 +191,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
               {t.templatesSection.sampleDateShort}
             </p>
             <p
-              className="text-[9.5px] font-medium truncate mt-0.5"
+              className={`text-[9.5px] font-medium truncate mt-0.5 ${m('max-sm:hidden')}`}
               style={{ color: overlay.metaColor }}
             >
               {t.templatesSection.sampleVenueShort}
@@ -197,7 +201,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
 
         {/* Top-Left Badges (Popular & New side-by-side cleanly) */}
         {(template.isPopular || template.isNew) && (
-          <div className="absolute top-3 left-3 z-[4] flex flex-nowrap items-center gap-1.5 max-w-[calc(100%-90px)]">
+          <div className={`absolute top-3 left-3 z-[4] flex flex-nowrap items-center gap-1.5 max-w-[calc(100%-90px)] ${m('max-sm:top-2 max-sm:left-2 max-sm:max-w-[calc(100%-16px)] max-sm:[&>*:nth-child(n+2)]:hidden')}`}>
             {template.isPopular && (
               <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide bg-gradient-to-br from-[#FFE5EF]/95 to-[#F9C6D9]/90 text-[#7A143A] border border-white/95 shadow-[0_4px_12px_-2px_rgba(198,72,115,0.22),inset_0_1px_0_rgba(255,255,255,1)] whitespace-nowrap">
                 {t.templatesSection.popular}
@@ -212,14 +216,14 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
         )}
 
         {/* Top-Right Quiet Sample Tag */}
-        <div className="absolute top-3 right-3 z-[4]">
+        <div className={`absolute top-3 right-3 z-[4] ${m('max-sm:hidden')}`}>
           <span className="px-2 py-0.5 rounded-full text-[9.5px] font-semibold bg-white/88 text-[#4A383F] border border-white/95 shadow-xs whitespace-nowrap">
             {t.templatesSection.exampleBadge}
           </span>
         </div>
 
         {/* Bottom-Right Liquid Glass Price Pill */}
-        <div className="absolute bottom-3 right-3 z-[4]">
+        <div className={`absolute bottom-3 right-3 z-[4] ${m('max-sm:bottom-2 max-sm:right-2')}`}>
           <span className="glass-price-pill inline-flex items-center px-3 py-1 rounded-full text-[11px] font-extrabold tabular-nums tracking-tight whitespace-nowrap">
             {formatPriceUZS(template.price, language)}
           </span>
@@ -227,7 +231,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
       </div>
 
       {/* Card Body */}
-      <div className="flex-1 flex flex-col p-4 xl:p-5 relative z-10">
+      <div className={`flex-1 flex flex-col p-4 xl:p-5 relative z-10 ${m('max-sm:p-2.5')}`}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] uppercase font-extrabold tracking-wider text-[#9E3E60] truncate">
             {categoryLabel}
@@ -246,21 +250,21 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
 
         <h3
           title={template.name}
-          className="font-playfair text-[17px] xl:text-lg font-bold text-[#1E1418] truncate mt-1"
+          className={`font-playfair text-[17px] xl:text-lg font-bold text-[#1E1418] truncate mt-1 ${m('max-sm:text-[14px] max-sm:mt-0.5')}`}
         >
           {template.name}
         </h3>
 
-        <p className="text-xs text-[#4A383F] line-clamp-2 min-h-[2.75rem] leading-[1.52] mt-1.5">
+        <p className={`text-xs text-[#4A383F] line-clamp-2 min-h-[2.75rem] leading-[1.52] mt-1.5 ${m('max-sm:hidden')}`}>
           {description}
         </p>
 
         {/* Uniform Bottom Action Row */}
-        <div className="mt-auto pt-3.5 border-t border-[#1E1418]/8 grid grid-cols-2 gap-2">
+        <div className={`mt-auto pt-3.5 border-t border-[#1E1418]/8 grid grid-cols-2 gap-2 ${m('max-sm:grid-cols-1 max-sm:pt-2 max-sm:mt-2 max-sm:gap-1.5')}`}>
           <Link
             to={`/templates/${template.slug}`}
             aria-label={`${t.templatesSection.shortPreview}: ${template.name}`}
-            className="min-h-[44px] px-2.5 py-2 rounded-2xl text-xs font-bold text-[#1E1418] bg-white/75 hover:bg-white border border-white/95 shadow-[0_6px_16px_-6px_rgba(30,20,24,0.12),inset_0_1px_0_rgba(255,255,255,1)] transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]"
+            className={`min-h-[44px] ${m('max-sm:min-h-[40px]')} px-2.5 py-2 rounded-2xl text-xs font-bold text-[#1E1418] bg-white/75 hover:bg-white border border-white/95 shadow-[0_6px_16px_-6px_rgba(30,20,24,0.12),inset_0_1px_0_rgba(255,255,255,1)] transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]`}
           >
             <Eye className="w-3.5 h-3.5 text-[#2E6FA3] shrink-0" aria-hidden="true" />
             <span>{t.templatesSection.shortPreview}</span>
@@ -269,7 +273,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ template, priority =
           <Link
             to={`/create/${template.slug}`}
             aria-label={`${t.templatesSection.selectShort}: ${template.name}`}
-            className="min-h-[44px] px-2.5 py-2 rounded-2xl text-xs font-extrabold text-white bg-gradient-to-br from-[#D6517F] via-[#C64873] to-[#A7325B] hover:brightness-105 border border-white/60 shadow-[0_10px_22px_-8px_rgba(198,72,115,0.45),inset_0_1px_0_rgba(255,255,255,0.55)] transition-all flex items-center justify-center gap-1 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]"
+            className={`min-h-[44px] ${m('max-sm:min-h-[40px]')} px-2.5 py-2 rounded-2xl text-xs font-extrabold text-white bg-gradient-to-br from-[#D6517F] via-[#C64873] to-[#A7325B] hover:brightness-105 border border-white/60 shadow-[0_10px_22px_-8px_rgba(198,72,115,0.45),inset_0_1px_0_rgba(255,255,255,0.55)] transition-all flex items-center justify-center gap-1 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C64873]`}
           >
             <span>{t.templatesSection.selectShort}</span>
             <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
