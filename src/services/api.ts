@@ -718,11 +718,9 @@ export const api = {
       finalSlug = await this.generateUniqueSlug(groom, bride, data.id);
     }
 
-    const resolvedOwnerId = authUid
-      ? isFallbackLocalId(data.ownerId)
-        ? authUid
-        : data.ownerId!
-      : data.ownerId || 'anonymous';
+    // A signed-in user can only ever save invitations under their own uid
+    // (RTDB rules reject anything else, and stale drafts of another account must not leak in).
+    const resolvedOwnerId = authUid ? authUid : data.ownerId || 'anonymous';
 
     const resolvedOwnerUid = authUid
       ? authUid

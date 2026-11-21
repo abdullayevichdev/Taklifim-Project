@@ -20,6 +20,57 @@ import type { Language } from '../types';
 const getAuthT = () => translations[getStoredLanguage()]?.auth || translations.uz.auth;
 
 const ACTIVE_USER_STORAGE_KEY = 'taklifim_active_user';
+const CACHE_OWNER_STORAGE_KEY = 'taklifim_cache_owner_uid';
+const BUILDER_DRAFT_STORAGE_KEY = 'taklifim_builder_draft';
+const USER_SCOPED_CACHE_KEYS = [
+  'taklifim_demo_invitations',
+  'taklifim_demo_guests',
+  'taklifim_demo_orders',
+];
+
+/**
+ * Removes the builder draft when it belongs to an account other than `nextUid`
+ * (with `nextUid === null`, any owned draft is removed). Guest drafts without an owner
+ * are kept so signing in can claim them.
+ */
+function dropForeignBuilderDraft(nextUid: string | null): void {
+  try {
+    const raw = localStorage.getItem(BUILDER_DRAFT_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { ownerId?: string; ownerUid?: string; orderId?: string } | null;
+    const owner = parsed?.ownerUid || parsed?.ownerId || '';
+    const ownedByOther = Boolean(owner) && owner !== 'anonymous' && owner !== nextUid;
+    // A guest draft that already has an order attached can only belong to someone who was logged in.
+    const orphanOrder = !owner && Boolean(parsed?.orderId);
+    if (ownedByOther || orphanOrder) {
+      localStorage.removeItem(BUILDER_DRAFT_STORAGE_KEY);
+    }
+  } catch {
+    try {
+      localStorage.removeItem(BUILDER_DRAFT_STORAGE_KEY);
+    } catch {}
+  }
+}
+
+/**
+ * Keeps browser caches strictly per-account: when a different user signs in on the same
+ * browser (or the user signs out), invitations / orders / drafts of the previous account
+ * must never be shown or re-submitted under the new account.
+ */
+function scopeLocalCachesToUser(nextUid: string | null): void {
+  try {
+    const previousUid = localStorage.getItem(CACHE_OWNER_STORAGE_KEY);
+    if (previousUid !== nextUid) {
+      USER_SCOPED_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
+    }
+    dropForeignBuilderDraft(nextUid);
+    if (nextUid) {
+      localStorage.setItem(CACHE_OWNER_STORAGE_KEY, nextUid);
+    } else {
+      localStorage.removeItem(CACHE_OWNER_STORAGE_KEY);
+    }
+  } catch {}
+}
 
 export type AuthProviderId = 'google' | 'apple';
 
@@ -284,6 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsub = onAuthStateChanged(authInstance, async (fbUser) => {
       if (!isMounted) return;
       if (fbUser) {
+        scopeLocalCachesToUser(fbUser.uid);
         setHasFirebaseSession(true);
         try {
           await syncFirebaseUserProfile(fbUser);
@@ -291,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isMounted) setAuthReady(true);
         }
       } else {
+        scopeLocalCachesToUser(null);
         setHasFirebaseSession(false);
         setUser(null);
         writeStoredUser(null);
@@ -321,6 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { success: false, message: msg };
         }
 
+        scopeLocalCachesToUser(res.user.uid);
         setHasFirebaseSession(true);
         const resolvedUser = await syncFirebaseUserProfile(res.user);
         showToast(
@@ -378,6 +432,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signOut(auth);
       } catch {}
     }
+    scopeLocalCachesToUser(null);
+    try {
+      localStorage.removeItem(BUILDER_DRAFT_STORAGE_KEY);
+    } catch {}
     setHasFirebaseSession(false);
     setUser(null);
     writeStoredUser(null);

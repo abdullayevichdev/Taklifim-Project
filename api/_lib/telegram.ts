@@ -1,4 +1,4 @@
-import { getPaymentTelegramConfig } from './env.js';
+import { getPaymentTelegramConfig, getTelegramWebhookRegistrationSecret } from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
 import { decideOrderPayment } from './firebaseAdmin.js';
 
@@ -110,9 +110,15 @@ async function handleAdminCallbackQuery(callback: any): Promise<void> {
   const callbackId = callback.id;
   const callbackData = callback.data || '';
   const message = callback.message;
-  const fromChatId = String(callback.message?.chat?.id ?? callback.from?.id ?? '');
+  const messageChatId = String(callback.message?.chat?.id ?? '');
+  const pressedById = String(callback.from?.id ?? '');
+  const hasAdminChat =
+    Boolean(adminChatId) && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && adminChatId !== 'MOCK_ADMIN_CHAT_ID';
+  // The admin chat may be a private chat (id === presser id) or a group (id === message chat id).
+  const isAdminPress =
+    hasAdminChat && (messageChatId === String(adminChatId) || pressedById === String(adminChatId));
 
-  if (adminChatId && adminChatId !== 'YOUR_ADMIN_CHAT_ID' && adminChatId !== 'MOCK_ADMIN_CHAT_ID' && fromChatId !== String(adminChatId)) {
+  if (!isAdminPress) {
     try {
       await tgPaymentApi('answerCallbackQuery', {
         callback_query_id: callbackId,
@@ -169,12 +175,18 @@ async function handleAdminCallbackQuery(callback: any): Promise<void> {
       });
       return;
     }
-    const originalCaption = message?.caption || message?.text || '';
+    // Telegram returns the caption as plain text; escape it before re-sending with parse_mode=HTML,
+    // otherwise names containing "<" or "&" make the edit fail.
+    const originalCaption = escapeTelegramHtml(message?.caption || message?.text || '');
     const statusBadge =
       action === 'confirm'
         ? `\n\n✅ <b>TO'LOV TASDIQLANDI</b> (Admin: ${adminName})`
         : `\n\n❌ <b>TO'LOV RAD ETILDI</b> (Admin: ${adminName})`;
-    const updatedCaption = originalCaption + statusBadge;
+    let updatedCaption = originalCaption + statusBadge;
+    const captionLimit = message?.caption !== undefined ? 1024 : 4096;
+    if (updatedCaption.length > captionLimit) {
+      updatedCaption = originalCaption.slice(0, Math.max(0, captionLimit - statusBadge.length - 3)) + '...' + statusBadge;
+    }
 
     if (message?.caption !== undefined) {
       await tgPaymentApi('editMessageCaption', {
@@ -235,7 +247,92 @@ export async function handlePaymentBotWebhookUpdate(update: any): Promise<void> 
   if (!update || typeof update !== 'object') return;
   if (update.callback_query) {
     await handlePaymentTelegramUpdate(update);
+    return;
   }
+
+  // /start or /id in any chat → reply with that chat's id (helps set TELEGRAM_ADMIN_CHAT_ID).
+  const msg = update.message;
+  const text = typeof msg?.text === 'string' ? msg.text.trim() : '';
+  if (msg?.chat?.id !== undefined && /^\/(start|id)(@\w+)?$/i.test(text)) {
+    const { adminChatId } = getPaymentTelegramConfig();
+    const isAdminChat = String(msg.chat.id) === String(adminChatId);
+    await tgPaymentApi('sendMessage', {
+      chat_id: msg.chat.id,
+      parse_mode: 'HTML',
+      text:
+        `🆔 Chat ID: <code>${escapeTelegramHtml(msg.chat.id)}</code>\n` +
+        (isAdminChat
+          ? "✅ Bu chat admin sifatida sozlangan. To'lov cheklari shu yerga keladi."
+          : "ℹ️ To'lov cheklari shu chatga kelishi uchun ushbu ID ni TELEGRAM_ADMIN_CHAT_ID sifatida kiriting."),
+    });
+  }
+}
+
+const WEBHOOK_ENSURE_TTL_MS = 10 * 60 * 1000;
+let lastWebhookEnsure: { url: string; at: number } = { url: '', at: 0 };
+
+/**
+ * Makes sure the payment bot webhook points to `${baseUrl}/api/telegram/webhook` with the
+ * current secret. Without a correct webhook the "✅ Tasdiqlash / ❌ Rad etish" buttons do nothing.
+ * Called before each receipt is sent, so the buttons on that message always work.
+ */
+export async function ensurePaymentBotWebhook(
+  baseUrl: string,
+  options?: { force?: boolean }
+): Promise<{ ok: boolean; changed: boolean; url?: string; error?: string }> {
+  const { botToken } = getPaymentTelegramConfig();
+  const secret = getTelegramWebhookRegistrationSecret();
+  if (!botToken || botToken === 'MOCK_BOT_TOKEN' || !secret || !/^https:\/\//i.test(baseUrl || '')) {
+    return { ok: false, changed: false, error: 'Webhook cannot be registered (missing token, secret or https URL).' };
+  }
+
+  const url = `${baseUrl.replace(/\/+$/, '')}/api/telegram/webhook`;
+  if (
+    !options?.force &&
+    lastWebhookEnsure.url === url &&
+    Date.now() - lastWebhookEnsure.at < WEBHOOK_ENSURE_TTL_MS
+  ) {
+    return { ok: true, changed: false, url };
+  }
+
+  const info = await tgApiWithToken(botToken, 'getWebhookInfo', {}, 5000);
+  const current = info?.result || {};
+  const allowed = current.allowed_updates;
+  const lastErrorAgeSec = current.last_error_date
+    ? Date.now() / 1000 - Number(current.last_error_date)
+    : Infinity;
+  const needsRegister =
+    Boolean(options?.force) ||
+    !info?.ok ||
+    current.url !== url ||
+    lastErrorAgeSec < 6 * 3600 ||
+    (Array.isArray(allowed) && allowed.length > 0 && !allowed.includes('callback_query'));
+
+  if (!needsRegister) {
+    lastWebhookEnsure = { url, at: Date.now() };
+    return { ok: true, changed: false, url };
+  }
+
+  const setResult = await tgApiWithToken(
+    botToken,
+    'setWebhook',
+    {
+      url,
+      secret_token: secret,
+      allowed_updates: ['callback_query', 'message'],
+      max_connections: 20,
+    },
+    6000
+  );
+  if (!setResult?.ok) {
+    console.error('Telegram setWebhook failed:', {
+      error_code: setResult?.error_code,
+      description: setResult?.description,
+    });
+    return { ok: false, changed: false, url, error: setResult?.description || 'setWebhook failed' };
+  }
+  lastWebhookEnsure = { url, at: Date.now() };
+  return { ok: true, changed: true, url };
 }
 
 export async function handleTelegramUpdate(update: any): Promise<void> {

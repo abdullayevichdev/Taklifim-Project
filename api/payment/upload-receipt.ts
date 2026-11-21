@@ -8,6 +8,34 @@ import {
 } from '../_lib/firebaseAdmin.js';
 import { cleanAndValidateUzPhone } from '../_lib/phone.js';
 import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
+import { ensurePaymentBotWebhook } from '../_lib/telegram.js';
+import { getPublicSiteUrl, getTelegramRuntimeEnv } from '../_lib/env.js';
+
+/** Public https base URL of this deployment (skips localhost and Vercel preview deployments). */
+function resolveWebhookBaseUrl(req: VercelRequest): string {
+  if (getTelegramRuntimeEnv() === 'preview') return '';
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || '';
+  const host = (first(req.headers['x-forwarded-host']) || first(req.headers.host)).split(',')[0].trim();
+  if (host && !/^(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test(host)) {
+    return `https://${host}`;
+  }
+  const site = getPublicSiteUrl();
+  return /^https:\/\//i.test(site) && !/localhost|127\.0\.0\.1/i.test(site) ? site : '';
+}
+
+/** Re-registers the bot webhook if needed so the admin's confirm/reject buttons reach this server. */
+async function ensureWebhookQuietly(req: VercelRequest): Promise<void> {
+  const base = resolveWebhookBaseUrl(req);
+  if (!base) return;
+  try {
+    await Promise.race([
+      ensurePaymentBotWebhook(base),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+  } catch (err: any) {
+    console.warn('Telegram webhook ensure note:', err?.message || err);
+  }
+}
 
 /** Max decoded image ~1.5MB; base64 string ceiling with margin under Vercel ~4.5MB body. */
 const MAX_IMAGE_BASE64_CHARS = Math.ceil(1.5 * 1024 * 1024 * 1.4);
@@ -128,6 +156,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : idempotencyKey
         ? String(idempotencyKey)
         : undefined;
+
+    await ensureWebhookQuietly(req);
 
     const result = await processUploadReceipt({
       verifiedUid: authUser.uid,
