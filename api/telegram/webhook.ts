@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 import crypto from 'node:crypto';
 
 function timingSafeSecretEqual(expected: string, provided: string): boolean {

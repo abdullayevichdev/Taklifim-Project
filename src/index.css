@@ -1616,3 +1616,15 @@ html.taklifim-modal-open .taklifim-bottom-nav {
 .builder-section-toggle[aria-expanded="true"] + * > div:first-child > div:first-child > h3.font-playfair:first-child {
   display: none;
 }
+
+/* Phones & touch tablets: no live backdrop blur anywhere (incl. Tailwind backdrop-blur-* utilities).
+ * Per-frame offscreen blurs are the main cause of janky scrolling on mid/low-end phones;
+ * every surface already has an opaque-enough fill, so the look stays the same. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  *,
+  *::before,
+  *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}

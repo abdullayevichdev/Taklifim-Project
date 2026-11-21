@@ -224,9 +224,10 @@ export const TemplatesPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr gap-5 lg:gap-6 items-stretch relative z-10">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:auto-rows-fr gap-3 sm:gap-5 lg:gap-6 items-stretch relative z-10">
               {filteredTemplates.map((template, idx) => (
                 <TemplateCard
+                  compact
                   key={template.id}
                   template={template}
                   priority={idx < 2}

@@ -511,9 +511,12 @@ export const HomePage: React.FC = () => {
 
         {/* Rich pastel gradient mesh behind cards */}
         <div className="taklifim-section-mesh">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr gap-5 lg:gap-6 items-stretch relative z-10">
+          {/* Phones: one swipeable row (like the desktop row) instead of 8 full-screen cards stacked vertically */}
+          <div className="flex sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:auto-rows-fr gap-4 sm:gap-5 lg:gap-6 items-stretch relative z-10 overflow-x-auto sm:overflow-visible snap-x snap-mandatory scroll-px-4 sm:scroll-px-0 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 sm:pb-0 overscroll-x-contain">
             {featuredTemplates.map((template, idx) => (
-              <TemplateCard key={template.id} template={template} priority={idx < 2} />
+              <div key={template.id} className="w-[78vw] max-w-[320px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:shrink">
+                <TemplateCard template={template} priority={idx < 2} />
+              </div>
             ))}
           </div>
         </div>

@@ -1,25 +1,23 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
-import {defineConfig} from 'vite';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite';
 
-export default defineConfig(() => {
-  return {
-    plugins: [react(), tailwindcss()],
-    resolve: {
-      alias: {
-        '@': path.resolve(import.meta.dirname || __dirname, '.'),
-      },
+const disableHmr = process.env.DISABLE_HMR === 'true';
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('.', import.meta.url)),
     },
-    server: {
-      port: 3000,
-      host: '0.0.0.0',
-      allowedHosts: true as const,
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
-    },
-  };
+  },
+  server: {
+    port: 3000,
+    host: '0.0.0.0',
+    allowedHosts: true,
+    // HMR / file watching can be disabled (DISABLE_HMR=true) to avoid flicker while files are edited by tools.
+    hmr: !disableHmr,
+    watch: disableHmr ? null : {},
+  },
 });
