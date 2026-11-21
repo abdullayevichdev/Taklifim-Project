@@ -11,6 +11,7 @@ import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { InvitationShell } from '../components/InvitationShell';
 import { LocationPickerMap } from '../components/LocationPickerMap';
+import { yandexPlaceUrl } from '../utils/mapLinks';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
 import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
@@ -227,6 +228,7 @@ export const BuilderPage: React.FC = () => {
   const [contactPhone, setContactPhone] = useState<string>('');
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const receiptSubmitLockRef = useRef<boolean>(false);
+  const lastMapToastRef = useRef<string>('');
   const existingSlugsRef = useRef<Set<string>>(new Set());
   const isSlugManualRef = useRef<boolean>(Boolean(queryInvitationId));
   const isTitleManualRef = useRef<boolean>(Boolean(queryInvitationId));
@@ -2411,24 +2413,30 @@ export const BuilderPage: React.FC = () => {
                       📍 {invitationState.venueLocationType === 'home' ? t.builder.venueMapHomeLabel : t.builder.venueMapHallLabel}
                     </label>
                     <LocationPickerMap
-                      latitude={invitationState.latitude || 41.3217}
-                      longitude={invitationState.longitude || 69.2415}
+                      latitude={invitationState.latitude}
+                      longitude={invitationState.longitude}
                       language={language}
-                      onLocationSelect={(lat, lng, detectedAddress) => {
+                      onLocationSelect={(lat, lng, detectedAddress, sourceLink) => {
                         setInvitationState((p) => {
                           const updated = {
                             ...p,
                             latitude: lat,
                             longitude: lng,
                             venueAddress: detectedAddress || p.venueAddress,
-                            mapUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+                            mapUrl: sourceLink || yandexPlaceUrl({ lat, lng }),
                           };
                           try {
-                            localStorage.setItem('taklifim_builder_draft', JSON.stringify(updated));
+                            if (!queryInvitationId) {
+                              localStorage.setItem('taklifim_builder_draft', JSON.stringify(updated));
+                            }
                           } catch {}
                           return updated;
                         });
-                        showToast(`${t.builder.toasts.mapPointSet} 📍 (${lat}, ${lng})`, 'success');
+                        const pointKey = `${lat},${lng}`;
+                        if (lastMapToastRef.current !== pointKey) {
+                          lastMapToastRef.current = pointKey;
+                          showToast(`${t.builder.toasts.mapPointSet} 📍`, 'success');
+                        }
                       }}
                     />
                   </div>

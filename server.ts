@@ -38,6 +38,15 @@ async function startServer() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+  app.get('/api/maps/resolve', async (req: Request, res: Response) => {
+    try {
+      const { default: resolveHandler } = await import('./api/maps/resolve.js');
+      return await resolveHandler(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'RESOLVE_FAILED' });
+    }
+  });
+
   app.all('/api/health/config', async (req: Request, res: Response) => {
     try {
       const { default: healthHandler } = await import('./api/health/config.js');

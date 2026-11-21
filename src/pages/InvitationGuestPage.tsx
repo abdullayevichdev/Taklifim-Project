@@ -8,7 +8,7 @@ import { api } from '../services/api';
 import { calculateCountdown, validateRSVPForm } from '../utils/logic';
 import { ShareModal } from '../components/ShareModal';
 import { MusicPlayer } from '../components/MusicPlayer';
-import { InteractiveMap } from '../components/InteractiveMap';
+import { VenueMap } from '../components/VenueMap';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
@@ -889,18 +889,12 @@ export const InvitationGuestPage: React.FC = () => {
               date: g.submittedAt || '',
             }))}
           interactiveMap={
-            invitation.latitude && invitation.longitude ? (
-              <div className="rounded-2xl overflow-hidden shadow-inner border border-black/5 aspect-[16/10] w-full">
-                <iframe
-                  title="Google Maps"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  src={`https://maps.google.com/maps?q=${invitation.latitude},${invitation.longitude}&z=15&output=embed`}
-                />
-              </div>
-            ) : undefined
+            <VenueMap
+              latitude={invitation.latitude}
+              longitude={invitation.longitude}
+              query={[invitation.venueName, invitation.venueAddress, invitation.city].filter(Boolean).join(', ')}
+              language={invLang}
+            />
           }
         />
 
