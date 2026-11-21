@@ -154,15 +154,50 @@ export function getPaymentTelegramConfig() {
   };
 }
 
+const TELEGRAM_SECRET_TOKEN_RE = /^[A-Za-z0-9_-]{1,256}$/;
+
+/**
+ * Telegram only accepts secret_token values made of A-Z, a-z, 0-9, "_" and "-".
+ * A secret with any other character (spaces, "!", "#", ...) makes setWebhook fail, so the
+ * buttons silently stop working. Such secrets are mapped to a deterministic hex digest.
+ */
+export function toTelegramSecretToken(raw: string): string {
+  const clean = cleanEnvString(raw);
+  if (!clean) return '';
+  if (TELEGRAM_SECRET_TOKEN_RE.test(clean)) return clean;
+  return crypto.createHash('sha256').update(clean, 'utf8').digest('hex');
+}
+
+/** Secret derived from the bot token, used when TELEGRAM_WEBHOOK_SECRET is not configured. */
+function deriveSecretFromBotToken(botToken: string): string {
+  if (!botToken || botToken === 'MOCK_BOT_TOKEN') return '';
+  return crypto.createHash('sha256').update(`tashrifim-webhook:${botToken}`, 'utf8').digest('hex');
+}
+
+/**
+ * The secret_token registered with Telegram's setWebhook (always Telegram-compatible).
+ * TELEGRAM_WEBHOOK_SECRET first; otherwise a value derived from TELEGRAM_BOT_TOKEN.
+ */
+export function getTelegramWebhookRegistrationSecret(): string {
+  const raw = cleanEnvString(process.env.TELEGRAM_WEBHOOK_SECRET);
+  if (raw) return toTelegramSecretToken(raw);
+  return deriveSecretFromBotToken(cleanEnvString(process.env.TELEGRAM_BOT_TOKEN));
+}
+
 /**
  * Webhook secrets accepted on /api/telegram/webhook.
  * TELEGRAM_WEBHOOK_SECRET is primary; TELEGRAM_LOGIN_WEBHOOK_SECRET is still accepted so a bot
  * webhook that was registered earlier with the (removed) login secret keeps delivering button presses.
  */
 export function getAcceptedTelegramWebhookSecrets(): string[] {
-  const secrets = [
+  const rawSecrets = [
     cleanEnvString(process.env.TELEGRAM_WEBHOOK_SECRET),
     cleanEnvString(process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET),
+  ].filter(Boolean);
+  const secrets = [
+    ...rawSecrets,
+    ...rawSecrets.map(toTelegramSecretToken),
+    getTelegramWebhookRegistrationSecret(),
   ].filter(Boolean);
   return Array.from(new Set(secrets));
 }

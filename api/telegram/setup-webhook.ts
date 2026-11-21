@@ -24,19 +24,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   res.setHeader('Cache-Control', 'no-store');
 
-  const { getPaymentTelegramConfig, getPublicSiteUrl } = await import('../_lib/env.js');
-  const { botToken, webhookSecret } = getPaymentTelegramConfig();
+  const { getPaymentTelegramConfig, getPublicSiteUrl, getAcceptedTelegramWebhookSecrets, getTelegramWebhookRegistrationSecret } =
+    await import('../_lib/env.js');
+  const { botToken } = getPaymentTelegramConfig();
+  const webhookSecret = getTelegramWebhookRegistrationSecret();
 
   if (!botToken || botToken === 'MOCK_BOT_TOKEN') {
     return res.status(500).json({ ok: false, error: 'TELEGRAM_BOT_TOKEN is not set on the server.' });
   }
-  if (!webhookSecret) {
-    return res.status(500).json({ ok: false, error: 'TELEGRAM_WEBHOOK_SECRET is not set on the server.' });
-  }
 
+  // ?key= may be TELEGRAM_WEBHOOK_SECRET or, when no secret is configured, the bot token itself.
   const key = typeof req.query.key === 'string' ? req.query.key : '';
-  if (!safeEqual(webhookSecret, key)) {
-    return res.status(401).json({ ok: false, error: 'Invalid key. Use ?key=<TELEGRAM_WEBHOOK_SECRET>.' });
+  const validKeys = [...getAcceptedTelegramWebhookSecrets(), botToken].filter(Boolean);
+  if (!validKeys.some((k) => safeEqual(k, key))) {
+    return res.status(401).json({
+      ok: false,
+      error: 'Invalid key. Use ?key=<TELEGRAM_WEBHOOK_SECRET> (or ?key=<TELEGRAM_BOT_TOKEN>).',
+    });
   }
 
   const tg = async (method: string, body?: Record<string, unknown>) => {

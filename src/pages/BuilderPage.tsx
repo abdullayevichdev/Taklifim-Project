@@ -133,6 +133,28 @@ function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | n
   return null;
 }
 
+/** Legacy offline ids that were never real Firebase accounts. */
+function isLegacyLocalOwnerId(id: string): boolean {
+  return /^(usr_|phone_|google_|apple_|tg_|telegram_)/.test(id);
+}
+
+/** True when a cached builder draft belongs to an account other than `uid`. */
+function isDraftForeignToUser(
+  draft: Pick<InvitationData, 'ownerId' | 'ownerUid' | 'orderId'> | null | undefined,
+  uid: string | undefined
+): boolean {
+  if (!draft) return false;
+  const owners = [draft.ownerUid, draft.ownerId].filter(
+    (v): v is string =>
+      typeof v === 'string' && v !== '' && v !== 'anonymous' && !isLegacyLocalOwnerId(v)
+  );
+  if (owners.length > 0) {
+    return !uid || owners.some((o) => o !== uid);
+  }
+  // An order can only be created while signed in, so an ownerless draft with an order is stale.
+  return Boolean(draft.orderId);
+}
+
 export const BuilderPage: React.FC = () => {
   const { params, navigate } = useRouter();
   const { t, language } = useLanguage();
@@ -212,59 +234,7 @@ export const BuilderPage: React.FC = () => {
   const sessionSlugCodeRef = useRef<string>(generate4DigitCode());
   const orderTransitionBaselineRef = useRef<string | null>(null);
 
-  // Main Builder State (Live reactive)
-  const [invitationState, setInvitationState] = useState<InvitationData>(() => {
-    // Only hydrate local draft when NOT explicitly opening a specific ?invitationId=...
-    if (!queryInvitationId) {
-      try {
-        const draft = localStorage.getItem('taklifim_builder_draft');
-        if (draft) {
-          const parsed = JSON.parse(draft);
-          const healed = healStaleBuilderDraft(parsed);
-          if (healed.startTime) {
-            healed.startTime = normalizeTime24h(healed.startTime, '18:00');
-          }
-          if (Array.isArray(healed.schedule)) {
-            healed.schedule = healed.schedule.map((item: ScheduleItem) => ({
-              ...item,
-              time: normalizeTime24h(item.time, '18:00'),
-            }));
-          }
-          const tailMatch = typeof healed.slug === 'string' ? healed.slug.match(/-(\d{4})$/) : null;
-          if (tailMatch) {
-            sessionSlugCodeRef.current = tailMatch[1];
-          }
-          if (params.templateSlug) {
-            const matchResolved = resolveTemplate(params.templateSlug, mockTemplates);
-            if (matchResolved) {
-              const matchTpl = matchResolved.template;
-              if (
-                healed.templateSlug !== matchResolved.templateSlug ||
-                healed.templateId !== matchResolved.templateId
-              ) {
-                healed.templateId = matchResolved.templateId;
-                healed.templateSlug = matchResolved.templateSlug;
-                healed.coverImage = matchTpl.previewImage;
-                healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
-                healed.customColors = { ...matchTpl.colorStyle };
-                healed.customFonts = {
-                  heading: matchTpl.typography.headingFont,
-                  body: matchTpl.typography.bodyFont,
-                };
-              }
-            } else {
-              // Invalid URL template slug must NOT silently inherit a cached or default template
-              healed.templateId = '';
-              healed.templateSlug = params.templateSlug;
-            }
-          }
-          return healed;
-        }
-      } catch {
-        // ignore
-      }
-    }
-
+  const createFreshInvitation = (): InvitationData => {
     const initialCode = sessionSlugCodeRef.current;
     const initResolved = resolveTemplate(params.templateSlug, mockTemplates);
     const seedTemplate = initResolved?.template || mockTemplates[0];
@@ -343,6 +313,62 @@ export const BuilderPage: React.FC = () => {
         body: seedTemplate.typography.bodyFont,
       },
     };
+  };
+
+  // Main Builder State (Live reactive)
+  const [invitationState, setInvitationState] = useState<InvitationData>(() => {
+    // Only hydrate local draft when NOT explicitly opening a specific ?invitationId=...
+    if (!queryInvitationId) {
+      try {
+        const draft = localStorage.getItem('taklifim_builder_draft');
+        if (draft) {
+          const parsed = JSON.parse(draft);
+          const healed = healStaleBuilderDraft(parsed);
+          if (healed.startTime) {
+            healed.startTime = normalizeTime24h(healed.startTime, '18:00');
+          }
+          if (Array.isArray(healed.schedule)) {
+            healed.schedule = healed.schedule.map((item: ScheduleItem) => ({
+              ...item,
+              time: normalizeTime24h(item.time, '18:00'),
+            }));
+          }
+          const tailMatch = typeof healed.slug === 'string' ? healed.slug.match(/-(\d{4})$/) : null;
+          if (tailMatch) {
+            sessionSlugCodeRef.current = tailMatch[1];
+          }
+          if (params.templateSlug) {
+            const matchResolved = resolveTemplate(params.templateSlug, mockTemplates);
+            if (matchResolved) {
+              const matchTpl = matchResolved.template;
+              if (
+                healed.templateSlug !== matchResolved.templateSlug ||
+                healed.templateId !== matchResolved.templateId
+              ) {
+                healed.templateId = matchResolved.templateId;
+                healed.templateSlug = matchResolved.templateSlug;
+                healed.coverImage = matchTpl.previewImage;
+                healed.galleryImages = [matchTpl.previewImage, ...(healed.galleryImages?.slice(1) || [])];
+                healed.customColors = { ...matchTpl.colorStyle };
+                healed.customFonts = {
+                  heading: matchTpl.typography.headingFont,
+                  body: matchTpl.typography.bodyFont,
+                };
+              }
+            } else {
+              // Invalid URL template slug must NOT silently inherit a cached or default template
+              healed.templateId = '';
+              healed.templateSlug = params.templateSlug;
+            }
+          }
+          return healed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return createFreshInvitation();
   });
 
   // Track last synced route slug to avoid reverting user template selection
@@ -350,12 +376,40 @@ export const BuilderPage: React.FC = () => {
   const isSlugLocked =
     invitationState.status !== 'draft' || Boolean(activeOrderId) || isOrderComplete;
 
+  const draftClaimedForUidRef = useRef<string>('');
+
+  /** Drops the current (foreign / inaccessible) draft and starts a clean invitation for this user. */
+  const resetToFreshDraft = () => {
+    try { localStorage.removeItem('taklifim_builder_draft'); } catch {}
+    sessionSlugCodeRef.current = generate4DigitCode();
+    isSlugManualRef.current = false;
+    isTitleManualRef.current = false;
+    orderTransitionBaselineRef.current = null;
+    draftClaimedForUidRef.current = '';
+    setInvitationState(createFreshInvitation());
+    setActiveOrderId('');
+    setOrderStatus('draft');
+    setOrderRejectReason('');
+    setOrderSentAt('');
+    setPublishedSlug('');
+    setIsOrderComplete(false);
+    setCurrentStep((prev) => (prev === 11 ? 1 : prev));
+  };
+
   // Hydrate existing invitation / order status from Firebase on load or F5 reload (wait for authReady first)
   useEffect(() => {
     if (!authReady) return;
     let active = true;
 
     async function hydrateFromServer() {
+      // A locally cached draft that belongs to another account (e.g. the previous user on this
+      // browser) must never be shown, polled or re-saved under the current account.
+      if (!queryInvitationId && isDraftForeignToUser(invitationState, user?.id)) {
+        resetToFreshDraft();
+        setIsLoadingInvitation(false);
+        return;
+      }
+
       const targetId = queryInvitationId || invitationState.id;
       const storedOrderId = !queryInvitationId ? invitationState.orderId : '';
 
@@ -475,12 +529,15 @@ export const BuilderPage: React.FC = () => {
   }, [invitationState, isLoadingInvitation, queryInvitationId, saveDraftLocally]);
 
   // Bind any guest draft to the newly authenticated user and persist to RTDB
-  const draftClaimedForUidRef = useRef<string>('');
   useEffect(() => {
     if (!authReady || !hasFirebaseSession || !user?.id || queryInvitationId || isLoadingInvitation) {
       return;
     }
     if (invitationState.ownerUid === user.id && invitationState.ownerId === user.id) {
+      return;
+    }
+    // Drafts of another account are discarded by the hydration effect; never claim them.
+    if (isDraftForeignToUser(invitationState, user.id)) {
       return;
     }
     if (draftClaimedForUidRef.current === `${user.id}:${invitationState.id}`) {
@@ -720,6 +777,12 @@ export const BuilderPage: React.FC = () => {
     let timerId: number | null = null;
     const pollOnce = async () => {
       const res = await api.getOrderStatus(activeOrderId);
+      if (!res.success && res.statusCode === 403 && !queryInvitationId) {
+        // This order belongs to another account (stale browser draft) — stop polling and start clean.
+        stopPolling();
+        resetToFreshDraft();
+        return;
+      }
       if (res.success && res.status) {
         handleResolvedOrderUpdate(
           res.status,
