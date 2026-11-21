@@ -43,11 +43,14 @@ const DEFAULT_POSTER = IS_SMALL_SCREEN
 const WEBM_SOURCE = IS_SMALL_SCREEN ? '/video/invitation-loop-mobile.webm?v=5' : '/video/invitation-loop.webm?v=4';
 const MP4_SOURCE = IS_SMALL_SCREEN ? '/video/invitation-loop-mobile.mp4?v=5' : '/video/invitation-loop.mp4?v=4';
 
-/** Slow mobile networks (2G/3G) keep the still poster only. */
+/**
+ * Only truly slow networks (2G) keep the still poster. Chrome reports many ordinary
+ * connections as "3g", so 3G must still get the (small) video.
+ */
 function isSlowConnection(): boolean {
   if (typeof navigator === 'undefined') return false;
   const conn = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
-  return Boolean(conn?.effectiveType && /(^|-)(2g|3g)$/.test(conn.effectiveType));
+  return conn?.effectiveType === 'slow-2g' || conn?.effectiveType === '2g';
 }
 
 /** Resolves once the page has loaded and the browser is idle, so the video never competes with first paint. */
