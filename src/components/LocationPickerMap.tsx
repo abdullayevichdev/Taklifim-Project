@@ -23,10 +23,11 @@ interface SearchResult {
 
 const LABELS = {
   uz: {
-    searchPlaceholder: 'To‘yxona yoki manzil nomini yozing (masalan: Versal)',
+    searchPlaceholder: 'To‘yxona nomi yoki manzil',
     search: 'Qidirish',
     gps: 'Hozir turgan joyim',
-    linkPlaceholder: 'yoki Yandex / Google xarita havolasini shu yerga qo‘ying',
+    linkPlaceholder: 'Havolani qo‘ying',
+    linkLabel: 'Yoki xarita havolasini qo‘ying (eng aniq usul):',
     linkApply: 'Qo‘shish',
     noResults: 'Hech narsa topilmadi. Boshqacha yozib ko‘ring yoki xarita havolasini qo‘ying.',
     searchFailed: 'Qidiruvda xatolik. Internetni tekshirib, qayta urinib ko‘ring.',
@@ -38,10 +39,11 @@ const LABELS = {
     tip: 'Maslahat: to‘yxona Yandex yoki Google xaritada bo‘lsa, uning havolasini qo‘yish eng aniq usul.',
   },
   ru: {
-    searchPlaceholder: 'Название ресторана или адрес (например: Versal)',
+    searchPlaceholder: 'Ресторан или адрес',
     search: 'Найти',
     gps: 'Моё местоположение',
-    linkPlaceholder: 'или вставьте ссылку Яндекс / Google Карт',
+    linkPlaceholder: 'Вставьте ссылку',
+    linkLabel: 'Или вставьте ссылку на карту (самый точный способ):',
     linkApply: 'Добавить',
     noResults: 'Ничего не найдено. Попробуйте иначе или вставьте ссылку на карту.',
     searchFailed: 'Ошибка поиска. Проверьте интернет и попробуйте снова.',
@@ -53,10 +55,11 @@ const LABELS = {
     tip: 'Совет: самый точный способ — вставить ссылку на заведение из Яндекс или Google Карт.',
   },
   en: {
-    searchPlaceholder: 'Venue name or address (e.g. Versal)',
+    searchPlaceholder: 'Venue or address',
     search: 'Search',
     gps: 'My location',
-    linkPlaceholder: 'or paste a Yandex / Google Maps link',
+    linkPlaceholder: 'Paste link',
+    linkLabel: 'Or paste a map link (most accurate):',
     linkApply: 'Add',
     noResults: 'Nothing found. Try different words or paste a map link.',
     searchFailed: 'Search failed. Check your connection and try again.',
@@ -279,6 +282,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         </ul>
       )}
 
+      <p className="text-xs font-semibold text-[#4A3E39] pt-1">{l.linkLabel}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -338,7 +342,6 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         </div>
       )}
 
-      <p className="text-[11px] leading-relaxed text-[#7A6A63]">{l.tip}</p>
     </div>
   );
 };

@@ -11,6 +11,7 @@ import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { InvitationShell } from '../components/InvitationShell';
 import { LocationPickerMap } from '../components/LocationPickerMap';
+import { BuilderSectionToggle } from '../components/BuilderSectionToggle';
 import { yandexPlaceUrl } from '../utils/mapLinks';
 import { audioStorage } from '../utils/audioStorage';
 import { api } from '../services/api';
@@ -133,6 +134,18 @@ function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | n
   return null;
 }
 
+/**
+ * The builder has 4 simple stages; internally they reuse the original step numbers:
+ * 1 = template, 2 = details (+ venue map), 3 = optional customization, 11 = review & payment.
+ */
+const SIMPLE_STEPS = [1, 2, 3, 11] as const;
+function toSimpleStep(step: number): number {
+  if (step <= 2) return Math.max(1, step);
+  if (step === 7) return 2;
+  if (step >= 10) return 11;
+  return 3;
+}
+
 /** Legacy offline ids that were never real Firebase accounts. */
 function isLegacyLocalOwnerId(id: string): boolean {
   return /^(usr_|phone_|google_|apple_|tg_|telegram_)/.test(id);
@@ -186,7 +199,9 @@ export const BuilderPage: React.FC = () => {
       ? initialQueryStepRaw
       : 1;
 
-  const [currentStep, setCurrentStep] = useState<number>(initialQueryStep);
+  const [currentStep, setCurrentStep] = useState<number>(() => toSimpleStep(initialQueryStep));
+  // Which optional "Customize" section is expanded (one at a time keeps the page short).
+  const [openSection, setOpenSection] = useState<number | null>(null);
   const [isLoadingInvitation, setIsLoadingInvitation] = useState<boolean>(Boolean(queryInvitationId));
   const [activeTabMobile, setActiveTabMobile] = useState<'settings' | 'preview'>('settings');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
@@ -587,7 +602,7 @@ export const BuilderPage: React.FC = () => {
 
   const goToStep = useCallback(
     (targetStep: number) => {
-      const clamped = Math.max(1, Math.min(11, targetStep));
+      const clamped = toSimpleStep(Math.max(1, Math.min(11, targetStep)));
       if (clamped === 11 && authReady && (!isLoggedIn || !hasFirebaseSession)) {
         saveDraftLocally();
         setShowStep11AuthModal(true);
@@ -1351,18 +1366,16 @@ export const BuilderPage: React.FC = () => {
   };
 
   const stepsList = [
-    { num: 1, title: t.builder.steps.template },
-    { num: 2, title: t.builder.steps.details },
-    { num: 3, title: t.builder.steps.message },
-    { num: 4, title: t.builder.steps.design },
-    { num: 5, title: t.builder.steps.photos },
-    { num: 6, title: t.builder.steps.schedule },
-    { num: 7, title: t.builder.steps.venue },
-    { num: 8, title: t.builder.steps.music },
-    { num: 9, title: t.builder.steps.rsvp },
-    { num: 10, title: t.builder.steps.review },
-    { num: 11, title: t.builder.steps.checkout },
+    { num: 1, title: t.builder.simple.stageTemplate },
+    { num: 2, title: t.builder.simple.stageDetails },
+    { num: 3, title: t.builder.simple.stageCustomize },
+    { num: 11, title: t.builder.simple.stageCheckout },
   ];
+  const currentStageIndex = Math.max(0, stepsList.findIndex((st) => st.num === currentStep));
+  const prevSimpleStep = SIMPLE_STEPS[Math.max(0, currentStageIndex - 1)];
+  const nextSimpleStep = SIMPLE_STEPS[Math.min(SIMPLE_STEPS.length - 1, currentStageIndex + 1)];
+  const isSampleHostNames = /^\s*asrorbek\s*&\s*madina\s*$/i.test(invitationState.hostNames || '');
+
 
   const stateTemplateResolution = resolveTemplate(invitationState, availableTemplates);
   const isTemplateResolutionError =
@@ -1522,7 +1535,10 @@ export const BuilderPage: React.FC = () => {
                 {t.builder.title}
               </h1>
               <p className="text-[11px] text-[#4A383F] tabular-nums">
-                {stepsList[currentStep - 1]?.title} {t.builder.stepProgressSuffix} ({currentStep}/11)
+                {stepsList[currentStageIndex]?.title} ·{' '}
+                {t.builder.simple.progress
+                  .replace('{current}', String(currentStageIndex + 1))
+                  .replace('{total}', String(stepsList.length))}
               </p>
             </div>
           </div>
@@ -1564,26 +1580,38 @@ export const BuilderPage: React.FC = () => {
           </div>
         </GlassSurface>
 
-        {/* Steps Progress Pills (Horizontal Scrollable) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {stepsList.map((st) => (
-            <button
-              key={st.num}
-              type="button"
-              onClick={() => goToStep(st.num)}
-              aria-current={currentStep === st.num ? 'step' : undefined}
-              className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer tabular-nums ${
-                currentStep === st.num
-                  ? 'bg-[#1E1418] text-white shadow-sm'
-                  : currentStep > st.num
-                  ? 'glass-surface-tinted-sky text-[#1E3A5F] hover:bg-white/90'
-                  : 'glass-surface-subtle text-[#4A383F] hover:text-[#1E1418] hover:bg-white/90'
-              }`}
-            >
-              <span>{st.num}. {st.title}</span>
-            </button>
-          ))}
-        </div>
+        {/* Simple 4-stage stepper */}
+        <ol className="grid grid-cols-4 gap-1.5 sm:gap-2.5" aria-label={t.builder.title}>
+          {stepsList.map((st, idx) => {
+            const isActive = currentStep === st.num;
+            const isDone = currentStageIndex > idx;
+            return (
+              <li key={st.num} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => goToStep(st.num)}
+                  aria-current={isActive ? 'step' : undefined}
+                  className={`w-full min-h-[52px] px-1.5 sm:px-3 py-2 rounded-2xl flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#1E1418] text-white shadow-md'
+                      : isDone
+                      ? 'glass-surface-tinted-sky text-[#1E3A5F] hover:bg-white/90'
+                      : 'glass-surface-subtle text-[#4A383F] hover:bg-white/90'
+                  }`}
+                >
+                  <span
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                      isActive ? 'bg-white text-[#1E1418]' : isDone ? 'bg-[#1E3A5F] text-white' : 'bg-black/8 text-[#4A383F]'
+                    }`}
+                  >
+                    {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" /> : idx + 1}
+                  </span>
+                  <span className="text-[10.5px] sm:text-xs font-semibold leading-tight line-clamp-2">{st.title}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
 
         {/* SPLIT LAYOUT: Settings Panel on Left, Reactive Live Preview on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1604,7 +1632,7 @@ export const BuilderPage: React.FC = () => {
                 <p className="text-xs text-[#7A6A63]">
                   {t.builder.step1Desc}
                 </p>
-                <div className="grid grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto pr-1">
                   {availableTemplates.map((tpl) => {
                     const isSelected =
                       invitationState.templateSlug === tpl.slug ||
@@ -1625,7 +1653,9 @@ export const BuilderPage: React.FC = () => {
                           <img
                             src={tpl.previewImage}
                             alt={tpl.name}
-                            className="w-full h-24 object-cover rounded-xl mb-2"
+                            className="w-full aspect-[4/5] object-cover object-center rounded-xl mb-2 bg-[#F7F1EE]"
+                            loading="lazy"
+                            decoding="async"
                           />
                           {isSelected && (
                             <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[#D9658B] text-white flex items-center justify-center text-xs shadow-md">
@@ -1645,9 +1675,12 @@ export const BuilderPage: React.FC = () => {
             {/* STEP 2: Event Details */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
-                  {t.builder.step2Heading}
-                </h3>
+                <div>
+                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
+                    {t.builder.step2Heading}
+                  </h3>
+                  <p className="text-xs text-[#4A383F] mt-0.5">{t.builder.simple.detailsHint}</p>
+                </div>
                 <div className="space-y-3.5 text-xs">
                   <GlassInput
                     type="text"
@@ -1680,68 +1713,6 @@ export const BuilderPage: React.FC = () => {
                     }}
                     placeholder={t.builder.hostNamesPlaceholder}
                   />
-
-                  <div className="space-y-1.5 min-w-0">
-                    <label className="font-bold text-[11px] text-[#3A2D28] block">
-                      {t.builder.slugLabel}
-                    </label>
-                    <div className="rounded-[var(--lg-radius)] overflow-hidden border border-black/10 bg-white/85 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
-                      <div className="px-3.5 py-1.5 bg-white/70 border-b border-black/8 font-mono text-[11px] text-[#4A383F] break-all">
-                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 min-w-0">
-                        <input
-                          type="text"
-                          value={invitationState.slug}
-                          disabled={isSlugLocked}
-                          onChange={(e) => {
-                            if (isSlugLocked) return;
-                            isSlugManualRef.current = true;
-                            const raw = e.target.value
-                              .toLowerCase()
-                              .replace(/[^a-z0-9-]+/g, '-')
-                              .replace(/-+/g, '-')
-                              .replace(/^-+/, '');
-                            setInvitationState((p) => ({ ...p, slug: raw }));
-                          }}
-                          onBlur={() => {
-                            if (isSlugLocked) return;
-                            setInvitationState((p) => ({
-                              ...p,
-                              slug: cleanNameForSlug(p.slug) || generateInvitationSlug(p.partner1Name, p.partner2Name, sessionSlugCodeRef.current),
-                            }));
-                          }}
-                          placeholder="asrorbek-madina-4135"
-                          className="flex-1 min-w-0 min-h-[40px] px-1.5 bg-transparent font-mono text-xs sm:text-[13px] text-[#1E1418] font-bold outline-none disabled:opacity-65"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz';
-                            const url = `${origin}/i/${invitationState.slug}`;
-                            if (navigator.clipboard) {
-                              navigator.clipboard.writeText(url);
-                              showToast(t.builder.slugCopiedToast, 'success');
-                            }
-                          }}
-                          aria-label={t.builder.copyLinkBtn}
-                          className="min-h-[40px] px-3 rounded-xl glass-surface-subtle hover:bg-white text-[11px] font-bold text-[#9E3E60] inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
-                        >
-                          <Copy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                          <span>{t.builder.copyLinkBtn}</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="text-[11px] text-[#4A383F] bg-white/55 px-3 py-1.5 rounded-xl border border-black/6">
-                      <span className="font-semibold text-[#3A2D28]">{t.builder.fullLinkPreviewLabel} </span>
-                      <span className="font-mono text-[#9E3E60] font-bold break-all">
-                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/{invitationState.slug}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-[#4A383F] block">
-                      {isSlugLocked ? t.builder.slugLockedNotice : t.builder.slugHint}
-                    </span>
-                  </div>
 
                   <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
                     <div className="min-w-0">
@@ -1887,8 +1858,25 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 3: Invitation Text */}
+            {/* Customize stage intro */}
             {currentStep === 3 && (
+              <div className="space-y-1.5">
+                <h3 className="font-playfair text-xl font-bold text-[#1E1418]">{t.builder.simple.customizeTitle}</h3>
+                <p className="text-xs leading-relaxed text-[#4A383F]">{t.builder.simple.customizeHint}</p>
+              </div>
+            )}
+
+            {/* Optional section 3 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="✍️"
+                title={t.builder.steps.message}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 3}
+                onToggle={() => setOpenSection((prev) => (prev === 3 ? null : 3))}
+              />
+            )}
+            {currentStep === 3 && openSection === 3 && (
               <div className="space-y-4">
                 <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step3Heading}
@@ -1916,8 +1904,17 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 4: Design & Colors */}
-            {currentStep === 4 && (
+            {/* Optional section 4 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="🎨"
+                title={t.builder.steps.design}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 4}
+                onToggle={() => setOpenSection((prev) => (prev === 4 ? null : 4))}
+              />
+            )}
+            {currentStep === 3 && openSection === 4 && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1997,7 +1994,7 @@ export const BuilderPage: React.FC = () => {
                                 }));
                               }}
                               placeholder="#000000"
-                              className="w-20 px-2 py-1 rounded-lg border border-black/10 bg-white font-mono text-xs text-[#231E1B] uppercase text-center focus:ring-1 focus:ring-[#D9658B] outline-none"
+                              className="w-[96px] shrink-0 px-1.5 py-1 rounded-lg border border-black/10 bg-white font-mono text-xs text-[#231E1B] uppercase text-center focus:ring-1 focus:ring-[#D9658B] outline-none"
                             />
                             <div
                               className="w-7 h-7 rounded-lg border border-black/10 shadow-inner flex-shrink-0"
@@ -2085,8 +2082,17 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 5: Photos */}
-            {currentStep === 5 && (() => {
+            {/* Optional section 5 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="📷"
+                title={t.builder.steps.photos}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 5}
+                onToggle={() => setOpenSection((prev) => (prev === 5 ? null : 5))}
+              />
+            )}
+            {currentStep === 3 && openSection === 5 && (() => {
               const galleryPresetOptions = [
                 { id: 'Bizning suratlarimiz', uz: 'Bizning suratlarimiz', ru: 'Наши фотографии', en: 'Our Photos', icon: '💑' },
                 { id: 'To‘y jarayoni suratlari', uz: 'To‘y jarayoni suratlari', ru: 'Фото со свадьбы', en: 'Wedding Moments', icon: '📸' },
@@ -2293,8 +2299,17 @@ export const BuilderPage: React.FC = () => {
               );
             })()}
 
-            {/* STEP 6: Schedule */}
-            {currentStep === 6 && (
+            {/* Optional section 6 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="🕰️"
+                title={t.builder.steps.schedule}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 6}
+                onToggle={() => setOpenSection((prev) => (prev === 6 ? null : 6))}
+              />
+            )}
+            {currentStep === 3 && openSection === 6 && (
               <div className="space-y-4">
                 <div className="flex flex-col min-[380px]:flex-row min-[380px]:items-center justify-between gap-2.5">
                   <h3 className="font-playfair text-xl font-bold text-[#1E1418] min-w-0">
@@ -2374,39 +2389,10 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 7: Venue & Map */}
-            {currentStep === 7 && (
+            {/* Venue map (part of the Details stage) */}
+            {currentStep === 2 && (
               <div className="space-y-5">
-                <div>
-                  <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
-                    {t.builder.step7Heading}
-                  </h3>
-                  <p className="text-xs text-[#4A383F] mt-0.5">
-                    {t.builder.step7Desc}
-                  </p>
-                </div>
-
                 <div className="space-y-4 text-xs">
-                  {/* Venue name (if restaurant) */}
-                  {(invitationState.venueLocationType || 'restaurant') === 'restaurant' && (
-                    <GlassInput
-                      type="text"
-                      label={t.builder.venueHallLabel}
-                      value={invitationState.venueName === 'Xonadonda' ? '' : invitationState.venueName}
-                      onChange={(e) => setInvitationState((p) => ({ ...p, venueName: e.target.value }))}
-                      placeholder={t.builder.venueHallPlaceholder}
-                    />
-                  )}
-
-                  {/* Exact address */}
-                  <GlassInput
-                    type="text"
-                    label={invitationState.venueLocationType === 'home' ? t.builder.homeAddressLabel : t.builder.exactAddressLabel}
-                    value={invitationState.venueAddress}
-                    onChange={(e) => setInvitationState((p) => ({ ...p, venueAddress: e.target.value }))}
-                    placeholder={invitationState.venueLocationType === 'home' ? t.builder.homeAddressPlaceholder : t.builder.venueAddressPlaceholder}
-                  />
-
                   {/* Interactive Map */}
                   <div className="space-y-2">
                     <label className="font-bold text-[#1E1418] block">
@@ -2444,8 +2430,17 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 8: Music */}
-            {currentStep === 8 && (
+            {/* Optional section 8 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="🎵"
+                title={t.builder.steps.music}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 8}
+                onToggle={() => setOpenSection((prev) => (prev === 8 ? null : 8))}
+              />
+            )}
+            {currentStep === 3 && openSection === 8 && (
               <div className="space-y-5">
                 <div>
                   <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
@@ -2710,8 +2705,94 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 9: RSVP Settings */}
-            {currentStep === 9 && (
+            {/* Optional section: invitation link (slug) */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="🔗"
+                title={t.builder.simple.linkSection}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 12}
+                onToggle={() => setOpenSection((prev) => (prev === 12 ? null : 12))}
+              />
+            )}
+            {currentStep === 3 && openSection === 12 && (
+              <div className="text-xs builder-section-body">
+                  <div className="space-y-1.5 min-w-0">
+                    <label className="font-bold text-[11px] text-[#3A2D28] block">
+                      {t.builder.slugLabel}
+                    </label>
+                    <div className="rounded-[var(--lg-radius)] overflow-hidden border border-black/10 bg-white/85 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#D66389]/35 focus-within:border-[#D66389]/60">
+                      <div className="px-3.5 py-1.5 bg-white/70 border-b border-black/8 font-mono text-[11px] text-[#4A383F] break-all">
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 min-w-0">
+                        <input
+                          type="text"
+                          value={invitationState.slug}
+                          disabled={isSlugLocked}
+                          onChange={(e) => {
+                            if (isSlugLocked) return;
+                            isSlugManualRef.current = true;
+                            const raw = e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9-]+/g, '-')
+                              .replace(/-+/g, '-')
+                              .replace(/^-+/, '');
+                            setInvitationState((p) => ({ ...p, slug: raw }));
+                          }}
+                          onBlur={() => {
+                            if (isSlugLocked) return;
+                            setInvitationState((p) => ({
+                              ...p,
+                              slug: cleanNameForSlug(p.slug) || generateInvitationSlug(p.partner1Name, p.partner2Name, sessionSlugCodeRef.current),
+                            }));
+                          }}
+                          placeholder="asrorbek-madina-4135"
+                          className="flex-1 min-w-0 min-h-[40px] px-1.5 bg-transparent font-mono text-xs sm:text-[13px] text-[#1E1418] font-bold outline-none disabled:opacity-65"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz';
+                            const url = `${origin}/i/${invitationState.slug}`;
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText(url);
+                              showToast(t.builder.slugCopiedToast, 'success');
+                            }
+                          }}
+                          aria-label={t.builder.copyLinkBtn}
+                          className="min-h-[40px] px-3 rounded-xl glass-surface-subtle hover:bg-white text-[11px] font-bold text-[#9E3E60] inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                        >
+                          <Copy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          <span>{t.builder.copyLinkBtn}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-[#4A383F] bg-white/55 px-3 py-1.5 rounded-xl border border-black/6">
+                      <span className="font-semibold text-[#3A2D28]">{t.builder.fullLinkPreviewLabel} </span>
+                      <span className="font-mono text-[#9E3E60] font-bold break-all">
+                        {(typeof window !== 'undefined' ? window.location.origin : 'https://tashrifim.uz')}/i/{invitationState.slug}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#4A383F] block">
+                      {isSlugLocked ? t.builder.slugLockedNotice : t.builder.slugHint}
+                    </span>
+                  </div>
+
+              </div>
+            )}
+
+            {/* Optional section 9 */}
+            {currentStep === 3 && (
+              <BuilderSectionToggle
+                icon="💌"
+                title={t.builder.steps.rsvp}
+                optionalLabel={t.builder.simple.optional}
+                isOpen={openSection === 9}
+                onToggle={() => setOpenSection((prev) => (prev === 9 ? null : 9))}
+              />
+            )}
+            {currentStep === 3 && openSection === 9 && (
               <div className="space-y-4">
                 <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step9Heading}
@@ -2825,8 +2906,17 @@ export const BuilderPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 10: Review */}
-            {currentStep === 10 && (
+            {/* Review summary (top of the checkout stage) */}
+            {currentStep === 11 && isSampleHostNames && !isOrderComplete && (
+              <div role="alert" className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-xs font-semibold text-amber-900">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                <span className="flex-1">{t.builder.simple.sampleNamesWarning}</span>
+                <button type="button" onClick={() => goToStep(2)} className="underline whitespace-nowrap">
+                  {t.builder.simple.editDetails}
+                </button>
+              </div>
+            )}
+            {currentStep === 11 && orderStatus !== 'pending_review' && orderStatus !== 'paid' && (
               <div className="space-y-4">
                 <h3 className="font-playfair text-xl font-bold text-[#1E1418]">
                   {t.builder.step10Heading}
@@ -3213,7 +3303,7 @@ export const BuilderPage: React.FC = () => {
                   type="button"
                   tone="light"
                   size="sm"
-                  onClick={() => setCurrentStep((p) => p - 1)}
+                  onClick={() => setCurrentStep(prevSimpleStep)}
                   leftIcon={<ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />}
                 >
                   {t.builder.prevStep}
@@ -3222,15 +3312,15 @@ export const BuilderPage: React.FC = () => {
                 <div />
               )}
 
-              {currentStep < 11 && (
+              {currentStep !== 11 && (
                 <GlassButton
                   type="button"
                   tone="tinted"
                   size="sm"
-                  onClick={() => goToStep(currentStep + 1)}
+                  onClick={() => goToStep(nextSimpleStep)}
                   rightIcon={<ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
                 >
-                  {t.builder.nextStep}
+                  {currentStep === 3 ? t.builder.simple.skipToCheckout : t.builder.simple.next}
                 </GlassButton>
               )}
             </div>

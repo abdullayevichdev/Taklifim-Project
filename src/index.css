@@ -1606,3 +1606,13 @@ html.taklifim-modal-open .taklifim-bottom-nav {
   animation: none;
   opacity: 0;
 }
+
+/* Builder: optional sections — the toggle already shows the title, so hide the body's own heading */
+.builder-section-toggle[aria-expanded="true"] + * {
+  padding: 4px 2px 8px;
+}
+.builder-section-toggle[aria-expanded="true"] + * > h3.font-playfair:first-child,
+.builder-section-toggle[aria-expanded="true"] + * > div:first-child > h3.font-playfair:first-child,
+.builder-section-toggle[aria-expanded="true"] + * > div:first-child > div:first-child > h3.font-playfair:first-child {
+  display: none;
+}

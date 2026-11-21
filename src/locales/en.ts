@@ -411,6 +411,22 @@ export const en: typeof uz = {
   builder: {
     title: 'Invitation Builder',
     subtitle: 'Customize your invitation and watch the live preview react in real time',
+    simple: {
+      stageTemplate: 'Template',
+      stageDetails: 'Details',
+      stageCustomize: 'Customize',
+      stageCheckout: 'Review & pay',
+      progress: 'Step {current} of {total}',
+      detailsHint: 'Just the essentials: whose celebration, when and where.',
+      customizeTitle: 'Customize your invitation (optional)',
+      customizeHint: 'Everything here is optional — the template already looks great. Open any section to change it, or go straight to the next step.',
+      optional: 'optional',
+      linkSection: 'Invitation link',
+      sampleNamesWarning: 'Heads up: the names are still the sample ones. Go back to step 2 and enter yours.',
+      editDetails: 'Edit details',
+      next: 'Next',
+      skipToCheckout: 'Done — review & pay',
+    },
     steps: {
       template: 'Template',
       details: 'Details',
