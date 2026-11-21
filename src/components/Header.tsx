@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { TashrifimMark } from './TashrifimLogo';
 import { useRouter, Link } from '../context/RouterContext';
 import { useLanguage } from '../locales';
 import { useAuth } from '../context/AuthContext';
@@ -169,6 +170,79 @@ export const Header: React.FC = () => {
     [t]
   );
 
+  // Responsive overflow: nav items that don't fit go into a "More" menu instead of being clipped.
+  // Item widths are measured once with every item rendered, then reused on each resize.
+  const navWrapRef = useRef<HTMLDivElement>(null);
+  const navItemWidthsRef = useRef<number[] | null>(null);
+  const [visibleNavCount, setVisibleNavCount] = useState<number>(navItems.length);
+  const [navMeasureToken, setNavMeasureToken] = useState(0);
+
+  const fitNavItems = () => {
+    const el = navWrapRef.current;
+    const widths = navItemWidthsRef.current;
+    if (!el || !widths) return;
+    const styles = window.getComputedStyle(el);
+    const available =
+      el.clientWidth - (parseFloat(styles.paddingLeft) || 0) - (parseFloat(styles.paddingRight) || 0);
+    const NAV_CHROME = 12; // navbar inner padding + gaps
+    const MORE_BUTTON = 84; // "More" trigger + gap
+    let count = widths.length;
+    const needed = (k: number) =>
+      widths.slice(0, k).reduce((sum, w) => sum + w, 0) + NAV_CHROME + (k < widths.length ? MORE_BUTTON : 0);
+    while (count > 2 && needed(count) > available) count--;
+    setVisibleNavCount((prev) => (prev === count ? prev : count));
+  };
+
+  // Re-measure when labels change (language), fonts finish loading or the desktop layout mounts.
+  useEffect(() => {
+    navItemWidthsRef.current = null;
+    setVisibleNavCount(navItems.length);
+    setNavMeasureToken((t) => t + 1);
+    let cancelled = false;
+    const remeasure = () => {
+      if (cancelled) return;
+      navItemWidthsRef.current = null;
+      setVisibleNavCount(navItems.length);
+      setNavMeasureToken((t) => t + 1);
+    };
+    (document as any).fonts?.ready?.then(remeasure);
+    const timer = window.setTimeout(remeasure, 900);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [navItems, isDesktopViewport]);
+
+  useLayoutEffect(() => {
+    const el = navWrapRef.current;
+    if (!el || navItemWidthsRef.current || visibleNavCount !== navItems.length) return;
+    const nav = el.firstElementChild as HTMLElement | null;
+    if (!nav) return;
+    const anchors = Array.from(nav.querySelectorAll(':scope > a, :scope > button')) as HTMLElement[];
+    if (anchors.length !== navItems.length) return;
+    navItemWidthsRef.current = anchors.map((a) => Math.ceil(a.getBoundingClientRect().width) + 1);
+    fitNavItems();
+  }, [navMeasureToken, visibleNavCount, navItems.length]);
+
+  useEffect(() => {
+    const el = navWrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => fitNavItems());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isDesktopViewport]);
+
+  const visibleNavItems = navItems.slice(0, visibleNavCount);
+  const overflowNavItems = navItems.slice(visibleNavCount);
+  const overflowMenuItems: GlassMenuItem[] = overflowNavItems.map((item) => ({
+    id: item.to,
+    label: item.label,
+    onSelect: () => handleNavNavigate(item.to),
+  }));
+  const overflowHasActive = overflowNavItems.some(
+    (item) => item.to === path || item.matchPaths?.includes(path)
+  );
+
   const handleNavNavigate = (to: string) => {
     if (to === '/how-it-works') {
       navigate('/how-it-works');
@@ -234,7 +308,7 @@ export const Header: React.FC = () => {
         }}
       />
 
-      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2.5 lg:gap-4 xl:gap-5">
+      <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-2.5 lg:gap-4 xl:gap-5">
         {/* Brand Logo Pill — always visible, never clipped */}
         <Link
           to="/"
@@ -242,14 +316,8 @@ export const Header: React.FC = () => {
             isScrolled ? 'glass-surface-elevated' : 'glass-surface'
           }`}
         >
-          <div className="w-8 h-8 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-[#F5C9D8] via-[#F5EBDD] to-[#B9DFFA] shadow-xs shrink-0 border border-white/90">
-            <img
-              src="/logo.jpg"
-              alt="INVITE Logo"
-              className="w-full h-full object-cover rounded-[10px]"
-            />
-          </div>
-          <span className="font-playfair text-[15px] sm:text-base xl:text-[17px] 2xl:text-[19px] font-bold tracking-[0.06em] uppercase text-[#1E1418] whitespace-nowrap pr-0.5">
+          <TashrifimMark className="w-9 h-9 drop-shadow-[0_4px_10px_rgba(178,56,100,0.28)]" />
+          <span className="font-playfair text-[16px] sm:text-[17px] xl:text-[18px] 2xl:text-[20px] font-bold tracking-[0.08em] uppercase text-[#1E1418] whitespace-nowrap pr-1">
             Tashrifim
           </span>
         </Link>
@@ -257,13 +325,35 @@ export const Header: React.FC = () => {
         {/* Desktop Center Floating Capsule Navigation & Controls (unmounted on mobile/tablet so hidden <lg-*> never runs) */}
         {isDesktopViewport && (
           <>
-            <div className="pointer-events-auto flex-1 min-w-0 flex items-center justify-center overflow-x-auto no-scrollbar py-3 -my-3 px-1">
+            <div
+              ref={navWrapRef}
+              className="pointer-events-auto flex-1 min-w-0 flex items-center justify-center gap-1.5 overflow-hidden py-3 -my-3 px-1"
+            >
               <GlassNavbar
-                items={navItems}
+                items={visibleNavItems}
                 currentPath={path}
                 onNavigate={handleNavNavigate}
                 ariaLabel={t.nav.primaryNavigation}
               />
+              {overflowMenuItems.length > 0 && (
+                <GlassActionMenu
+                  ariaLabel={t.nav.more}
+                  items={overflowMenuItems}
+                  className="shrink-0"
+                  triggerClassName={`min-h-[38px] px-3 ${overflowHasActive ? 'ring-1 ring-[#D66389]/40' : ''}`}
+                  trigger={(isOpen) => (
+                    <>
+                      <span className="font-semibold text-[13.5px] whitespace-nowrap">{t.nav.more}</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 opacity-60 shrink-0 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </>
+                  )}
+                />
+              )}
             </div>
 
             <div className="pointer-events-auto flex items-center gap-1.5 xl:gap-2 shrink-0">
@@ -272,7 +362,7 @@ export const Header: React.FC = () => {
                 href="tel:+998933223580"
                 aria-label="+998 933223580 — Avazxanov Abdulhay"
                 title="+998 933223580 — Avazxanov Abdulhay"
-                className={`hidden min-[1240px]:inline-flex min-[1420px]:hidden items-center justify-center shrink-0 w-9 h-9 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+                className={`hidden min-[1240px]:inline-flex min-[1640px]:hidden items-center justify-center shrink-0 w-9 h-9 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
                   isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
                 }`}
               >
@@ -283,7 +373,7 @@ export const Header: React.FC = () => {
               <a
                 href="tel:+998933223580"
                 aria-label="+998 933223580 — Avazxanov Abdulhay"
-                className={`hidden min-[1420px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
+                className={`hidden min-[1640px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
                   isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
                 }`}
               >

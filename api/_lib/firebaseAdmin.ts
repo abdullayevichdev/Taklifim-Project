@@ -437,7 +437,12 @@ export async function validateOrderBeforeReceipt(params: {
     return { ok: false, statusCode: 400, error: "Buyurtma raqami noto'g'ri." };
   }
 
-  const existingOrder = await getOrder(safeOrderId);
+  // Read order and (when known) invitation in parallel to save a database round trip.
+  const requestedInvId = sanitizeRtdbKeySegment(params.invitationId);
+  const [existingOrder, prefetchedInv] = await Promise.all([
+    getOrder(safeOrderId),
+    requestedInvId ? getInvitationRecord(requestedInvId) : Promise.resolve(undefined),
+  ]);
 
   if (existingOrder?.ownerUid && existingOrder.ownerUid !== params.verifiedUid) {
     return {
@@ -458,7 +463,10 @@ export async function validateOrderBeforeReceipt(params: {
   const finalInvId = sanitizeRtdbKeySegment(params.invitationId || existingOrder?.invitationId);
   let existingInv: Record<string, any> | null = null;
   if (finalInvId) {
-    existingInv = await getInvitationRecord(finalInvId);
+    existingInv =
+      prefetchedInv !== undefined && finalInvId === requestedInvId
+        ? prefetchedInv
+        : await getInvitationRecord(finalInvId);
     const invOwner = existingInv?.ownerUid || existingInv?.ownerId;
     if (invOwner && invOwner !== 'anonymous' && invOwner !== params.verifiedUid) {
       return {
@@ -644,16 +652,20 @@ export async function commitOrderPendingReview(params: {
   telegramMessageId?: number;
   idempotencyKey?: string;
   nowIso: string;
+  /** Ownership check already done in this request; reused to skip two extra database reads. */
+  preValidated?: { existingOrder: ServerOrder | null; existingInv: Record<string, any> | null };
 }): Promise<{ ok: true; orderData: ServerOrder } | { ok: false; statusCode: number; error: string }> {
   const safeOrderId = sanitizeRtdbKeySegment(params.orderId);
   const safeInvIdParam = sanitizeRtdbKeySegment(params.invitationId);
   const safeAttemptKey = sanitizeRtdbKeySegment(params.idempotencyKey);
 
-  const preCheck = await validateOrderBeforeReceipt({
-    verifiedUid: params.verifiedUid,
-    orderId: safeOrderId,
-    invitationId: safeInvIdParam,
-  });
+  const preCheck = params.preValidated
+    ? ({ ok: true, ...params.preValidated } as const)
+    : await validateOrderBeforeReceipt({
+        verifiedUid: params.verifiedUid,
+        orderId: safeOrderId,
+        invitationId: safeInvIdParam,
+      });
 
   if (preCheck.ok === false) {
     return preCheck;

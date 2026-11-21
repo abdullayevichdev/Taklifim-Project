@@ -8,7 +8,7 @@ import { api } from '../services/api';
 import { calculateCountdown, validateRSVPForm } from '../utils/logic';
 import { ShareModal } from '../components/ShareModal';
 import { MusicPlayer } from '../components/MusicPlayer';
-import { InteractiveMap } from '../components/InteractiveMap';
+import { VenueMap } from '../components/VenueMap';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
@@ -41,7 +41,7 @@ import {
   Instagram,
   Phone,
 } from 'lucide-react';
-import { TaklifimLogo } from '../components/TaklifimLogo';
+import { TashrifimLogo } from '../components/TashrifimLogo';
 import { GlassSurface, GlassButton, GlassSegmented } from '../components/glass';
 
 // Haqiqiy va to'liq ko'p tilli tarjimalar (UZ / RU / EN)
@@ -810,7 +810,7 @@ export const InvitationGuestPage: React.FC = () => {
       rounded="full"
       className="inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold text-[#3B2A30]"
     >
-      <TaklifimLogo className="w-3.5 h-3.5" />
+      <TashrifimLogo className="w-3.5 h-3.5" />
       <span>{gt.createdOn}</span>
     </GlassSurface>
   );
@@ -889,18 +889,12 @@ export const InvitationGuestPage: React.FC = () => {
               date: g.submittedAt || '',
             }))}
           interactiveMap={
-            invitation.latitude && invitation.longitude ? (
-              <div className="rounded-2xl overflow-hidden shadow-inner border border-black/5 aspect-[16/10] w-full">
-                <iframe
-                  title="Google Maps"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  src={`https://maps.google.com/maps?q=${invitation.latitude},${invitation.longitude}&z=15&output=embed`}
-                />
-              </div>
-            ) : undefined
+            <VenueMap
+              latitude={invitation.latitude}
+              longitude={invitation.longitude}
+              query={[invitation.venueName, invitation.venueAddress, invitation.city].filter(Boolean).join(', ')}
+              language={invLang}
+            />
           }
         />
 

@@ -1,285 +1,349 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, MapPin, Compass, Check, AlertCircle } from 'lucide-react';
-import { useLanguage, translations } from '../locales';
+import { Search, MapPin, LocateFixed, Link2, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { useLanguage } from '../locales';
 import { Language } from '../types';
+import { VenueMap } from './VenueMap';
+import { isShortMapLink, isValidLatLng, looksLikeMapLink, parseCoordsFromText } from '../utils/mapLinks';
 
 interface LocationPickerMapProps {
   latitude?: number;
   longitude?: number;
-  onLocationSelect: (lat: number, lng: number, detectedAddress?: string) => void;
+  /** `sourceLink` is set when the place came from a pasted Yandex / Google link. */
+  onLocationSelect: (lat: number, lng: number, detectedAddress?: string, sourceLink?: string) => void;
   className?: string;
   language?: Language;
 }
 
-const DEFAULT_LAT = 41.3217;
-const DEFAULT_LNG = 69.2415;
+interface SearchResult {
+  lat: number;
+  lng: number;
+  title: string;
+  subtitle: string;
+}
 
+const LABELS = {
+  uz: {
+    searchPlaceholder: 'To‘yxona nomi yoki manzil',
+    search: 'Qidirish',
+    gps: 'Hozir turgan joyim',
+    linkPlaceholder: 'Havolani qo‘ying',
+    linkLabel: 'Yoki xarita havolasini qo‘ying (eng aniq usul):',
+    linkApply: 'Qo‘shish',
+    noResults: 'Hech narsa topilmadi. Boshqacha yozib ko‘ring yoki xarita havolasini qo‘ying.',
+    searchFailed: 'Qidiruvda xatolik. Internetni tekshirib, qayta urinib ko‘ring.',
+    badLink: 'Havoladan joylashuvni aniqlab bo‘lmadi. Xaritada joyni ochib, “Ulashish” havolasini nusxalang.',
+    gpsUnsupported: 'Brauzeringiz joylashuvni aniqlay olmaydi.',
+    gpsDenied: 'Joylashuvga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.',
+    selected: 'Joy belgilandi',
+    notSelected: 'Hali joy tanlanmadi — yuqorida qidiring',
+    tip: 'Maslahat: to‘yxona Yandex yoki Google xaritada bo‘lsa, uning havolasini qo‘yish eng aniq usul.',
+  },
+  ru: {
+    searchPlaceholder: 'Ресторан или адрес',
+    search: 'Найти',
+    gps: 'Моё местоположение',
+    linkPlaceholder: 'Вставьте ссылку',
+    linkLabel: 'Или вставьте ссылку на карту (самый точный способ):',
+    linkApply: 'Добавить',
+    noResults: 'Ничего не найдено. Попробуйте иначе или вставьте ссылку на карту.',
+    searchFailed: 'Ошибка поиска. Проверьте интернет и попробуйте снова.',
+    badLink: 'Не удалось определить место по ссылке. Откройте место на карте и скопируйте ссылку «Поделиться».',
+    gpsUnsupported: 'Браузер не поддерживает геолокацию.',
+    gpsDenied: 'Доступ к геолокации запрещён. Разрешите его в настройках браузера.',
+    selected: 'Место выбрано',
+    notSelected: 'Место ещё не выбрано — найдите его выше',
+    tip: 'Совет: самый точный способ — вставить ссылку на заведение из Яндекс или Google Карт.',
+  },
+  en: {
+    searchPlaceholder: 'Venue or address',
+    search: 'Search',
+    gps: 'My location',
+    linkPlaceholder: 'Paste link',
+    linkLabel: 'Or paste a map link (most accurate):',
+    linkApply: 'Add',
+    noResults: 'Nothing found. Try different words or paste a map link.',
+    searchFailed: 'Search failed. Check your connection and try again.',
+    badLink: 'Could not read a location from this link. Open the place on the map and copy its “Share” link.',
+    gpsUnsupported: 'Your browser cannot detect location.',
+    gpsDenied: 'Location access was denied. Allow it in your browser settings.',
+    selected: 'Location set',
+    notSelected: 'No location yet — search above',
+    tip: 'Tip: pasting the venue’s Yandex or Google Maps link is the most accurate way.',
+  },
+};
+
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+
+async function reverseGeocode(lat: number, lng: number, lang: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&accept-language=${lang},uz,ru`
+    );
+    if (!res.ok) return '';
+    const data = await res.json();
+    return typeof data?.display_name === 'string' ? data.display_name : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Simple, beginner-friendly venue picker: search by name, use GPS, or paste a Yandex / Google link.
+ * The chosen place is previewed on Yandex Maps / Google Maps.
+ */
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
-  latitude = DEFAULT_LAT,
-  longitude = DEFAULT_LNG,
+  latitude,
+  longitude,
   onLocationSelect,
   className = '',
   language,
 }) => {
   const { language: ctxLanguage } = useLanguage();
-  const activeLang = language || ctxLanguage;
-  const t = translations[activeLang] || translations.uz;
+  const lang = (language || ctxLanguage || 'uz') as keyof typeof LABELS;
+  const l = LABELS[lang] || LABELS.uz;
 
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const hasPoint = isValidLatLng(latitude, longitude);
+  const [query, setQuery] = useState('');
+  const [link, setLink] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [busy, setBusy] = useState<'search' | 'gps' | 'link' | null>(null);
+  const [error, setError] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({
-    lat: latitude || DEFAULT_LAT,
-    lng: longitude || DEFAULT_LNG,
-  });
+  useEffect(() => () => abortRef.current?.abort(), []);
 
-  const fetchAddress = async (lat: number, lng: number) => {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        { headers: { 'Accept-Language': `${activeLang},uz,ru,en` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        return data.display_name || '';
-      }
-    } catch {
-      // ignore
-    }
-    return '';
-  };
-
-  useEffect(() => {
-    let L: any;
-
-    const init = async () => {
-      try {
-        L = await import('leaflet');
-
-        if (!mapContainerRef.current) return;
-
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.remove();
-        }
-
-        const map = L.map(mapContainerRef.current, {
-          center: [currentCoords.lat, currentCoords.lng],
-          zoom: 15,
-          zoomControl: true,
-        });
-
-        mapInstanceRef.current = map;
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap',
-        }).addTo(map);
-
-        const customIcon = L.divIcon({
-          html: `
-            <div style="
-              background: #D9658B;
-              width: 38px;
-              height: 38px;
-              border-radius: 50% 50% 50% 0;
-              transform: rotate(-45deg);
-              border: 3px solid white;
-              box-shadow: 0 4px 15px rgba(217,101,139,0.5);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-            ">
-              <div style="transform: rotate(45deg); color: white; font-size: 16px; margin-top: -2px;">📍</div>
-            </div>
-          `,
-          iconSize: [38, 38],
-          iconAnchor: [19, 38],
-          popupAnchor: [0, -38],
-        });
-
-        const marker = L.marker([currentCoords.lat, currentCoords.lng], {
-          icon: customIcon,
-          draggable: true,
-        }).addTo(map);
-
-        markerRef.current = marker;
-
-        marker.bindPopup(`<b>${t.shared.mapDragHint}</b><br>${t.shared.mapDragSub}`).openPopup();
-
-        map.on('click', async (e: any) => {
-          setGpsError(null);
-          const lat = parseFloat(e.latlng.lat.toFixed(5));
-          const lng = parseFloat(e.latlng.lng.toFixed(5));
-          setCurrentCoords({ lat, lng });
-          marker.setLatLng([lat, lng]);
-          const addr = await fetchAddress(lat, lng);
-          onLocationSelect(lat, lng, addr);
-        });
-
-        marker.on('dragend', async () => {
-          setGpsError(null);
-          const pos = marker.getLatLng();
-          const lat = parseFloat(pos.lat.toFixed(5));
-          const lng = parseFloat(pos.lng.toFixed(5));
-          setCurrentCoords({ lat, lng });
-          const addr = await fetchAddress(lat, lng);
-          onLocationSelect(lat, lng, addr);
-        });
-      } catch (err) {
-        console.warn('Map initialization note:', err);
-      }
-    };
-
-    init();
-
-    return () => {
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.remove();
-          mapInstanceRef.current = null;
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (latitude && longitude && mapInstanceRef.current && markerRef.current) {
-      if (latitude !== currentCoords.lat || longitude !== currentCoords.lng) {
-        setCurrentCoords({ lat: latitude, lng: longitude });
-        markerRef.current.setLatLng([latitude, longitude]);
-        mapInstanceRef.current.setView([latitude, longitude], 16);
-      }
-    }
-  }, [latitude, longitude]);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim() || isSearching) return;
-
-    setGpsError(null);
-    setIsSearching(true);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          searchQuery + ', Uzbekistan'
-        )}&limit=1`,
-        { headers: { 'Accept-Language': `${activeLang},uz,ru,en` } }
-      );
-      if (res.ok) {
-        const results = await res.json();
-        if (results && results.length > 0) {
-          const item = results[0];
-          const lat = parseFloat(parseFloat(item.lat).toFixed(5));
-          const lng = parseFloat(parseFloat(item.lon).toFixed(5));
-          setCurrentCoords({ lat, lng });
-
-          if (mapInstanceRef.current && markerRef.current) {
-            mapInstanceRef.current.flyTo([lat, lng], 16);
-            markerRef.current.setLatLng([lat, lng]);
-            markerRef.current.bindPopup(`<b>${searchQuery}</b><br>${item.display_name}`).openPopup();
-          }
-
-          onLocationSelect(lat, lng, item.display_name);
-        }
-      }
-    } catch (err) {
-      console.warn('Search error:', err);
-    } finally {
-      setIsSearching(false);
+  const select = async (lat: number, lng: number, address?: string, sourceLink?: string) => {
+    const la = round6(lat);
+    const ln = round6(lng);
+    setResults([]);
+    setError('');
+    // Report the point immediately; fill in the address once it is known.
+    onLocationSelect(la, ln, address, sourceLink);
+    if (!address) {
+      const found = await reverseGeocode(la, ln, lang);
+      if (found) onLocationSelect(la, ln, found, sourceLink);
     }
   };
 
-  const handleCurrentGPS = () => {
-    setGpsError(null);
-    if (!navigator.geolocation) {
-      setGpsError(t.shared.mapGpsUnsupported);
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const q = query.trim();
+    if (!q || busy) return;
+
+    // People often paste a link or coordinates into the search box — handle that too.
+    if (looksLikeMapLink(q) || parseCoordsFromText(q)) {
+      setLink(q);
+      await applyLink(q);
       return;
     }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setBusy('search');
+    setError('');
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=uz&limit=5&accept-language=${lang},uz,ru&q=${encodeURIComponent(q)}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string; name?: string }>;
+      const list: SearchResult[] = (Array.isArray(data) ? data : [])
+        .map((item) => {
+          const parts = String(item.display_name || '').split(',').map((s) => s.trim());
+          return {
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            title: item.name || parts[0] || q,
+            subtitle: parts.slice(item.name ? 0 : 1).join(', '),
+          };
+        })
+        .filter((r) => isValidLatLng(r.lat, r.lng));
+      if (list.length === 0) {
+        setError(l.noResults);
+      } else if (list.length === 1) {
+        await select(list[0].lat, list[0].lng, [list[0].title, list[0].subtitle].filter(Boolean).join(', '));
+      } else {
+        setResults(list);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') setError(l.searchFailed);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const applyLink = async (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setBusy('link');
+    setError('');
+    try {
+      let coords = parseCoordsFromText(value);
+      if (!coords && (isShortMapLink(value) || looksLikeMapLink(value))) {
+        const res = await fetch(`/api/maps/resolve?url=${encodeURIComponent(value)}`);
+        const data = await res.json().catch(() => null);
+        if (data?.ok && typeof data.url === 'string') {
+          coords = parseCoordsFromText(data.url);
+        }
+      }
+      if (!coords) {
+        setError(l.badLink);
+        return;
+      }
+      const source = looksLikeMapLink(value) ? (/^https?:\/\//i.test(value) ? value : `https://${value}`) : undefined;
+      await select(coords.lat, coords.lng, undefined, source);
+      setLink('');
+      setQuery('');
+    } catch {
+      setError(l.badLink);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleGps = () => {
+    setError('');
+    if (!navigator.geolocation) {
+      setError(l.gpsUnsupported);
+      return;
+    }
+    setBusy('gps');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = parseFloat(pos.coords.latitude.toFixed(5));
-        const lng = parseFloat(pos.coords.longitude.toFixed(5));
-        setCurrentCoords({ lat, lng });
-
-        if (mapInstanceRef.current && markerRef.current) {
-          mapInstanceRef.current.flyTo([lat, lng], 17);
-          markerRef.current.setLatLng([lat, lng]);
-          markerRef.current.bindPopup(`<b>${t.shared.mapYouAreHere}</b>`).openPopup();
-        }
-
-        const addr = await fetchAddress(lat, lng);
-        onLocationSelect(lat, lng, addr);
+        await select(pos.coords.latitude, pos.coords.longitude);
+        setBusy(null);
       },
       () => {
-        setGpsError(t.shared.mapGpsDenied);
-      }
+        setError(l.gpsDenied);
+        setBusy(null);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
     );
   };
 
   return (
-    <div className={`space-y-2 rounded-2xl overflow-hidden border border-black/10 bg-white shadow-sm p-3 ${className}`}>
-      <form onSubmit={handleSearch} className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-[#7A6A63] absolute left-3 top-1/2 -translate-y-1/2" />
+    <div className={`space-y-3 rounded-2xl border border-black/10 bg-white shadow-sm p-3 sm:p-4 ${className}`}>
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-4 h-4 text-[#7A6A63] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={l.searchPlaceholder}
+            aria-label={l.searchPlaceholder}
+            className="w-full min-h-[46px] pl-9 pr-3 rounded-xl bg-[#F7F3F1] border border-black/5 text-sm outline-none focus:bg-white focus:border-[#D9658B] transition-colors"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={busy !== null || !query.trim()}
+            className="flex-1 sm:flex-none min-h-[46px] px-5 rounded-xl bg-[#1E1418] text-white hover:bg-black disabled:opacity-50 text-sm font-bold transition-colors inline-flex items-center justify-center gap-1.5"
+          >
+            {busy === 'search' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null}
+            {l.search}
+          </button>
+          <button
+            type="button"
+            onClick={handleGps}
+            disabled={busy !== null}
+            className="flex-1 sm:flex-none min-h-[46px] px-3.5 rounded-xl bg-[#E8F3FA] text-[#1E3A5F] hover:bg-[#B9DFFA] disabled:opacity-50 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+          >
+            {busy === 'gps' ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <LocateFixed className="w-4 h-4" aria-hidden="true" />
+            )}
+            {l.gps}
+          </button>
+        </div>
+      </form>
+
+      {results.length > 0 && (
+        <ul className="rounded-xl border border-black/10 divide-y divide-black/5 overflow-hidden">
+          {results.map((r, i) => (
+            <li key={`${r.lat},${r.lng},${i}`}>
+              <button
+                type="button"
+                onClick={() => select(r.lat, r.lng, [r.title, r.subtitle].filter(Boolean).join(', '))}
+                className="w-full text-left px-3 py-2.5 hover:bg-[#FCEEF4] transition-colors flex items-start gap-2"
+              >
+                <MapPin className="w-4 h-4 mt-0.5 text-[#D9658B] shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-[#1E1418] truncate">{r.title}</span>
+                  {r.subtitle && <span className="block text-xs text-[#7A6A63] line-clamp-2">{r.subtitle}</span>}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="text-xs font-semibold text-[#4A3E39] pt-1">{l.linkLabel}</p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          applyLink(link);
+        }}
+        className="flex gap-2"
+      >
+        <div className="relative flex-1 min-w-0">
+          <Link2 className="w-4 h-4 text-[#7A6A63] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.shared.mapSearchFullPlaceholder}
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/5 border border-black/5 text-xs outline-none focus:bg-white focus:border-[#D9658B] transition-all"
+            inputMode="url"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            onPaste={(e) => {
+              const pasted = e.clipboardData.getData('text');
+              if (pasted && (looksLikeMapLink(pasted) || parseCoordsFromText(pasted))) {
+                e.preventDefault();
+                setLink(pasted);
+                applyLink(pasted);
+              }
+            }}
+            placeholder={l.linkPlaceholder}
+            aria-label={l.linkPlaceholder}
+            className="w-full min-h-[44px] pl-9 pr-3 rounded-xl bg-[#F7F3F1] border border-dashed border-black/15 text-sm outline-none focus:bg-white focus:border-[#D9658B] transition-colors"
           />
         </div>
         <button
           type="submit"
-          disabled={isSearching}
-          className="px-4 py-2 rounded-xl bg-[#1E1418] text-white hover:bg-black text-xs font-bold shrink-0 transition-all"
+          disabled={busy !== null || !link.trim()}
+          className="min-h-[44px] px-4 rounded-xl border border-black/10 bg-white hover:bg-black/5 disabled:opacity-50 text-sm font-semibold transition-colors inline-flex items-center gap-1.5"
         >
-          {isSearching ? t.shared.mapSearchingBtn : t.shared.mapSearchBtn}
-        </button>
-        <button
-          type="button"
-          onClick={handleCurrentGPS}
-          className="p-2 rounded-xl bg-[#E8F3FA] text-[#1E3A5F] hover:bg-[#B9DFFA] shrink-0 transition-all"
-          title={t.shared.mapMyGpsBtn}
-          aria-label={t.shared.mapMyGpsBtn}
-        >
-          <Compass className="w-4 h-4" />
+          {busy === 'link' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null}
+          {l.linkApply}
         </button>
       </form>
 
-      {gpsError && (
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-rose-600 bg-rose-50 px-2.5 py-1.5 rounded-xl border border-rose-200">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{gpsError}</span>
+      {error && (
+        <div role="alert" className="flex items-start gap-1.5 text-xs font-medium text-rose-700 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200">
+          <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="relative rounded-xl overflow-hidden border border-black/10" style={{ height: '260px' }}>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossOrigin="" />
-        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
-
-        <div className="absolute top-2 left-2 z-[400] bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg shadow-sm border border-black/5 text-[10px] font-bold text-[#1E1418] flex items-center gap-1.5 pointer-events-none">
-          <MapPin className="w-3 h-3 text-[#D9658B]" />
-          <span>{t.shared.mapTapHint}</span>
+      {hasPoint ? (
+        <>
+          <VenueMap latitude={latitude} longitude={longitude} language={lang} height={240} showRouteButtons={false} />
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+            <Check className="w-4 h-4" aria-hidden="true" />
+            {l.selected}
+          </div>
+        </>
+      ) : (
+        <div className="rounded-xl bg-[#F7F3F1] border border-dashed border-black/10 px-3 py-6 text-center text-xs text-[#7A6A63]">
+          <MapPin className="w-5 h-5 mx-auto mb-1.5 text-[#D9658B]" aria-hidden="true" />
+          {l.notSelected}
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center justify-between text-[11px] pt-1">
-        <span className="text-[#5C4F48] flex items-center gap-1">
-          <Check className="w-3.5 h-3.5 text-emerald-600" />
-          <span>{t.shared.mapSelectedPoint}</span>
-        </span>
-        <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-          {currentCoords.lat}, {currentCoords.lng}
-        </span>
-      </div>
     </div>
   );
 };
+
+export default LocationPickerMap;

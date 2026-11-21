@@ -915,16 +915,6 @@ lg-navbar.taklifim-top-navbar .lg-nav__copy > span {
   }
 }
 
-/* Leaflet map container and popups use the UI font */
-.leaflet-container,
-.leaflet-popup-content,
-.leaflet-popup-content-wrapper,
-.leaflet-control {
-  font-family: var(--font-ui) !important;
-  font-feature-settings: "lnum" 1, "tnum" 1;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-
 /* Pure-CSS GlassSegmented track & indicator */
 .taklifim-seg-track {
   scrollbar-width: none;
@@ -1615,4 +1605,14 @@ html.taklifim-modal-open .taklifim-bottom-nav {
 .tk-cover--opening .tk-cover-glow {
   animation: none;
   opacity: 0;
+}
+
+/* Builder: optional sections — the toggle already shows the title, so hide the body's own heading */
+.builder-section-toggle[aria-expanded="true"] + * {
+  padding: 4px 2px 8px;
+}
+.builder-section-toggle[aria-expanded="true"] + * > h3.font-playfair:first-child,
+.builder-section-toggle[aria-expanded="true"] + * > div:first-child > h3.font-playfair:first-child,
+.builder-section-toggle[aria-expanded="true"] + * > div:first-child > div:first-child > h3.font-playfair:first-child {
+  display: none;
 }

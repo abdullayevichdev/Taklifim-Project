@@ -7,6 +7,7 @@ export const ru: typeof uz = {
 
   // Навигация
   nav: {
+    more: 'Ещё',
     home: 'Главная',
     templates: 'Шаблоны',
     myInvitations: 'Мои приглашения',
@@ -427,6 +428,22 @@ export const ru: typeof uz = {
   builder: {
     title: 'Конструктор приглашения',
     subtitle: 'Настройте свой шаблон и мгновенно наблюдайте результат на панели справа',
+    simple: {
+      stageTemplate: 'Шаблон',
+      stageDetails: 'Данные',
+      stageCustomize: 'Оформление',
+      stageCheckout: 'Проверка и оплата',
+      progress: 'Шаг {current} из {total}',
+      detailsHint: 'Только самое нужное: чьё торжество, когда и где.',
+      customizeTitle: 'Оформите приглашение (необязательно)',
+      customizeHint: 'Всё здесь необязательно — шаблон уже красивый. Откройте нужный раздел или сразу переходите к следующему шагу.',
+      optional: 'необязательно',
+      linkSection: 'Ссылка на приглашение',
+      sampleNamesWarning: 'Внимание: имена всё ещё из примера. Вернитесь на шаг 2 и впишите свои.',
+      editDetails: 'Изменить данные',
+      next: 'Далее',
+      skipToCheckout: 'Готово — проверка и оплата',
+    },
     steps: {
       template: 'Шаблон',
       details: 'Основные данные',

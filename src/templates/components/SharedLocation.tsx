@@ -46,7 +46,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
       time: 'Boshlanish vaqti',
       venue: 'Tadbir manzili',
       home: '🏡 Uyda (Xonadonda)',
-      openMap: 'Google Maps xaritasida ko‘rish',
+      openMap: 'Xaritada ochish',
       calendar: 'Taqvimga saqlash',
       menAudience: '👔 Erkaklar majlisi',
       womenAudience: '👗 Ayollar davrasi',
@@ -57,7 +57,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
       time: 'Время начала',
       venue: 'Место проведения',
       home: '🏡 В семейном кругу (Дома)',
-      openMap: 'Открыть на картах Google',
+      openMap: 'Открыть на карте',
       calendar: 'Добавить в календарь',
       menAudience: '👔 Мужской банкет',
       womenAudience: '👗 Женский вечер',
@@ -68,7 +68,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
       time: 'Start Time',
       venue: 'Event Venue',
       home: '🏡 Family Residence (Home)',
-      openMap: 'Open in Google Maps',
+      openMap: 'Open in Maps',
       calendar: 'Save to Calendar',
       menAudience: '👔 Gentlemen’s Gathering',
       womenAudience: '👗 Ladies’ Celebration',
@@ -79,7 +79,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
     time: 'Boshlanish vaqti',
     venue: 'Tadbir manzili',
     home: '🏡 Uyda (Xonadonda)',
-    openMap: 'Google Maps xaritasida ko‘rish',
+    openMap: 'Xaritada ochish',
     calendar: 'Taqvimga saqlash',
     menAudience: '👔 Erkaklar majlisi',
     womenAudience: '👗 Ayollar davrasi',
@@ -105,9 +105,7 @@ export const SharedLocation: React.FC<SharedLocationProps> = ({
 
   const resolvedMapUrl =
     mapUrl ||
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      `${venueName || ''} ${venueAddress || ''}`
-    )}`;
+    `https://yandex.uz/maps/?text=${encodeURIComponent(`${venueName || ''} ${venueAddress || ''}`.trim())}`;
 
   return (
     <div

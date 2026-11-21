@@ -5,6 +5,7 @@ export const uz = {
 
   // Navigatsiya
   nav: {
+    more: 'Yana',
     home: 'Bosh sahifa',
     templates: 'Shablonlar',
     myInvitations: 'Taklifnomalarim',
@@ -425,6 +426,22 @@ export const uz = {
   builder: {
     title: 'Taklifnoma konstruktori',
     subtitle: 'Shabloningizni moslashtiring va natijani o‘ng tomonda jonli kuzating',
+    simple: {
+      stageTemplate: 'Shablon',
+      stageDetails: 'Ma’lumotlar',
+      stageCustomize: 'Bezash',
+      stageCheckout: 'Tekshirish va to‘lov',
+      progress: '{current}-bosqich / {total}',
+      detailsHint: 'Faqat eng kerakli ma’lumotlar: kimning to‘yi, qachon va qayerda.',
+      customizeTitle: 'Taklifnomani bezang (ixtiyoriy)',
+      customizeHint: 'Bu yerdagi hamma narsa ixtiyoriy — shablon allaqachon chiroyli. Xohlagan bo‘limni ochib o‘zgartiring yoki to‘g‘ridan-to‘g‘ri keyingi bosqichga o‘ting.',
+      optional: 'ixtiyoriy',
+      linkSection: 'Taklifnoma havolasi',
+      sampleNamesWarning: 'Diqqat: ismlar hali namunadagidek. 2-bosqichga qaytib, o‘z ismlaringizni yozing.',
+      editDetails: 'Ma’lumotlarni tahrirlash',
+      next: 'Keyingisi',
+      skipToCheckout: 'Tayyor — tekshirish va to‘lov',
+    },
     steps: {
       template: 'Shablon',
       details: 'Asosiy ma’lumotlar',
