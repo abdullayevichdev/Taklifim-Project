@@ -11,6 +11,7 @@ import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { InvitationShell } from '../components/InvitationShell';
 import { LocationPickerMap } from '../components/LocationPickerMap';
+import { PRESET_MUSIC_TRACKS, DEFAULT_MUSIC_TITLE, DEFAULT_MUSIC_URL } from '../data/musicLibrary';
 import { BuilderSectionToggle } from '../components/BuilderSectionToggle';
 import { yandexPlaceUrl } from '../utils/mapLinks';
 import { audioStorage } from '../utils/audioStorage';
@@ -113,11 +114,6 @@ const POPULAR_VENUES = [
   { name: '«Sayohat» Restorani', address: 'Toshkent sh., Mirzo Ulug‘bek tumani, Buyuk Ipak Yo‘li ko‘chasi, 115', lat: 41.3245, lng: 69.3142 },
 ];
 
-// Sara to'y taronalari kutubxonasi (100% ishlaydigan audio fayllar)
-const PRESET_MUSIC_TRACKS = [
-  { title: 'Nafis To‘y Valsi (Pianino va Skripka)', url: '/audio/wedding_vals.mp3' },
-  { title: 'Romantik Sevgi Taronasi (Sweet Love)', url: '/audio/romantic_love.mp3' },
-];
 
 // Google Maps havolasidan yoki matndan koordinatalarni aniqlovchi aqlli parser
 function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | null {
@@ -289,8 +285,8 @@ export const BuilderPage: React.FC = () => {
       galleryTitle: 'Bizning suratlarimiz',
       galleryPosition: 'after_message',
       musicEnabled: true,
-      musicTitle: 'Nafis To‘y Valsi (Pianino va Skripka)',
-      musicUrl: '/audio/wedding_vals.mp3',
+      musicTitle: DEFAULT_MUSIC_TITLE,
+      musicUrl: DEFAULT_MUSIC_URL,
       musicFileData: undefined,
       musicPlacement: 'all',
       socialLinks: {
@@ -1338,26 +1334,26 @@ export const BuilderPage: React.FC = () => {
 
   const handleRemoveTrack = (trackId: string) => {
     setInvitationState((prev) => {
+      const removed = (prev.musicTracks || []).find((t) => t.id === trackId);
       const remaining = (prev.musicTracks || []).filter((t) => t.id !== trackId);
-      const activeUrl = prev.musicUrl;
-      const willResetActive = remaining.every((t) => t.url !== activeUrl);
+      // Only switch songs when the removed upload was the one playing; a chosen library song stays.
+      const willResetActive = Boolean(removed && removed.url === prev.musicUrl);
       return {
         ...prev,
         musicTracks: remaining,
-        musicTitle: willResetActive ? (remaining[0]?.title || '') : prev.musicTitle,
-        musicUrl: willResetActive ? (remaining[0]?.url || '') : prev.musicUrl,
-        musicEnabled: remaining.length > 0 ? prev.musicEnabled : false,
+        musicTitle: willResetActive ? (remaining[0]?.title || DEFAULT_MUSIC_TITLE) : prev.musicTitle,
+        musicUrl: willResetActive ? (remaining[0]?.url || DEFAULT_MUSIC_URL) : prev.musicUrl,
       };
     });
     showToast(t.builder.toasts.trackRemoved, 'info');
   };
 
   const handleRemoveMusic = () => {
+    // Uploaded songs are cleared; the invitation falls back to the default library song.
     setInvitationState((prev) => ({
       ...prev,
-      musicEnabled: false,
-      musicTitle: '',
-      musicUrl: '',
+      musicTitle: DEFAULT_MUSIC_TITLE,
+      musicUrl: DEFAULT_MUSIC_URL,
       musicTracks: [],
       musicFileData: undefined,
     }));
@@ -2622,7 +2618,8 @@ export const BuilderPage: React.FC = () => {
                         <div className="space-y-1.5">
                           {PRESET_MUSIC_TRACKS.map((track, idx) => {
                             const isSelected = invitationState.musicUrl === track.url;
-                            const displayTitle = t.builder.tracks[idx]?.name || track.title;
+                            const displayTitle =
+                              (track.localeIndex !== undefined && t.builder.tracks[track.localeIndex]?.name) || track.title;
                             return (
                               <div
                                 key={idx}

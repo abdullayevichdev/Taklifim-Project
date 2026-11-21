@@ -9,6 +9,7 @@ import { calculateCountdown, validateRSVPForm } from '../utils/logic';
 import { ShareModal } from '../components/ShareModal';
 import { MusicPlayer } from '../components/MusicPlayer';
 import { VenueMap } from '../components/VenueMap';
+import { DEFAULT_MUSIC_TITLE, DEFAULT_MUSIC_URL } from '../data/musicLibrary';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { PhoneInput } from '../components/PhoneInput';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
@@ -899,10 +900,10 @@ export const InvitationGuestPage: React.FC = () => {
         />
 
         {/* Floating Music Player if enabled & uploaded */}
-        {invitation.musicEnabled && invitation.musicUrl && (
+        {invitation.musicEnabled !== false && (
           <MusicPlayer
-            url={invitation.musicUrl}
-            title={invitation.musicTitle}
+            url={invitation.musicUrl || DEFAULT_MUSIC_URL}
+            title={invitation.musicUrl ? invitation.musicTitle : DEFAULT_MUSIC_TITLE}
             autoPlay={true}
             delaySeconds={5}
             language={invLang}

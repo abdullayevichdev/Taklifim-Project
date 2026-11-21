@@ -1,3 +1,4 @@
+import { DEFAULT_MUSIC_URL } from '../data/musicLibrary';
 /**
  * Yengil, mustahkam va xavfsiz Audio Storage (IndexedDB)
  * Brauzerda har qanday hajmdagi MP3/WAV/OGG fayllarni 100% CORS xatoliksiz
@@ -70,7 +71,7 @@ export const audioStorage = {
    * - Agar fayl topilmasa -> standart to'y kuyi bilan xatoliksiz ta'minlaydi
    */
   async getAudioUrl(idOrUrl: string): Promise<string> {
-    if (!idOrUrl) return '/audio/wedding_vals.mp3';
+    if (!idOrUrl) return DEFAULT_MUSIC_URL;
 
     // Oddiy HTTP yoki lokal fayl bo'lsa
     if (!idOrUrl.startsWith('idb://')) {
@@ -103,14 +104,14 @@ export const audioStorage = {
             resolve(blobUrl);
           } else {
             // Agar boshqa qurilma yoki topilmasa, jim qolmasdan chiroyli to'y valsi yangraydi
-            resolve('/audio/wedding_vals.mp3');
+            resolve(DEFAULT_MUSIC_URL);
           }
         };
 
-        req.onerror = () => resolve('/audio/wedding_vals.mp3');
+        req.onerror = () => resolve(DEFAULT_MUSIC_URL);
       });
     } catch {
-      return '/audio/wedding_vals.mp3';
+      return DEFAULT_MUSIC_URL;
     }
   },
 
