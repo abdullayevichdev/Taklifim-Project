@@ -167,7 +167,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <span>{t.footer?.madeWithLove || 'Yurakdan mehr bilan yaratilgan'}</span>
             <Heart className="w-3.5 h-3.5 text-[#D66389] fill-[#D66389]" aria-hidden="true" />
-            <span>{t.footer?.location || 'Toshkent, O‘zbekiston'}</span>
+            <span>{t.footer?.location || 'Namangan, O‘zbekiston'}</span>
           </div>
         </div>
       </div>

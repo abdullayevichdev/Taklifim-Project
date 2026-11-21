@@ -24,7 +24,7 @@ export const LuxuryEnvelope: React.FC<LuxuryEnvelopeProps> = ({
   onOpen,
   hostNames = 'Nodirbek & Malika',
   eventDate = '2026.10.25 • 18:00',
-  venueName = '«Versal» Saroyi, Toshkent',
+  venueName = '«Versal» Saroyi, Namangan',
   className = '',
   buttonLabel = 'Taklifnomani ochish',
   headerLabel = 'Taklifnoma',
