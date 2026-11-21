@@ -312,12 +312,12 @@ export const Header: React.FC = () => {
         {/* Brand Logo Pill — always visible, never clipped */}
         <Link
           to="/"
-          className={`pointer-events-auto inline-flex items-center gap-2 shrink-0 min-h-[42px] px-2.5 sm:px-3 py-1 rounded-full transition-all duration-300 ${
+          className={`pointer-events-auto inline-flex items-center gap-1.5 sm:gap-2 shrink-0 min-h-[42px] px-2 sm:px-3 py-1 rounded-full transition-all duration-300 ${
             isScrolled ? 'glass-surface-elevated' : 'glass-surface'
           }`}
         >
-          <TashrifimMark className="w-9 h-9 drop-shadow-[0_4px_10px_rgba(178,56,100,0.28)]" />
-          <span className="font-playfair text-[16px] sm:text-[17px] xl:text-[18px] 2xl:text-[20px] font-bold tracking-[0.08em] uppercase text-[#1E1418] whitespace-nowrap pr-1">
+          <TashrifimMark className="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_4px_10px_rgba(178,56,100,0.28)]" />
+          <span className="font-playfair text-[14px] min-[400px]:text-[15px] sm:text-[17px] xl:text-[18px] 2xl:text-[20px] font-bold tracking-[0.05em] sm:tracking-[0.08em] uppercase text-[#1E1418] whitespace-nowrap pr-1">
             Tashrifim
           </span>
         </Link>
@@ -469,6 +469,16 @@ export const Header: React.FC = () => {
 
         {/* Mobile Compact Header Controls (NO duplicated hamburger drawer — handled by GlassBottomNav) */}
         <div className="pointer-events-auto flex items-center gap-1.5 lg:hidden shrink-0">
+          {/* Phones: compact call button (the full number pill does not fit next to the logo) */}
+          <a
+            href="tel:+998933223580"
+            aria-label="+998 933223580 — Avazxanov Abdulhay"
+            title="+998 933223580 — Avazxanov Abdulhay"
+            className="sm:hidden inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-full lg-contact-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]"
+          >
+            <Phone className="w-4 h-4 text-[#B23864]" aria-hidden="true" />
+          </a>
+
           <a
             href="tel:+998933223580"
             aria-label="+998 933223580 — Avazxanov Abdulhay"
@@ -493,7 +503,7 @@ export const Header: React.FC = () => {
             options={languageOptions}
             ariaLabel={t.nav.selectLanguage}
             title={t.nav.selectLanguage}
-            buttonClassName="px-2.5 py-1.5 min-h-[42px]"
+            buttonClassName="px-2 sm:px-2.5 py-1.5 min-h-[42px]"
             renderTriggerLabel={(selected) => (
               <span className="inline-flex items-center gap-1.5">
                 <FlagIcon code={selected.value} />
@@ -540,7 +550,7 @@ export const Header: React.FC = () => {
               className="inline-flex items-center gap-1.5 min-h-[42px] px-3 py-1.5 rounded-full glass-surface text-xs font-semibold text-[#1E1418] hover:bg-white/95 transition-all whitespace-nowrap"
             >
               <LogIn className="w-3.5 h-3.5 text-[#C94F79]" aria-hidden="true" />
-              <span>{t.nav.login}</span>
+              <span className="max-[419px]:sr-only">{t.nav.login}</span>
             </Link>
           )}
         </div>
