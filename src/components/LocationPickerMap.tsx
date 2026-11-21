@@ -4,6 +4,7 @@ import { useLanguage } from '../locales';
 import { Language } from '../types';
 import { VenueMap } from './VenueMap';
 import { isShortMapLink, isValidLatLng, looksLikeMapLink, parseCoordsFromText } from '../utils/mapLinks';
+import { DEFAULT_CITY_ID, UZ_CITIES, distanceKm } from '../data/uzCities';
 
 interface LocationPickerMapProps {
   latitude?: number;
@@ -23,7 +24,11 @@ interface SearchResult {
 
 const LABELS = {
   uz: {
-    searchPlaceholder: 'To‘yxona nomi yoki manzil',
+    cityLabel: 'Shahar',
+    gpsApprox: 'Brauzer joylashuvingizni faqat taxminan aniqladi (±{km} km) — kompyuterlarda ko‘pincha internet provayder manzili ko‘rsatiladi. Bu joy to‘g‘rimi?',
+    gpsUseAnyway: 'Ha, shu joy',
+    gpsCancel: 'Yo‘q — qidiraman',
+    searchPlaceholder: 'To‘yxona nomi yoki manzil (masalan: Versal)',
     search: 'Qidirish',
     gps: 'Hozir turgan joyim',
     linkPlaceholder: 'Havolani qo‘ying',
@@ -39,7 +44,11 @@ const LABELS = {
     tip: 'Maslahat: to‘yxona Yandex yoki Google xaritada bo‘lsa, uning havolasini qo‘yish eng aniq usul.',
   },
   ru: {
-    searchPlaceholder: 'Ресторан или адрес',
+    cityLabel: 'Город',
+    gpsApprox: 'Браузер определил место лишь приблизительно (±{km} км) — на компьютерах часто показывается адрес интернет-провайдера. Это правильное место?',
+    gpsUseAnyway: 'Да, это место',
+    gpsCancel: 'Нет — найду поиском',
+    searchPlaceholder: 'Ресторан или адрес (например: Versal)',
     search: 'Найти',
     gps: 'Моё местоположение',
     linkPlaceholder: 'Вставьте ссылку',
@@ -55,7 +64,11 @@ const LABELS = {
     tip: 'Совет: самый точный способ — вставить ссылку на заведение из Яндекс или Google Карт.',
   },
   en: {
-    searchPlaceholder: 'Venue or address',
+    cityLabel: 'City',
+    gpsApprox: 'Your browser only estimated your location (±{km} km) — computers often report the internet provider’s address. Is this the right place?',
+    gpsUseAnyway: 'Yes, use it',
+    gpsCancel: 'No — I’ll search',
+    searchPlaceholder: 'Venue or address (e.g. Versal)',
     search: 'Search',
     gps: 'My location',
     linkPlaceholder: 'Paste link',
@@ -108,6 +121,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [busy, setBusy] = useState<'search' | 'gps' | 'link' | null>(null);
   const [error, setError] = useState('');
+  const [cityId, setCityId] = useState<string>(DEFAULT_CITY_ID);
+  const [pendingGps, setPendingGps] = useState<{ lat: number; lng: number; accuracyKm: number } | null>(null);
+  const city = UZ_CITIES.find((c) => c.id === cityId) || UZ_CITIES[0];
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -143,13 +159,26 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     setBusy('search');
     setError('');
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=uz&limit=5&accept-language=${lang},uz,ru&q=${encodeURIComponent(q)}`,
-        { signal: controller.signal }
-      );
-      if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string; name?: string }>;
-      const list: SearchResult[] = (Array.isArray(data) ? data : [])
+      // 1) inside the chosen city, 2) "<query>, <city>" anywhere in Uzbekistan, 3) the plain query.
+      const d = 0.3;
+      const viewbox = `${city.lng - d},${city.lat + d},${city.lng + d},${city.lat - d}`;
+      const base = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=uz&limit=6&accept-language=${lang},uz,ru`;
+      const attempts = [
+        `${base}&viewbox=${viewbox}&bounded=1&q=${encodeURIComponent(q)}`,
+        `${base}&viewbox=${viewbox}&q=${encodeURIComponent(`${q}, ${city.name}`)}`,
+        `${base}&viewbox=${viewbox}&q=${encodeURIComponent(q)}`,
+      ];
+      let data: Array<{ lat: string; lon: string; display_name: string; name?: string }> = [];
+      for (const url of attempts) {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(String(res.status));
+        const json = await res.json();
+        if (Array.isArray(json) && json.length > 0) {
+          data = json;
+          break;
+        }
+      }
+      const list: SearchResult[] = data
         .map((item) => {
           const parts = String(item.display_name || '').split(',').map((s) => s.trim());
           return {
@@ -159,7 +188,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
             subtitle: parts.slice(item.name ? 0 : 1).join(', '),
           };
         })
-        .filter((r) => isValidLatLng(r.lat, r.lng));
+        .filter((r) => isValidLatLng(r.lat, r.lng))
+        // Closest to the chosen city first
+        .sort((a, b) => distanceKm(a.lat, a.lng, city.lat, city.lng) - distanceKm(b.lat, b.lng, city.lat, city.lng));
       if (list.length === 0) {
         setError(l.noResults);
       } else if (list.length === 1) {
@@ -212,20 +243,47 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
     setBusy('gps');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        await select(pos.coords.latitude, pos.coords.longitude);
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        const accuracyKm = Math.round((accuracy || 0) / 1000);
         setBusy(null);
+        // Desktop browsers without GPS/Wi-Fi often return the ISP location (usually Tashkent).
+        // Don't silently put a wrong pin: ask when the estimate is coarse.
+        if (accuracy > 3000) {
+          setPendingGps({ lat, lng, accuracyKm: Math.max(1, accuracyKm) });
+          return;
+        }
+        setPendingGps(null);
+        await select(lat, lng);
       },
       () => {
         setError(l.gpsDenied);
         setBusy(null);
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
   return (
     <div className={`space-y-3 rounded-2xl border border-black/10 bg-white shadow-sm p-3 sm:p-4 ${className}`}>
-      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
+      <label className="flex items-center gap-2 text-xs font-semibold text-[#4A3E39]">
+        <span>{l.cityLabel}:</span>
+        <select
+          value={cityId}
+          onChange={(e) => {
+            setCityId(e.target.value);
+            setResults([]);
+          }}
+          className="min-h-[40px] px-3 rounded-xl bg-[#F7F3F1] border border-black/5 text-sm font-semibold text-[#1E1418] outline-none focus:bg-white focus:border-[#D9658B] cursor-pointer"
+        >
+          {UZ_CITIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <form onSubmit={handleSearch} className="flex flex-col gap-2">
         <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 text-[#7A6A63] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
@@ -241,7 +299,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           <button
             type="submit"
             disabled={busy !== null || !query.trim()}
-            className="flex-1 sm:flex-none min-h-[46px] px-5 rounded-xl bg-[#1E1418] text-white hover:bg-black disabled:opacity-50 text-sm font-bold transition-colors inline-flex items-center justify-center gap-1.5"
+            className="flex-1 min-h-[46px] px-5 rounded-xl bg-[#1E1418] text-white hover:bg-black disabled:opacity-50 text-sm font-bold transition-colors inline-flex items-center justify-center gap-1.5"
           >
             {busy === 'search' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null}
             {l.search}
@@ -250,7 +308,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
             type="button"
             onClick={handleGps}
             disabled={busy !== null}
-            className="flex-1 sm:flex-none min-h-[46px] px-3.5 rounded-xl bg-[#E8F3FA] text-[#1E3A5F] hover:bg-[#B9DFFA] disabled:opacity-50 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+            className="flex-1 min-h-[46px] px-3.5 rounded-xl bg-[#E8F3FA] text-[#1E3A5F] hover:bg-[#B9DFFA] disabled:opacity-50 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
           >
             {busy === 'gps' ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -319,6 +377,32 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           {l.linkApply}
         </button>
       </form>
+
+      {pendingGps && (
+        <div role="alert" className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+          <p className="font-medium leading-relaxed">{l.gpsApprox.replace('{km}', String(pendingGps.accuracyKm))}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const p = pendingGps;
+                setPendingGps(null);
+                void select(p.lat, p.lng);
+              }}
+              className="min-h-[36px] px-3 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700"
+            >
+              {l.gpsUseAnyway}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingGps(null)}
+              className="min-h-[36px] px-3 rounded-lg border border-amber-300 bg-white font-semibold hover:bg-amber-100"
+            >
+              {l.gpsCancel}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="flex items-start gap-1.5 text-xs font-medium text-rose-700 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200">

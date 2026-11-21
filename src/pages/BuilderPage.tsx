@@ -102,19 +102,6 @@ import {
 const GLASS_FIELD_CLS =
   'w-full min-h-[42px] px-3.5 py-2 rounded-[var(--lg-radius)] glass-surface-subtle bg-white/80 text-xs sm:text-[13px] text-[#1E1418] placeholder-[#7A6A63] outline-none transition-all focus:bg-white/95 focus:ring-2 focus:ring-[#D66389]/35 focus:border-[#D66389]/60';
 
-// Mashhur tantanalar zallari va ularning aniq koordinatalari
-const POPULAR_VENUES = [
-  { name: '«Versal» Tantanalar Majmuasi', address: 'Toshkent sh., Shayxontohur t., Navoiy ko‘chasi, 42', lat: 41.3217, lng: 69.2415 },
-  { name: '«Yakkasaroy» Tantanalar Saroyi', address: 'Toshkent sh., Shota Rustaveli ko‘chasi, 82', lat: 41.2785, lng: 69.2458 },
-  { name: '«Ezidiyor» Majmuasi', address: 'Toshkent sh., Chilonzor tumani, Bunyodkor shoh ko‘chasi', lat: 41.2721, lng: 69.2014 },
-  { name: '«Hyatt Regency Tashkent» Ballroom', address: 'Toshkent sh., Navoiy shoh ko‘chasi, 1-A', lat: 41.3168, lng: 69.2788 },
-  { name: '«Hilton Tashkent City»', address: 'Toshkent sh., Islom Karimov ko‘chasi, 2', lat: 41.3121, lng: 69.2512 },
-  { name: '«Osiyo Grand»', address: 'Toshkent sh., Yunusobod tumani, A. Temur shoh ko‘chasi', lat: 41.3541, lng: 69.2890 },
-  { name: '«Mumtoz» Tantanalar Saroyi', address: 'Toshkent sh., Qorasaroy ko‘chasi, 312', lat: 41.3489, lng: 69.2312 },
-  { name: '«Sayohat» Restorani', address: 'Toshkent sh., Mirzo Ulug‘bek tumani, Buyuk Ipak Yo‘li ko‘chasi, 115', lat: 41.3245, lng: 69.3142 },
-];
-
-
 // Google Maps havolasidan yoki matndan koordinatalarni aniqlovchi aqlli parser
 function parseGoogleMapsInput(input: string): { lat?: number; lng?: number } | null {
   if (!input) return null;
@@ -271,7 +258,7 @@ export const BuilderPage: React.FC = () => {
       celebrationAudience: 'all',
       venueName: '',
       venueAddress: '',
-      city: 'Toshkent',
+      city: 'Namangan',
       latitude: undefined,
       longitude: undefined,
       mapUrl: '',
