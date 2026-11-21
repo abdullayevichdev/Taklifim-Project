@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 import { checkRateLimit } from '../_lib/rateLimit.js';
 import { sendTemplateErrorAlertToTelegram } from '../_lib/telegram.js';
 

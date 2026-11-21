@@ -10,7 +10,8 @@
     "moduleDetection": "force",
     "esModuleInterop": true,
     "allowJs": true,
-    "noEmit": true
+    "noEmit": true,
+    "strict": true
   },
   "include": ["./**/*.ts"],
   "exclude": ["./**/*.test.ts"]

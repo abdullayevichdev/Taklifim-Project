@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 
 /**
  * Expands a Yandex / Google Maps share link (yandex.uz/maps/-/..., maps.app.goo.gl/...)

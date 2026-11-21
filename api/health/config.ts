@@ -1,5 +1,5 @@
 // TEMPORARY DIAGNOSTIC ENDPOINT — DELETE AFTER DEBUGGING
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
