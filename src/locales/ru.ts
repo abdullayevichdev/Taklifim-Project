@@ -7,6 +7,7 @@ export const ru: typeof uz = {
 
   // Навигация
   nav: {
+    more: 'Ещё',
     home: 'Главная',
     templates: 'Шаблоны',
     myInvitations: 'Мои приглашения',

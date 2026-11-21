@@ -419,6 +419,7 @@ export async function processUploadReceipt(
           telegramMessageId,
           idempotencyKey: attemptKey,
           nowIso,
+          preValidated: { existingOrder, existingInv },
         });
 
         if (commitRes.ok === false) {

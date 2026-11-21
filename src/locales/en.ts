@@ -6,6 +6,7 @@ export const en: typeof uz = {
   brandDesc: 'A premier digital invitation platform for crafting interactive website invitations for weddings, anniversaries, and milestones.',
 
   nav: {
+    more: 'More',
     home: 'Home',
     templates: 'Templates',
     myInvitations: 'My Invitations',

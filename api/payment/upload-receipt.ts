@@ -157,7 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? String(idempotencyKey)
         : undefined;
 
-    await ensureWebhookQuietly(req);
+    // Runs alongside the upload (not before it) so it never adds latency for the customer.
+    const webhookCheck = ensureWebhookQuietly(req);
 
     const result = await processUploadReceipt({
       verifiedUid: authUser.uid,
@@ -182,6 +183,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idempotencyKey: resolvedIdem,
     });
 
+    await webhookCheck;
     return res.status(result.statusCode).json(result.body);
   } catch (err: any) {
     console.error('Upload receipt handler error:', {

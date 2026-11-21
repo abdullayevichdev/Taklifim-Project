@@ -31,7 +31,7 @@ import {
   updateDoc,
   query,
   where,
-} from 'firebase/firestore';
+} from './firestoreDisabled';
 import {
   ref as rtdbRef,
   set as rtdbSet,
@@ -791,6 +791,11 @@ export const api = {
       let remoteOrderId: string | undefined;
       let remoteOwnerId: string | undefined;
 
+      // Read the invitation and its slug index in parallel (one round trip instead of two).
+      const initialSlug = preparedData.slug;
+      const slugReadPromise = rtdbGet(rtdbRef(rtdb, `slugs/${initialSlug}`)).catch(() => null);
+      let slugAlreadyOwned = false;
+
       try {
         const existingSnap = await rtdbGet(rtdbRef(rtdb, `invitations/${targetId}`));
         if (existingSnap.exists()) {
@@ -828,8 +833,10 @@ export const api = {
 
       // Check slug ownership in RTDB before writing so we never violate slugs/$slug .write rule
       try {
-        const slugSnap = await rtdbGet(rtdbRef(rtdb, `slugs/${preparedData.slug}`));
-        if (slugSnap.exists() && slugSnap.val() && slugSnap.val() !== targetId) {
+        const slugSnap = await slugReadPromise;
+        if (slugSnap && slugSnap.exists() && slugSnap.val() === targetId) {
+          slugAlreadyOwned = true;
+        } else if (slugSnap && slugSnap.exists() && slugSnap.val() && slugSnap.val() !== targetId) {
           const { groom, bride } = parseHostNames(
             preparedData.hostNames,
             preparedData.partner1Name,
@@ -867,8 +874,8 @@ export const api = {
       try {
         await rtdbUpdate(rtdbRef(rtdb, `invitations/${targetId}`), remotePayload);
         try {
-          const slugSnapAfter = await rtdbGet(rtdbRef(rtdb, `slugs/${preparedData.slug}`));
-          if (!slugSnapAfter.exists() || slugSnapAfter.val() === targetId) {
+          // Slug was checked above (free, or freshly generated as unique); claim it unless already ours.
+          if (!(slugAlreadyOwned && preparedData.slug === initialSlug)) {
             await rtdbSet(rtdbRef(rtdb, `slugs/${preparedData.slug}`), targetId);
           }
         } catch (slugErr) {

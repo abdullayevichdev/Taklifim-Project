@@ -1,4 +1,5 @@
 import React from 'react';
+import { TashrifimMark } from './TashrifimLogo';
 import { useRouter, Link } from '../context/RouterContext';
 import { useLanguage } from '../locales';
 import { Heart, Send, Instagram, Phone } from 'lucide-react';
@@ -21,19 +22,7 @@ export const Footer: React.FC = () => {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <Link to="/" className="inline-flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl overflow-hidden p-0.5 bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center border border-white/90 shadow-xs">
-                <img
-                  src="/logo.jpg"
-                  alt="INVITE Logo"
-                  className="w-full h-full object-cover rounded-[12px]"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.src.includes('Taklifim%20logo.jpg')) {
-                      target.src = '/assets/logo.jpg';
-                    }
-                  }}
-                />
-              </div>
+              <TashrifimMark className="w-11 h-11 drop-shadow-[0_6px_14px_rgba(178,56,100,0.25)]" />
               <span className="font-playfair text-2xl font-bold text-[#1E1418] tracking-wider uppercase">
                 Tashrifim
               </span>

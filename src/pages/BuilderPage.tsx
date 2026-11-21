@@ -42,9 +42,8 @@ import {
 } from '../utils/receiptUpload';
 import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PhoneInput } from '../components/PhoneInput';
-import { isFirebaseConfigured, storage } from '../services/firebase';
+import { isFirebaseConfigured, getStorageLazy } from '../services/firebase';
 import { SocialLoginButtons } from '../components/SocialLoginButtons';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
 import {
   ArrowLeft,
@@ -86,7 +85,7 @@ import {
   Send,
   Phone,
 } from 'lucide-react';
-import { TaklifimLogo } from '../components/TaklifimLogo';
+import { TashrifimLogo } from '../components/TashrifimLogo';
 import {
   GlassSurface,
   GlassButton,
@@ -1015,7 +1014,9 @@ export const BuilderPage: React.FC = () => {
       let fileBase64Payload: string | undefined = fileBase64 || undefined;
 
       if (isPdf) {
-        if (!isFirebaseConfigured() || !storage) {
+        const storage = isFirebaseConfigured() ? await getStorageLazy() : null;
+        const { ref: storageRef, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        if (!storage) {
           throw new Error(t.builder.toasts.pdfStorageError);
         }
         const path = `receipts/${orderId}/${Date.now()}_${selectedFile.name}`;
@@ -2678,7 +2679,7 @@ export const BuilderPage: React.FC = () => {
                           </div>
 
                           <div className="pt-1">
-                            <audio controls src={previewAudioUrl || invitationState.musicUrl} key={previewAudioUrl || invitationState.musicUrl} className="w-full h-8 rounded-lg" />
+                            <audio controls preload="none" src={previewAudioUrl || invitationState.musicUrl} key={previewAudioUrl || invitationState.musicUrl} className="w-full h-8 rounded-lg" />
                           </div>
 
                           <div>

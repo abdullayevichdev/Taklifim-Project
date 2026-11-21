@@ -5,6 +5,7 @@ export const uz = {
 
   // Navigatsiya
   nav: {
+    more: 'Yana',
     home: 'Bosh sahifa',
     templates: 'Shablonlar',
     myInvitations: 'Taklifnomalarim',

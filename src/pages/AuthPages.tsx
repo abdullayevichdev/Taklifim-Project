@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import { TashrifimMark } from '../components/TashrifimLogo';
 import { useRouter, Link } from '../context/RouterContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
@@ -86,13 +87,7 @@ export const AuthPages: React.FC = () => {
         {/* Header with untouched Logo */}
         <div className="text-center space-y-2">
           <Link to="/" className="inline-flex items-center gap-2 group">
-            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-[#F5C9D8] via-white to-[#B9DFFA] shadow-md border border-white">
-              <img
-                src="/logo.jpg"
-                alt={t.brandName}
-                className="w-full h-full object-cover rounded-[14px]"
-              />
-            </div>
+            <TashrifimMark className="w-14 h-14 drop-shadow-[0_8px_18px_rgba(178,56,100,0.3)]" title={t.brandName} />
           </Link>
           <h1 className="font-playfair text-2xl sm:text-3xl font-extrabold text-[#1E1418]">
             {t.auth.loginTitle}

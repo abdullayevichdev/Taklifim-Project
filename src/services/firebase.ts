@@ -1,9 +1,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
 import { getDatabase, Database } from 'firebase/database';
 import { getAuth, Auth } from 'firebase/auth';
-import { getAnalytics, Analytics } from 'firebase/analytics';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import type { FirebaseStorage } from 'firebase/storage';
 
 /**
  * FIREBASE KONFIGURATSIYASI — TAKLIFIM.UZ (teklifim-9dae7)
@@ -34,45 +32,44 @@ export const isFirebaseConfigured = (): boolean => {
 };
 
 let app: FirebaseApp | null = null;
-let db: Firestore | null = null;
+// Cloud Firestore is not enabled for this project; RTDB is the single source of truth.
+const db: null = null;
 let rtdb: Database | null = null;
 let auth: Auth | null = null;
-let analytics: Analytics | null = null;
+let analytics: unknown = null;
 let storage: FirebaseStorage | null = null;
-
-// Teklifim loyihasida Firebase Realtime Database (RTDB) asosiy real-time bulutli baza hisoblanadi.
-// Cloud Firestore esa projectda (teklifim-9dae7) yoqilmaganligi sababli 10 soniyalik backend timeout xatosini keltirib chiqarmasligi uchun nofaol qilingan.
-const ENABLE_FIRESTORE = false;
 
 if (isFirebaseConfigured()) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     rtdb = getDatabase(app);
     auth = getAuth(app);
-    storage = getStorage(app);
 
-    if (ENABLE_FIRESTORE) {
-      try {
-        db = getFirestore(app);
-      } catch (fErr) {
-        console.warn('Firestore initialization skipped:', fErr);
-      }
-    }
-
-    // Analytics faqat browser muhitida ishlaydi
+    // Analytics is non-critical: load it after the page is interactive so it never delays first paint.
     if (typeof window !== 'undefined') {
-      try {
-        analytics = getAnalytics(app);
-      } catch {}
+      const loadAnalytics = () => {
+        import('firebase/analytics')
+          .then(({ getAnalytics }) => {
+            if (app) analytics = getAnalytics(app);
+          })
+          .catch(() => {});
+      };
+      const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+      if (w.requestIdleCallback) w.requestIdleCallback(loadAnalytics, { timeout: 8000 });
+      else window.setTimeout(loadAnalytics, 4000);
     }
-    console.log('🔥 Firebase muvaffaqiyatli ulandi! RTDB & Auth faol (teklifim-9dae7)');
   } catch (err) {
     console.warn('Firebase ishga tushirishda xatolik:', err);
   }
-} else {
-  console.info(
-    'ℹ️ Firebase sozlanmagan. Real-Time Local Store faol.'
-  );
+}
+
+/** Firebase Storage is only needed for PDF receipts, so its SDK is loaded on demand. */
+export async function getStorageLazy(): Promise<FirebaseStorage | null> {
+  if (!app) return null;
+  if (storage) return storage;
+  const { getStorage } = await import('firebase/storage');
+  storage = getStorage(app);
+  return storage;
 }
 
 export { app, db, rtdb, auth, analytics, storage };

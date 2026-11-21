@@ -24,8 +24,7 @@ import {
 import { resolveLegacyOrderTemplate } from '../utils/templateResolver';
 import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
-import { isFirebaseConfigured, storage } from '../services/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { isFirebaseConfigured, getStorageLazy } from '../services/firebase';
 import { ShareModal } from '../components/ShareModal';
 import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
 import { PhoneInput } from '../components/PhoneInput';
@@ -464,7 +463,9 @@ export const OrderStatusPage: React.FC = () => {
       let fileBase64Payload: string | undefined = fileBase64 || undefined;
 
       if (isPdf) {
-        if (!isFirebaseConfigured() || !storage) {
+        const storage = isFirebaseConfigured() ? await getStorageLazy() : null;
+        const { ref: storageRef, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        if (!storage) {
           throw new Error(t.builder.toasts.pdfStorageError);
         }
         const path = `receipts/${order.orderId}/${Date.now()}_${selectedFile.name}`;
