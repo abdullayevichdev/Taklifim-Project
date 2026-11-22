@@ -12,7 +12,7 @@ import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { InvitationShell } from '../components/InvitationShell';
 import { LocationPickerMap } from '../components/LocationPickerMap';
-import { getDefaultMusic, useMusicLibrary } from '../services/musicLibrary';
+import { PRESET_MUSIC_TRACKS, DEFAULT_MUSIC_TITLE, DEFAULT_MUSIC_URL } from '../data/musicLibrary';
 import { BuilderSectionToggle } from '../components/BuilderSectionToggle';
 import { yandexPlaceUrl } from '../utils/mapLinks';
 import { audioStorage } from '../utils/audioStorage';
@@ -155,7 +155,6 @@ function isDraftForeignToUser(
 export const BuilderPage: React.FC = () => {
   // Re-render when the admin changes card details
   useSiteSettings();
-  const musicLibrary = useMusicLibrary();
   const { params, navigate } = useRouter();
   const { t, language } = useLanguage();
   const { showToast, isLoggedIn, authReady, hasFirebaseSession, user, updateUserProfile } = useAuth();
@@ -276,8 +275,8 @@ export const BuilderPage: React.FC = () => {
       galleryTitle: 'Bizning suratlarimiz',
       galleryPosition: 'after_message',
       musicEnabled: true,
-      musicTitle: getDefaultMusic().title,
-      musicUrl: getDefaultMusic().url,
+      musicTitle: DEFAULT_MUSIC_TITLE,
+      musicUrl: DEFAULT_MUSIC_URL,
       musicFileData: undefined,
       musicPlacement: 'all',
       socialLinks: {
@@ -1332,8 +1331,8 @@ export const BuilderPage: React.FC = () => {
       return {
         ...prev,
         musicTracks: remaining,
-        musicTitle: willResetActive ? (remaining[0]?.title || getDefaultMusic().title) : prev.musicTitle,
-        musicUrl: willResetActive ? (remaining[0]?.url || getDefaultMusic().url) : prev.musicUrl,
+        musicTitle: willResetActive ? (remaining[0]?.title || DEFAULT_MUSIC_TITLE) : prev.musicTitle,
+        musicUrl: willResetActive ? (remaining[0]?.url || DEFAULT_MUSIC_URL) : prev.musicUrl,
       };
     });
     showToast(t.builder.toasts.trackRemoved, 'info');
@@ -1343,8 +1342,8 @@ export const BuilderPage: React.FC = () => {
     // Uploaded songs are cleared; the invitation falls back to the default library song.
     setInvitationState((prev) => ({
       ...prev,
-      musicTitle: getDefaultMusic().title,
-      musicUrl: getDefaultMusic().url,
+      musicTitle: DEFAULT_MUSIC_TITLE,
+      musicUrl: DEFAULT_MUSIC_URL,
       musicTracks: [],
       musicFileData: undefined,
     }));
@@ -2609,13 +2608,13 @@ export const BuilderPage: React.FC = () => {
                           <span className="text-[10px] text-[#D9658B] font-semibold">{t.builder.presetGuaranteedBadge}</span>
                         </label>
                         <div className="space-y-1.5">
-                          {musicLibrary.tracks.map((track, idx) => {
+                          {PRESET_MUSIC_TRACKS.map((track, idx) => {
                             const isSelected = invitationState.musicUrl === track.url;
                             const displayTitle =
                               (track.localeIndex !== undefined && t.builder.tracks[track.localeIndex]?.name) || track.title;
                             return (
                               <div
-                                key={track.id}
+                                key={idx}
                                 onClick={() => {
                                   setInvitationState((p) => ({
                                     ...p,

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   Download,
-  Music2,
   History,
   Settings as SettingsIcon,
   Check,
@@ -24,7 +23,6 @@ import {
 } from 'lucide-react';
 import { TashrifimMark } from '../components/TashrifimLogo';
 import { AdminSettings } from '../components/admin/AdminSettings';
-import { AdminMusic } from '../components/admin/AdminMusic';
 import { AnimatedValue, BRAND, ChartCard, ColumnChart, HBarList, LineChart, SERIES, SegmentBar } from '../components/admin/AdminCharts';
 import {
   adminAction,
@@ -95,7 +93,7 @@ interface AdminMessage {
   createdAt?: string;
 }
 
-type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages' | 'music' | 'settings' | 'history';
+type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages' | 'settings' | 'history';
 
 /* ---------------------------------------------------------------- helpers */
 const groupDigits = (n: number) => String(Math.round(Math.abs(n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -594,7 +592,6 @@ export const AdminPanel: React.FC = () => {
     { id: 'invitations', label: 'Taklifnomalar', icon: <Mail className="w-4 h-4" /> },
     { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
     { id: 'messages', label: 'Xabarlar', icon: <Inbox className="w-4 h-4" />, badge: newMessages },
-    { id: 'music', label: 'Musiqa', icon: <Music2 className="w-4 h-4" /> },
     { id: 'settings', label: 'Sozlamalar', icon: <SettingsIcon className="w-4 h-4" /> },
     { id: 'history', label: 'Tarix', icon: <History className="w-4 h-4" /> },
   ];
@@ -657,7 +654,7 @@ export const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {loaded && tab !== 'stats' && tab !== 'settings' && tab !== 'music' && (
+        {loaded && tab !== 'stats' && tab !== 'settings' && (
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6A63]" />
             <input
@@ -963,8 +960,6 @@ export const AdminPanel: React.FC = () => {
           </div>
         )}
         {/* SETTINGS */}
-        {loaded && tab === 'music' && <AdminMusic onToast={showToast} />}
-
         {loaded && tab === 'settings' && (
           <AdminSettings settings={siteSettings} overrides={templateOverrides} onToast={showToast} />
         )}

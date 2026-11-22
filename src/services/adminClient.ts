@@ -180,39 +180,3 @@ export async function getReceiptImage(orderId: string): Promise<string | null> {
     }
   }
 }
-
-/** Uploads a song to Firebase Storage (music/{id}.{ext}) with the admin session; reports progress 0–100. */
-export async function uploadMusicFile(
-  file: File,
-  id: string,
-  onProgress?: (pct: number) => void
-): Promise<{ url: string; storagePath: string }> {
-  init();
-  const { getStorage, ref: sRef, uploadBytesResumable, getDownloadURL } = await import('firebase/storage');
-  const ext = (file.name.split('.').pop() || 'mp3').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4) || 'mp3';
-  const storagePath = `music/${id}.${ext}`;
-  const contentType = file.type && file.type.startsWith('audio/') ? file.type : ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg';
-  const task = uploadBytesResumable(sRef(getStorage(adminApp!), storagePath), file, {
-    contentType,
-    cacheControl: 'public, max-age=31536000',
-  });
-  await new Promise<void>((resolve, reject) => {
-    task.on(
-      'state_changed',
-      (snap) => onProgress?.(Math.round((snap.bytesTransferred / Math.max(1, snap.totalBytes)) * 100)),
-      reject,
-      () => resolve()
-    );
-  });
-  return { url: await getDownloadURL(task.snapshot.ref), storagePath };
-}
-
-export async function deleteMusicFile(storagePath: string): Promise<void> {
-  init();
-  const { getStorage, ref: sRef, deleteObject } = await import('firebase/storage');
-  try {
-    await deleteObject(sRef(getStorage(adminApp!), storagePath));
-  } catch (err: any) {
-    if (err?.code !== 'storage/object-not-found') throw err;
-  }
-}

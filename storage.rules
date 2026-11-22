@@ -1,18 +1,6 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Wedding songs uploaded from the admin panel: everyone can listen, only a live admin session can upload/delete.
-    match /music/{fileName} {
-      allow read: if true;
-      allow write: if request.auth != null
-                   && request.auth.uid == 'tashrifim-admin'
-                   && request.auth.token.admin == true
-                   && request.auth.token.adminUntil > request.time.toMillis()
-                   && (request.resource == null
-                       || (request.resource.size < 15 * 1024 * 1024
-                           && request.resource.contentType.matches('audio/.*')));
-    }
-
     match /receipts/{orderId}/{fileName} {
       allow read: if true;
       allow write: if request.resource.size < 4 * 1024 * 1024
