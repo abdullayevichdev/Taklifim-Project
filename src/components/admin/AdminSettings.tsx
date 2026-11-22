@@ -147,7 +147,7 @@ const TemplateRow: React.FC<{
       <img src={image} alt="" className="w-10 h-12 object-cover rounded-lg bg-[#F3EEEA]" loading="lazy" />
       <div className="flex-1 min-w-[140px]">
         <div className="text-sm font-bold">{name}</div>
-        <div className="text-[11px] text-[#7A6A63]">{slug}{override.price ? ` · asl narx ${basePrice.toLocaleString('uz-UZ')}` : ''}</div>
+        <div className="text-[11px] text-[#7A6A63]">{slug}{override.price ? ` · asl narx ${String(basePrice).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}</div>
       </div>
       <form
         className="flex items-center gap-1.5"
