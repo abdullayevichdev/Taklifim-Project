@@ -35,7 +35,11 @@ function niceMax(v: number): number {
 }
 
 export const compact = (n: number) =>
-  n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 10_000 ? `${Math.round(n / 1000)}K` : new Intl.NumberFormat('uz-UZ').format(n);
+  n >= 1_000_000
+    ? `${+(n / 1_000_000).toFixed(1)}M`
+    : n >= 10_000
+    ? `${Math.round(n / 1000)}K`
+    : String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 /** Rounded-top rectangle path (square at the baseline). */
 function colPath(x: number, y: number, w: number, h: number, r = 4): string {
@@ -186,7 +190,13 @@ export const ColumnChart: React.FC<{
             const y = padT + innerH - h;
             return (
               <g key={d.label + i}>
-                <path d={colPath(x, y, barW, h)} fill={color} opacity={hover === -1 || hover === i ? 1 : 0.55} />
+                <path
+                  d={colPath(x, y, barW, h)}
+                  fill={color}
+                  opacity={hover === -1 || hover === i ? 1 : 0.55}
+                  className="admin-bar-grow"
+                  style={{ animationDelay: `${Math.min(i, 40) * 12}ms`, transition: 'opacity 0.15s ease' }}
+                />
                 {i === peak && d.value > 0 && (
                   <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={10} fontWeight={700} fill="#1e1418">
                     {compact(d.value)}
@@ -277,6 +287,8 @@ export const LineChart: React.FC<{
           {series.map((s) => (
             <g key={s.name}>
               <polyline
+                pathLength={1}
+                className="admin-line-draw"
                 fill="none"
                 stroke={s.color}
                 strokeWidth={2}
@@ -343,7 +355,10 @@ export const HBarList: React.FC<{
             <span className="font-bold tabular-nums text-[#1e1418] shrink-0">{format(it.value)}</span>
           </div>
           <div className="h-3 rounded-r bg-[#f3eeea]">
-            <div className="h-3 rounded-r" style={{ width: `${(it.value / max) * 100}%`, background: color, minWidth: it.value ? 3 : 0 }} />
+            <div
+              className="h-3 rounded-r admin-hbar-grow"
+              style={{ width: `${(it.value / max) * 100}%`, background: color, minWidth: it.value ? 3 : 0 }}
+            />
           </div>
         </li>
       ))}
@@ -372,6 +387,7 @@ export const SegmentBar: React.FC<{
                 onPointerLeave={() => setHover(null)}
                 onFocus={() => setHover(s.label)}
                 onBlur={() => setHover(null)}
+                className="admin-hbar-grow"
                 style={{ width: `${(s.value / total) * 100}%`, background: s.color, opacity: hover && hover !== s.label ? 0.55 : 1 }}
               />
             ))}
@@ -389,4 +405,31 @@ export const SegmentBar: React.FC<{
       </ul>
     </div>
   );
+};
+
+/** Number that counts smoothly to its new value (also on live updates). Respects reduced motion. */
+export const AnimatedValue: React.FC<{ value: number; format: (n: number) => string }> = ({ value, format }) => {
+  const [shown, setShown] = useState(value);
+  const shownRef = useRef(0);
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const from = shownRef.current;
+    if (reduce || from === value) {
+      shownRef.current = value;
+      setShown(value);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / 700);
+      const v = from + (value - from) * (1 - Math.pow(1 - t, 3));
+      shownRef.current = v;
+      setShown(v);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(shown)}</>;
 };

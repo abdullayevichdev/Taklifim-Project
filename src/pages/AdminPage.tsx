@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
+  Download,
+  Music2,
   History,
   Settings as SettingsIcon,
   Check,
@@ -22,7 +24,8 @@ import {
 } from 'lucide-react';
 import { TashrifimMark } from '../components/TashrifimLogo';
 import { AdminSettings } from '../components/admin/AdminSettings';
-import { BRAND, ChartCard, ColumnChart, HBarList, LineChart, SERIES, SegmentBar } from '../components/admin/AdminCharts';
+import { AdminMusic } from '../components/admin/AdminMusic';
+import { AnimatedValue, BRAND, ChartCard, ColumnChart, HBarList, LineChart, SERIES, SegmentBar } from '../components/admin/AdminCharts';
 import {
   adminAction,
   adminLogin,
@@ -92,10 +95,11 @@ interface AdminMessage {
   createdAt?: string;
 }
 
-type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages' | 'settings' | 'history';
+type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages' | 'music' | 'settings' | 'history';
 
 /* ---------------------------------------------------------------- helpers */
-const fmtMoney = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0))} so‘m`;
+const groupDigits = (n: number) => String(Math.round(Math.abs(n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const fmtMoney = (n: number) => `${n < 0 ? '-' : ''}${groupDigits(n)} so‘m`;
 const ts = (iso?: string) => {
   const t = iso ? Date.parse(iso) : NaN;
   return Number.isFinite(t) ? t : 0;
@@ -172,6 +176,7 @@ const AdminLogin: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [shakeKey, setShakeKey] = useState(0);
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#FCEEF4] via-[#FAF6F0] to-[#E8F3FC]">
       <form
@@ -186,9 +191,11 @@ const AdminLogin: React.FC<{ onDone: () => void }> = ({ onDone }) => {
           else {
             setError(r.error || 'Kirib bo‘lmadi.');
             setCode('');
+            setShakeKey((k) => k + 1);
           }
         }}
-        className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-black/5 p-6 space-y-4"
+        key={shakeKey}
+        className={`w-full max-w-sm bg-white rounded-3xl shadow-xl border border-black/5 p-6 space-y-4 ${shakeKey ? 'admin-shake' : 'admin-pop'}`}
       >
         <div className="flex items-center gap-3">
           <TashrifimMark className="w-10 h-10" />
@@ -227,10 +234,12 @@ const AdminLogin: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 };
 
 /* ------------------------------------------------------------ order card */
-const OrderCard: React.FC<{ order: AdminOrder & { _key: string }; onToast: (m: string, ok?: boolean) => void }> = ({
-  order,
-  onToast,
-}) => {
+const OrderCard: React.FC<{
+  order: AdminOrder & { _key: string };
+  onToast: (m: string, ok?: boolean) => void;
+  index?: number;
+  fresh?: boolean;
+}> = ({ order, onToast, index = 0, fresh = false }) => {
   const id = order.orderId || order.id || order._key;
   const [img, setImg] = useState<string | null | undefined>(undefined);
   const [open, setOpen] = useState(false);
@@ -260,7 +269,10 @@ const OrderCard: React.FC<{ order: AdminOrder & { _key: string }; onToast: (m: s
   };
 
   return (
-    <article className={`bg-white rounded-2xl border p-4 space-y-3 shadow-sm ${isLate ? 'border-rose-300 ring-2 ring-rose-200' : 'border-black/5'}`}>
+    <article
+      className={`admin-stagger admin-lift bg-white rounded-2xl border p-4 space-y-3 shadow-sm ${isLate ? 'border-rose-300 ring-2 ring-rose-200' : 'border-black/5'} ${fresh ? 'admin-flash' : ''}`}
+      style={{ animationDelay: fresh ? undefined : `${Math.min(index, 10) * 40}ms` }}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -360,7 +372,7 @@ const OrderCard: React.FC<{ order: AdminOrder & { _key: string }; onToast: (m: s
 };
 
 /* ----------------------------------------------------------- main panel */
-const AdminPanel: React.FC = () => {
+export const AdminPanel: React.FC = () => {
   const [tab, setTab] = useState<Tab>('orders');
   const [orders, setOrders] = useState<Record<string, AdminOrder>>({});
   const [invitations, setInvitations] = useState<Record<string, AdminInvitation>>({});
@@ -376,6 +388,7 @@ const AdminPanel: React.FC = () => {
   const [query, setQuery] = useState('');
   const knownPending = useRef<Set<string> | null>(null);
   const [range, setRange] = useState<7 | 30 | 90>(30);
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
 
   const showToast = (text: string, ok = true) => {
     setToast({ text, ok });
@@ -410,7 +423,12 @@ const AdminPanel: React.FC = () => {
   // Sound + title badge when a new receipt arrives
   useEffect(() => {
     const ids = new Set(pending.map((o) => o._key));
-    if (knownPending.current && [...ids].some((id) => !knownPending.current!.has(id))) {
+    const added = knownPending.current ? [...ids].filter((id) => !knownPending.current!.has(id)) : [];
+    if (added.length) {
+      setFreshIds(new Set(added));
+      window.setTimeout(() => setFreshIds(new Set()), 2500);
+    }
+    if (knownPending.current && added.length > 0) {
       beep();
       showToast('Yangi chek keldi! 🧾');
     }
@@ -483,6 +501,18 @@ const AdminPanel: React.FC = () => {
         { label: 'Rad etilgan', value: inRange.filter((o) => o.status === 'rejected').length, color: SERIES[2] },
       ],
       conversion: submitted ? Math.round((paidInRange / submitted) * 100) : 0,
+      topTemplates: top.map(([label, v]) => ({ label, count: v.count, sum: v.sum })),
+      recentPaid: paid
+        .slice()
+        .sort((x, y) => paidAt(y) - paidAt(x))
+        .slice(0, 15)
+        .map((o) => ({
+          id: o.orderId || o.id || '',
+          customer: o.customerName || 'Mijoz',
+          template: o.templateName || o.invitationSlug || '—',
+          price: Number(o.price) || 0,
+          date: fmtDate(o.decidedAt || o.updatedAt),
+        })),
       topCount: top.map(([label, v]) => ({ label, value: v.count })),
       topSum: top.map(([label, v]) => ({ label, value: v.sum })),
       users: userList.length,
@@ -522,12 +552,49 @@ const AdminPanel: React.FC = () => {
     showToast(r.ok ? okText : r.error || 'Xatolik', r.ok);
   };
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const exportPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const { downloadStatsPdf } = await import('../components/admin/statsPdf');
+      await downloadStatsPdf({
+        rangeDays: range,
+        generatedAt: new Date(),
+        kpis: [
+          { label: 'Bugungi tushum', value: fmtMoney(stats.today) },
+          { label: `${range} kunlik tushum`, value: fmtMoney(stats.rangeRevenue) },
+          { label: 'Jami tushum', value: fmtMoney(stats.total) },
+          { label: 'Tekshiruvda', value: `${stats.pendingCount} ta` },
+          { label: 'Konversiya', value: `${stats.conversion}%` },
+          { label: 'Foydalanuvchilar', value: `${stats.users} (+${stats.newUsers})` },
+          { label: 'Taklifnomalar', value: `${stats.invitations} ta` },
+          { label: 'Faol taklifnomalar', value: `${stats.activeInvitations} ta` },
+        ],
+        revenueDaily: stats.revenueDaily,
+        dayLabels: stats.dayLabels,
+        ordersDaily: stats.ordersDaily,
+        usersDaily: stats.usersDaily,
+        statusSegments: stats.statusSegments,
+        topTemplates: stats.topTemplates,
+        recentPaid: stats.recentPaid,
+      });
+      showToast('PDF hisobot yuklab olindi 📄');
+    } catch (err) {
+      console.error('PDF export failed', err);
+      showToast('PDF yaratib bo‘lmadi. Qayta urinib ko‘ring.', false);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; badge?: number }> = [
     { id: 'orders', label: 'Buyurtmalar', icon: <Receipt className="w-4 h-4" />, badge: pending.length },
     { id: 'stats', label: 'Statistika', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'invitations', label: 'Taklifnomalar', icon: <Mail className="w-4 h-4" /> },
     { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
     { id: 'messages', label: 'Xabarlar', icon: <Inbox className="w-4 h-4" />, badge: newMessages },
+    { id: 'music', label: 'Musiqa', icon: <Music2 className="w-4 h-4" /> },
     { id: 'settings', label: 'Sozlamalar', icon: <SettingsIcon className="w-4 h-4" /> },
     { id: 'history', label: 'Tarix', icon: <History className="w-4 h-4" /> },
   ];
@@ -546,7 +613,7 @@ const AdminPanel: React.FC = () => {
               }`}
               title={mode === 'polling' ? 'Ma’lumotlar har 5 soniyada yangilanmoqda' : 'Jonli ulanish'}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${mode === 'realtime' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === 'realtime' ? 'bg-emerald-500 admin-pulse' : 'bg-amber-500'}`} />
               {mode === 'realtime' ? 'Jonli' : mode === 'polling' ? 'Har 5 s' : 'Ulanmoqda…'}
             </span>
           </div>
@@ -567,7 +634,7 @@ const AdminPanel: React.FC = () => {
                 setTab(t.id);
                 setQuery('');
               }}
-              className={`relative inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 ${
+              className={`admin-press relative inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 tab === t.id ? 'border-[#C64873] text-[#9E3E60]' : 'border-transparent text-[#7A6A63]'
               }`}
             >
@@ -583,14 +650,14 @@ const AdminPanel: React.FC = () => {
         </nav>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-5 space-y-4">
+      <main key={tab} className="admin-tab-enter max-w-6xl mx-auto px-4 py-5 space-y-4">
         {!loaded && (
           <div className="py-16 text-center text-sm text-[#7A6A63]">
             <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Ma’lumotlar yuklanmoqda…
           </div>
         )}
 
-        {loaded && tab !== 'stats' && tab !== 'settings' && (
+        {loaded && tab !== 'stats' && tab !== 'settings' && tab !== 'music' && (
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6A63]" />
             <input
@@ -633,8 +700,8 @@ const AdminPanel: React.FC = () => {
               </p>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
-                {shownOrders.map((o) => (
-                  <OrderCard key={o._key} order={o} onToast={showToast} />
+                {shownOrders.map((o, idx) => (
+                  <OrderCard key={o._key} order={o} onToast={showToast} index={idx} fresh={freshIds.has(o._key)} />
                 ))}
               </div>
             )}
@@ -659,22 +726,39 @@ const AdminPanel: React.FC = () => {
                 </button>
               ))}
               <span className="text-xs text-[#7A6A63] ml-1">Barcha raqamlar jonli yangilanadi</span>
+              <button
+                type="button"
+                onClick={exportPdf}
+                disabled={pdfBusy}
+                className="admin-press ml-auto min-h-[40px] px-4 rounded-full bg-gradient-to-br from-[#D6517F] to-[#A7325B] text-white text-sm font-bold inline-flex items-center gap-2 shadow-md disabled:opacity-60"
+              >
+                {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                PDF yuklab olish
+              </button>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                ['Bugungi tushum', fmtMoney(stats.today)],
-                [`${range} kunlik tushum`, fmtMoney(stats.rangeRevenue)],
-                ['Jami tushum', fmtMoney(stats.total)],
-                ['Tekshiruvda', String(stats.pendingCount)],
-                ['Konversiya', `${stats.conversion}%`],
-                ['Foydalanuvchilar', `${stats.users} (+${stats.newUsers})`],
-                ['Taklifnomalar', String(stats.invitations)],
-                ['Faol taklifnomalar', String(stats.activeInvitations)],
-              ].map(([label, value]) => (
-                <div key={label} className="bg-white rounded-2xl border border-black/5 p-4">
+              {(
+                [
+                  ['Bugungi tushum', stats.today, fmtMoney],
+                  [`${range} kunlik tushum`, stats.rangeRevenue, fmtMoney],
+                  ['Jami tushum', stats.total, fmtMoney],
+                  ['Tekshiruvda', stats.pendingCount, (n: number) => `${Math.round(n)} ta`],
+                  ['Konversiya', stats.conversion, (n: number) => `${Math.round(n)}%`],
+                  ['Foydalanuvchilar', stats.users, (n: number) => `${Math.round(n)} (+${stats.newUsers})`],
+                  ['Taklifnomalar', stats.invitations, (n: number) => `${Math.round(n)} ta`],
+                  ['Faol taklifnomalar', stats.activeInvitations, (n: number) => `${Math.round(n)} ta`],
+                ] as Array<[string, number, (n: number) => string]>
+              ).map(([label, value, format], idx) => (
+                <div
+                  key={label}
+                  className="admin-stagger admin-lift bg-white rounded-2xl border border-black/5 p-4"
+                  style={{ animationDelay: `${idx * 45}ms` }}
+                >
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-[#7A6A63]">{label}</div>
-                  <div className="mt-1 text-lg sm:text-xl font-bold tabular-nums">{value}</div>
+                  <div className="mt-1 text-lg sm:text-xl font-bold tabular-nums">
+                    <AnimatedValue value={value} format={format} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -741,11 +825,11 @@ const AdminPanel: React.FC = () => {
           <div className="space-y-2">
             {invList
               .filter((i) => match(i.hostNames, i.eventTitle, i.slug, i.venueName, i._key))
-              .map((i) => {
+              .map((i, idx) => {
                 const id = i.id || i._key;
                 const active = i.status === 'paid' || i.status === 'published';
                 return (
-                  <div key={i._key} className="bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3">
+                  <div key={i._key} className="admin-stagger admin-lift bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3" style={{ animationDelay: `${Math.min(idx, 12) * 30}ms` }}>
                     <div className="flex-1 min-w-[200px]">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold">{i.hostNames || i.eventTitle || 'Nomsiz'}</span>
@@ -805,12 +889,12 @@ const AdminPanel: React.FC = () => {
           <div className="space-y-2">
             {userList
               .filter((u) => match(u.name, u.email, u.phone, u._key))
-              .map((u) => {
+              .map((u, idx) => {
                 const uid = u.id || u._key;
                 const o = ordersByOwner.get(uid);
                 const phone = digits(u.phone);
                 return (
-                  <div key={u._key} className="bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3">
+                  <div key={u._key} className="admin-stagger admin-lift bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3" style={{ animationDelay: `${Math.min(idx, 12) * 30}ms` }}>
                     <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center font-bold">
                       {(u.name || u.email || '?').charAt(0).toUpperCase()}
                     </div>
@@ -846,10 +930,10 @@ const AdminPanel: React.FC = () => {
           <div className="space-y-2">
             {msgList
               .filter((m) => match(m.name, m.contact, m.subject, m.message))
-              .map((m) => {
+              .map((m, idx) => {
                 const id = m.id || m._key;
                 return (
-                  <div key={m._key} className={`bg-white rounded-2xl border p-4 space-y-2 ${m.status === 'new' ? 'border-[#D9658B]/40' : 'border-black/5'}`}>
+                  <div key={m._key} className={`admin-stagger admin-lift bg-white rounded-2xl border p-4 space-y-2 ${m.status === 'new' ? 'border-[#D9658B]/40' : 'border-black/5'}`} style={{ animationDelay: `${Math.min(idx, 12) * 30}ms` }}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="font-bold">
                         {m.name || '—'} <span className="font-normal text-xs text-[#7A6A63]">· {m.contact}</span>
@@ -879,6 +963,8 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
         {/* SETTINGS */}
+        {loaded && tab === 'music' && <AdminMusic onToast={showToast} />}
+
         {loaded && tab === 'settings' && (
           <AdminSettings settings={siteSettings} overrides={templateOverrides} onToast={showToast} />
         )}
@@ -906,7 +992,8 @@ const AdminPanel: React.FC = () => {
       {toast && (
         <div
           role="status"
-          className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white ${
+          key={toast.text}
+          className={`admin-toast fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white ${
             toast.ok ? 'bg-[#1E1418]' : 'bg-rose-600'
           }`}
         >

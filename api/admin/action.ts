@@ -24,7 +24,15 @@ type ActionBody =
       hidden?: boolean;
       isPopular?: boolean;
       isNew?: boolean;
-    };
+    }
+  | { type: 'music.add'; id: string; title: string; url: string; storagePath: string }
+  | { type: 'music.update'; id: string; title?: string; hidden?: boolean }
+  | { type: 'music.delete'; id: string; builtin?: boolean }
+  | { type: 'music.setDefault'; id: string }
+  | { type: 'music.reorder'; ids: string[] };
+
+const MUSIC_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const STORAGE_BUCKET = (process.env.FIREBASE_STORAGE_BUCKET || 'teklifim-9dae7.firebasestorage.app').trim();
 
 /** POST admin actions. Every request must carry a live admin-session ID token. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -156,6 +164,78 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await db.ref('settings/public').update({ ...patch, updatedAt: nowIso });
         invalidateServerSiteSettings();
         await audit('settings', Object.entries(patch).map(([k, v]) => `${k}=${k === 'cardNumber' ? `****${v.slice(-4)}` : v}`).join(', '));
+        return res.json({ ok: true });
+      }
+
+      case 'music.add': {
+        const title = String(body.title || '').trim().slice(0, 120);
+        const url = String(body.url || '');
+        const path = String(body.storagePath || '');
+        const urlPrefix = `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/music%2F`;
+        if (!MUSIC_ID.test(body.id) || !title || !url.startsWith(urlPrefix) || !/^music\/[a-z0-9-]+\.[a-z0-9]{2,4}$/.test(path)) {
+          return res.status(400).json({ ok: false, error: 'Qo‘shiq ma’lumotlari noto‘g‘ri.' });
+        }
+        const items = (await db.ref('musicLibrary/items').get()).val() || {};
+        const maxOrder = Math.max(10, ...Object.values<any>(items).map((v) => Number(v?.order) || 0));
+        await db.ref(`musicLibrary/items/${body.id}`).set({
+          title,
+          url,
+          storagePath: path,
+          source: 'upload',
+          hidden: false,
+          order: maxOrder + 1,
+          createdAt: nowIso,
+        });
+        await audit(body.id, `Qo‘shiq qo‘shildi: ${title}`);
+        return res.json({ ok: true });
+      }
+
+      case 'music.update': {
+        if (!MUSIC_ID.test(body.id)) break;
+        const patch: Record<string, unknown> = { updatedAt: nowIso };
+        if (typeof body.title === 'string') {
+          const title = body.title.trim().slice(0, 120);
+          if (!title) return res.status(400).json({ ok: false, error: 'Qo‘shiq nomi bo‘sh bo‘lmasin.' });
+          patch.title = title;
+        }
+        if (typeof body.hidden === 'boolean') patch.hidden = body.hidden;
+        await db.ref(`musicLibrary/items/${body.id}`).update(patch);
+        await audit(body.id, typeof body.hidden === 'boolean' ? (body.hidden ? 'Qo‘shiq yashirildi' : 'Qo‘shiq qaytarildi') : `Nomi: ${patch.title}`);
+        return res.json({ ok: true });
+      }
+
+      case 'music.delete': {
+        if (!MUSIC_ID.test(body.id)) break;
+        const snap = await db.ref(`musicLibrary/items/${body.id}`).get();
+        const item = snap.val() || {};
+        if (item.source === 'upload') {
+          await db.ref(`musicLibrary/items/${body.id}`).remove();
+        } else {
+          // Built-in songs ship with the site, so "delete" hides them from the library.
+          await db.ref(`musicLibrary/items/${body.id}`).update({ hidden: true, updatedAt: nowIso });
+        }
+        const def = (await db.ref('musicLibrary/defaultId').get()).val();
+        if (def === body.id) await db.ref('musicLibrary/defaultId').remove();
+        await audit(body.id, `Qo‘shiq o‘chirildi${item.title ? `: ${item.title}` : ''}`);
+        return res.json({ ok: true });
+      }
+
+      case 'music.setDefault': {
+        if (!MUSIC_ID.test(body.id)) break;
+        await db.ref('musicLibrary/defaultId').set(body.id);
+        await audit(body.id, 'Standart qo‘shiq qilib belgilandi');
+        return res.json({ ok: true });
+      }
+
+      case 'music.reorder': {
+        const ids = Array.isArray(body.ids) ? body.ids.filter((id) => MUSIC_ID.test(String(id))).slice(0, 200) : [];
+        if (ids.length === 0) break;
+        const updates: Record<string, unknown> = {};
+        ids.forEach((id, i) => {
+          updates[`musicLibrary/items/${id}/order`] = i;
+        });
+        await db.ref().update(updates);
+        await audit('music', 'Tartib o‘zgardi');
         return res.json({ ok: true });
       }
 

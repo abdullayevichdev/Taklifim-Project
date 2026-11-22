@@ -27,6 +27,11 @@
       ".write": false
     },
 
+    "musicLibrary": {
+      ".read": true,
+      ".write": false
+    },
+
     "adminAudit": {
       ".write": false
     },
