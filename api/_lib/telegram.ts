@@ -514,3 +514,39 @@ export async function sendTemplateErrorAlertToTelegram(params: {
     return { ok: false, error: sanitizeTelegramErrorMessage(err) };
   }
 }
+
+/**
+ * Called when a receipt is decided from the admin panel: removes the confirm/reject buttons
+ * from the original Telegram message and replies with the outcome, so the chat stays in sync.
+ */
+export async function markTelegramReceiptDecided(params: {
+  messageId?: number;
+  orderId: string;
+  decision: 'paid' | 'rejected';
+  reason?: string;
+}): Promise<void> {
+  const { adminChatId } = getPaymentTelegramConfig();
+  if (!adminChatId || adminChatId === 'MOCK_ADMIN_CHAT_ID') return;
+  try {
+    if (params.messageId) {
+      await tgPaymentApi('editMessageReplyMarkup', {
+        chat_id: adminChatId,
+        message_id: params.messageId,
+        reply_markup: { inline_keyboard: [] },
+      });
+    }
+    const text =
+      params.decision === 'paid'
+        ? `✅ <b>#${escapeTelegramHtml(params.orderId)}</b> — admin panel orqali TASDIQLANDI`
+        : `❌ <b>#${escapeTelegramHtml(params.orderId)}</b> — admin panel orqali RAD ETILDI` +
+          (params.reason ? `\nSabab: ${escapeTelegramHtml(params.reason.slice(0, 300))}` : '');
+    await tgPaymentApi('sendMessage', {
+      chat_id: adminChatId,
+      text,
+      parse_mode: 'HTML',
+      ...(params.messageId ? { reply_to_message_id: params.messageId, allow_sending_without_reply: true } : {}),
+    });
+  } catch {
+    /* non-fatal */
+  }
+}

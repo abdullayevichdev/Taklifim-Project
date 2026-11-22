@@ -30,6 +30,15 @@
     },
     "api/maps/resolve.ts": {
       "maxDuration": 10
+    },
+    "api/admin/login.ts": {
+      "maxDuration": 10
+    },
+    "api/admin/action.ts": {
+      "maxDuration": 20
+    },
+    "api/admin/data.ts": {
+      "maxDuration": 15
     }
   },
   "headers": [

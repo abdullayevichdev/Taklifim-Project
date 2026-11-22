@@ -1,0 +1,850 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BarChart3,
+  Check,
+  Clock,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  Inbox,
+  Loader2,
+  LogOut,
+  Mail,
+  Phone,
+  Receipt,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
+import { TashrifimMark } from '../components/TashrifimLogo';
+import {
+  adminAction,
+  adminLogin,
+  adminLogout,
+  getReceiptImage,
+  subscribeAdmin,
+  watchAdminSession,
+} from '../services/adminClient';
+
+/* ------------------------------------------------------------------ types */
+interface AdminOrder {
+  id?: string;
+  orderId?: string;
+  orderNumber?: string;
+  status?: string;
+  customerName?: string;
+  customerPhone?: string;
+  templateName?: string;
+  price?: number;
+  weddingDate?: string;
+  venueName?: string;
+  invitationId?: string;
+  invitationSlug?: string;
+  receiptUrl?: string;
+  receiptType?: string;
+  receiptSentAt?: string;
+  submittedAt?: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  rejectReason?: string;
+  ownerUid?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+interface AdminInvitation {
+  id?: string;
+  slug?: string;
+  status?: string;
+  hostNames?: string;
+  eventTitle?: string;
+  eventDate?: string;
+  venueName?: string;
+  templateSlug?: string;
+  ownerUid?: string;
+  ownerId?: string;
+  orderId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  viewsCount?: number;
+}
+interface AdminUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  authProvider?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
+}
+interface AdminMessage {
+  id?: string;
+  name?: string;
+  contact?: string;
+  subject?: string;
+  message?: string;
+  status?: string;
+  createdAt?: string;
+}
+
+type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages';
+
+/* ---------------------------------------------------------------- helpers */
+const fmtMoney = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0))} so‘m`;
+const ts = (iso?: string) => {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(t) ? t : 0;
+};
+const fmtDate = (iso?: string) => {
+  const t = ts(iso);
+  return t
+    ? new Date(t).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+};
+const ago = (iso?: string) => {
+  const t = ts(iso);
+  if (!t) return '';
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'hozirgina';
+  if (m < 60) return `${m} daqiqa oldin`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} soat oldin`;
+  return `${Math.round(h / 24)} kun oldin`;
+};
+const toList = <T,>(rec: Record<string, T>): Array<T & { _key: string }> =>
+  Object.entries(rec || {})
+    .filter(([, v]) => v && typeof v === 'object')
+    .map(([k, v]) => ({ ...(v as any), _key: k }));
+const digits = (s?: string) => (s || '').replace(/\D/g, '');
+
+const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
+  pending_review: { text: 'Tekshiruvda', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
+  pending_payment: { text: 'To‘lov kutilmoqda', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+  paid: { text: 'Faol (to‘langan)', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  published: { text: 'Faol', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  rejected: { text: 'Rad etilgan', cls: 'bg-rose-100 text-rose-800 border-rose-200' },
+  draft: { text: 'Qoralama', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+};
+const StatusBadge: React.FC<{ status?: string }> = ({ status }) => {
+  const s = STATUS_LABEL[status || ''] || { text: status || '—', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+  return <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${s.cls}`}>{s.text}</span>;
+};
+
+function beep() {
+  try {
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const ctx = new Ctx();
+    [0, 0.18].forEach((delay) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.15);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + delay);
+      o.stop(ctx.currentTime + delay + 0.16);
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ------------------------------------------------------------ login view */
+const AdminLogin: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#FCEEF4] via-[#FAF6F0] to-[#E8F3FC]">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!code.trim() || busy) return;
+          setBusy(true);
+          setError('');
+          const r = await adminLogin(code.trim());
+          setBusy(false);
+          if (r.ok) onDone();
+          else {
+            setError(r.error || 'Kirib bo‘lmadi.');
+            setCode('');
+          }
+        }}
+        className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-black/5 p-6 space-y-4"
+      >
+        <div className="flex items-center gap-3">
+          <TashrifimMark className="w-10 h-10" />
+          <div>
+            <h1 className="font-playfair text-xl font-bold text-[#1E1418]">Boshqaruv paneli</h1>
+            <p className="text-xs text-[#7A6A63]">Kirish kodini kiriting</p>
+          </div>
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          aria-label="Kirish kodi"
+          placeholder="•••"
+          className="w-full min-h-[52px] px-4 rounded-2xl border border-black/10 bg-[#F7F3F1] text-center text-2xl tracking-[0.5em] font-bold outline-none focus:bg-white focus:border-[#D9658B]"
+        />
+        {error && (
+          <p role="alert" className="text-sm font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={busy || !code.trim()}
+          className="w-full min-h-[50px] rounded-2xl bg-gradient-to-br from-[#D6517F] to-[#A7325B] text-white font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2"
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+          Kirish
+        </button>
+      </form>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------ order card */
+const OrderCard: React.FC<{ order: AdminOrder & { _key: string }; onToast: (m: string, ok?: boolean) => void }> = ({
+  order,
+  onToast,
+}) => {
+  const id = order.orderId || order.id || order._key;
+  const [img, setImg] = useState<string | null | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<'paid' | 'rejected' | null>(null);
+  const sentAt = order.receiptSentAt || order.submittedAt;
+  const isLate = order.status === 'pending_review' && Date.now() - ts(sentAt) > 2 * 3600 * 1000;
+  const phone = digits(order.customerPhone);
+
+  const showReceipt = async () => {
+    setOpen(true);
+    if (img === undefined) setImg(await getReceiptImage(id));
+  };
+
+  const decide = async (decision: 'paid' | 'rejected') => {
+    let reason: string | undefined;
+    if (decision === 'rejected') {
+      const r = window.prompt('Rad etish sababi (mijozga ko‘rsatiladi):', "To'lov cheki tasdiqlanmadi. Iltimos, to'g'ri chekni qayta yuklang.");
+      if (r === null) return;
+      reason = r;
+    } else if (!window.confirm(`#${id} buyurtmasini tasdiqlaysizmi? Taklifnoma faollashadi.`)) {
+      return;
+    }
+    setBusy(decision);
+    const res = await adminAction({ type: 'order.decide', orderId: id, decision, reason });
+    setBusy(null);
+    onToast(res.ok ? (decision === 'paid' ? 'Tasdiqlandi ✅' : 'Rad etildi') : res.error || 'Xatolik', res.ok);
+  };
+
+  return (
+    <article className={`bg-white rounded-2xl border p-4 space-y-3 shadow-sm ${isLate ? 'border-rose-300 ring-2 ring-rose-200' : 'border-black/5'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs font-bold text-[#9E3E60]">#{id}</span>
+            <StatusBadge status={order.status} />
+            {isLate && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700">
+                <Clock className="w-3.5 h-3.5" /> 2 soatdan oshdi
+              </span>
+            )}
+          </div>
+          <h3 className="mt-1 font-bold text-[#1E1418] truncate">{order.customerName || 'Mijoz'}</h3>
+          <p className="text-xs text-[#7A6A63]">
+            {order.templateName || order.invitationSlug || '—'} · {fmtMoney(Number(order.price) || 0)}
+          </p>
+        </div>
+        <div className="text-right text-[11px] text-[#7A6A63]">
+          <div>{fmtDate(sentAt || order.createdAt)}</div>
+          <div>{ago(sentAt || order.createdAt)}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-[#4A3E39]">
+        <span>📅 {order.weddingDate || '—'}</span>
+        <span className="truncate">📍 {order.venueName || '—'}</span>
+        {order.rejectReason && <span className="col-span-2 text-rose-700">Sabab: {order.rejectReason}</span>}
+        {order.decidedAt && (
+          <span className="col-span-2 text-[#7A6A63]">
+            Qaror: {fmtDate(order.decidedAt)} {order.decidedBy ? `· ${order.decidedBy}` : ''}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {phone && (
+          <>
+            <a href={`tel:+${phone}`} className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold">
+              <Phone className="w-3.5 h-3.5" /> {order.customerPhone}
+            </a>
+            <a href={`https://t.me/+${phone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl bg-[#E8F3FA] text-xs font-semibold text-[#1E3A5F]">
+              Telegram
+            </a>
+          </>
+        )}
+        {order.invitationSlug && (
+          <a href={`/i/${order.invitationSlug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold">
+            <ExternalLink className="w-3.5 h-3.5" /> Taklifnoma
+          </a>
+        )}
+        {order.receiptUrl ? (
+          <a href={order.receiptUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl bg-[#FCEEF4] text-xs font-semibold text-[#9E3E60]">
+            <FileText className="w-3.5 h-3.5" /> Chek (PDF)
+          </a>
+        ) : (
+          <button type="button" onClick={showReceipt} className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl bg-[#FCEEF4] text-xs font-semibold text-[#9E3E60]">
+            <ImageIcon className="w-3.5 h-3.5" /> Chekni ko‘rish
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="rounded-xl border border-black/5 bg-[#F7F3F1] p-2">
+          {img === undefined ? (
+            <div className="py-6 text-center text-xs text-[#7A6A63]"><Loader2 className="w-4 h-4 animate-spin inline" /> Yuklanmoqda…</div>
+          ) : img ? (
+            <a href={img} target="_blank" rel="noreferrer">
+              <img src={img} alt={`Chek #${id}`} className="w-full max-h-[70vh] object-contain rounded-lg" />
+            </a>
+          ) : (
+            <p className="py-4 text-center text-xs text-[#7A6A63]">Bu chekning nusxasi saytda saqlanmagan (eski buyurtma) — Telegramdan ko‘ring.</p>
+          )}
+        </div>
+      )}
+
+      {(order.status === 'pending_review' || order.status === 'pending_payment') && (
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => decide('paid')}
+            className="min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+          >
+            {busy === 'paid' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Tasdiqlash
+          </button>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => decide('rejected')}
+            className="min-h-[46px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+          >
+            {busy === 'rejected' ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Rad etish
+          </button>
+        </div>
+      )}
+    </article>
+  );
+};
+
+/* ----------------------------------------------------------- main panel */
+const AdminPanel: React.FC = () => {
+  const [tab, setTab] = useState<Tab>('orders');
+  const [orders, setOrders] = useState<Record<string, AdminOrder>>({});
+  const [invitations, setInvitations] = useState<Record<string, AdminInvitation>>({});
+  const [users, setUsers] = useState<Record<string, AdminUser>>({});
+  const [messages, setMessages] = useState<Record<string, AdminMessage>>({});
+  const [mode, setMode] = useState<'realtime' | 'polling' | 'connecting'>('connecting');
+  const [loaded, setLoaded] = useState(false);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [orderFilter, setOrderFilter] = useState<'pending' | 'all' | 'paid' | 'rejected'>('pending');
+  const [query, setQuery] = useState('');
+  const knownPending = useRef<Set<string> | null>(null);
+
+  const showToast = (text: string, ok = true) => {
+    setToast({ text, ok });
+    window.setTimeout(() => setToast(null), 3500);
+  };
+
+  useEffect(() => {
+    const unsubs = [
+      subscribeAdmin<AdminOrder>('orders', (v) => {
+        setOrders(v);
+        setLoaded(true);
+      }, setMode),
+      subscribeAdmin<AdminInvitation>('invitations', setInvitations),
+      subscribeAdmin<AdminUser>('users', setUsers),
+      subscribeAdmin<AdminMessage>('messages', setMessages),
+    ];
+    return () => unsubs.forEach((u) => u());
+  }, []);
+
+  const orderList = useMemo(
+    () =>
+      toList(orders).sort(
+        (a, b) => ts(b.receiptSentAt || b.submittedAt || b.updatedAt || b.createdAt) - ts(a.receiptSentAt || a.submittedAt || a.updatedAt || a.createdAt)
+      ),
+    [orders]
+  );
+  const pending = orderList.filter((o) => o.status === 'pending_review');
+
+  // Sound + title badge when a new receipt arrives
+  useEffect(() => {
+    const ids = new Set(pending.map((o) => o._key));
+    if (knownPending.current && [...ids].some((id) => !knownPending.current!.has(id))) {
+      beep();
+      showToast('Yangi chek keldi! 🧾');
+    }
+    if (loaded) knownPending.current = ids;
+    document.title = pending.length ? `(${pending.length}) Boshqaruv paneli` : 'Boshqaruv paneli';
+  }, [pending.length, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const q = query.trim().toLowerCase();
+  const match = (...fields: Array<string | undefined>) => !q || fields.some((f) => (f || '').toLowerCase().includes(q));
+
+  const shownOrders = orderList.filter((o) => {
+    if (orderFilter === 'pending' && o.status !== 'pending_review') return false;
+    if (orderFilter === 'paid' && o.status !== 'paid') return false;
+    if (orderFilter === 'rejected' && o.status !== 'rejected') return false;
+    return match(o.orderId, o.id, o._key, o.customerName, o.customerPhone, o.templateName, o.invitationSlug);
+  });
+
+  const invList = toList(invitations).sort((a, b) => ts(b.updatedAt || b.createdAt) - ts(a.updatedAt || a.createdAt));
+  const userList = toList(users).sort((a, b) => ts(b.createdAt) - ts(a.createdAt));
+  const msgList = toList(messages).sort((a, b) => ts(b.createdAt) - ts(a.createdAt));
+  const newMessages = msgList.filter((m) => m.status === 'new').length;
+
+  /* stats */
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const day = 86400000;
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+    const paid = orderList.filter((o) => o.status === 'paid');
+    const revenue = (from: number) =>
+      paid.filter((o) => ts(o.decidedAt || o.updatedAt) >= from).reduce((s, o) => s + (Number(o.price) || 0), 0);
+    const byTemplate = new Map<string, number>();
+    paid.forEach((o) => {
+      const k = o.templateName || o.invitationSlug || '—';
+      byTemplate.set(k, (byTemplate.get(k) || 0) + 1);
+    });
+    const last14 = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(startToday.getTime() - (13 - i) * day);
+      const from = d.getTime();
+      const to = from + day;
+      const sum = paid
+        .filter((o) => {
+          const t = ts(o.decidedAt || o.updatedAt);
+          return t >= from && t < to;
+        })
+        .reduce((s, o) => s + (Number(o.price) || 0), 0);
+      return { label: `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`, sum };
+    });
+    const submitted = orderList.filter((o) => o.status !== 'pending_payment' && o.status !== 'draft').length;
+    return {
+      today: revenue(startToday.getTime()),
+      week: revenue(now - 7 * day),
+      month: revenue(now - 30 * day),
+      total: revenue(0),
+      paidCount: paid.length,
+      pendingCount: pending.length,
+      rejectedCount: orderList.filter((o) => o.status === 'rejected').length,
+      conversion: submitted ? Math.round((paid.length / submitted) * 100) : 0,
+      topTemplates: [...byTemplate.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+      users: userList.length,
+      newUsers7: userList.filter((u) => ts(u.createdAt) >= now - 7 * day).length,
+      invitations: invList.length,
+      activeInvitations: invList.filter((i) => i.status === 'paid' || i.status === 'published').length,
+      last14,
+    };
+  }, [orderList, pending.length, userList, invList]);
+
+  const ordersByOwner = useMemo(() => {
+    const m = new Map<string, { count: number; paid: number }>();
+    orderList.forEach((o) => {
+      if (!o.ownerUid) return;
+      const e = m.get(o.ownerUid) || { count: 0, paid: 0 };
+      e.count += 1;
+      if (o.status === 'paid') e.paid += Number(o.price) || 0;
+      m.set(o.ownerUid, e);
+    });
+    return m;
+  }, [orderList]);
+  const invByOwner = useMemo(() => {
+    const m = new Map<string, number>();
+    invList.forEach((i) => {
+      const o = i.ownerUid || i.ownerId;
+      if (o) m.set(o, (m.get(o) || 0) + 1);
+    });
+    return m;
+  }, [invList]);
+
+  const runAction = async (body: Record<string, unknown>, okText: string, confirmText?: string) => {
+    if (confirmText && !window.confirm(confirmText)) return;
+    const r = await adminAction(body);
+    showToast(r.ok ? okText : r.error || 'Xatolik', r.ok);
+  };
+
+  const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; badge?: number }> = [
+    { id: 'orders', label: 'Buyurtmalar', icon: <Receipt className="w-4 h-4" />, badge: pending.length },
+    { id: 'stats', label: 'Statistika', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'invitations', label: 'Taklifnomalar', icon: <Mail className="w-4 h-4" /> },
+    { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
+    { id: 'messages', label: 'Xabarlar', icon: <Inbox className="w-4 h-4" />, badge: newMessages },
+  ];
+
+  const maxDay = Math.max(1, ...stats.last14.map((d) => d.sum));
+
+  return (
+    <div className="min-h-screen bg-[#F7F3F1] text-[#1E1418]">
+      <header className="sticky top-0 z-30 bg-white/95 border-b border-black/5">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <TashrifimMark className="w-8 h-8" />
+            <span className="font-playfair font-bold truncate">Boshqaruv paneli</span>
+            <span
+              className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                mode === 'realtime' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+              }`}
+              title={mode === 'polling' ? 'Ma’lumotlar har 5 soniyada yangilanmoqda' : 'Jonli ulanish'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === 'realtime' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              {mode === 'realtime' ? 'Jonli' : mode === 'polling' ? 'Har 5 s' : 'Ulanmoqda…'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => adminLogout()}
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl border border-black/10 text-sm font-semibold hover:bg-black/5"
+          >
+            <LogOut className="w-4 h-4" /> Chiqish
+          </button>
+        </div>
+        <nav className="max-w-6xl mx-auto px-2 flex gap-1 overflow-x-auto no-scrollbar">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setTab(t.id);
+                setQuery('');
+              }}
+              className={`relative inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 ${
+                tab === t.id ? 'border-[#C64873] text-[#9E3E60]' : 'border-transparent text-[#7A6A63]'
+              }`}
+            >
+              {t.icon}
+              {t.label}
+              {!!t.badge && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#C64873] text-white text-[11px] font-bold inline-flex items-center justify-center">
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-5 space-y-4">
+        {!loaded && (
+          <div className="py-16 text-center text-sm text-[#7A6A63]">
+            <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Ma’lumotlar yuklanmoqda…
+          </div>
+        )}
+
+        {loaded && tab !== 'stats' && (
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6A63]" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Qidirish: ism, telefon, buyurtma raqami, havola…"
+              className="w-full min-h-[46px] pl-9 pr-3 rounded-2xl bg-white border border-black/10 text-sm outline-none focus:border-[#D9658B]"
+            />
+          </div>
+        )}
+
+        {/* ORDERS */}
+        {loaded && tab === 'orders' && (
+          <>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {(
+                [
+                  ['pending', `Tekshiruvda (${pending.length})`],
+                  ['all', 'Barchasi'],
+                  ['paid', 'Tasdiqlangan'],
+                  ['rejected', 'Rad etilgan'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setOrderFilter(id)}
+                  className={`min-h-[38px] px-3.5 rounded-full text-sm font-semibold whitespace-nowrap border ${
+                    orderFilter === id ? 'bg-[#1E1418] text-white border-[#1E1418]' : 'bg-white border-black/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {shownOrders.length === 0 ? (
+              <p className="py-12 text-center text-sm text-[#7A6A63]">
+                {orderFilter === 'pending' ? 'Tekshirilishi kerak bo‘lgan chek yo‘q 🎉' : 'Hech narsa topilmadi.'}
+              </p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {shownOrders.map((o) => (
+                  <OrderCard key={o._key} order={o} onToast={showToast} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* STATS */}
+        {loaded && tab === 'stats' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                ['Bugun', fmtMoney(stats.today)],
+                ['7 kun', fmtMoney(stats.week)],
+                ['30 kun', fmtMoney(stats.month)],
+                ['Jami tushum', fmtMoney(stats.total)],
+                ['Tekshiruvda', String(stats.pendingCount)],
+                ['Tasdiqlangan', String(stats.paidCount)],
+                ['Rad etilgan', String(stats.rejectedCount)],
+                ['Konversiya', `${stats.conversion}%`],
+                ['Foydalanuvchilar', String(stats.users)],
+                ['Yangi (7 kun)', String(stats.newUsers7)],
+                ['Taklifnomalar', String(stats.invitations)],
+                ['Faol taklifnomalar', String(stats.activeInvitations)],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-white rounded-2xl border border-black/5 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[#7A6A63]">{label}</div>
+                  <div className="mt-1 text-lg sm:text-xl font-bold tabular-nums">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-4">
+              <h3 className="font-bold mb-3">Oxirgi 14 kunlik tushum</h3>
+              <div className="flex items-end gap-1.5 h-40">
+                {stats.last14.map((d) => (
+                  <div key={d.label} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.label}: ${fmtMoney(d.sum)}`}>
+                    <div className="w-full rounded-t-md bg-[#D6517F]" style={{ height: `${Math.max(2, (d.sum / maxDay) * 100)}%`, opacity: d.sum ? 1 : 0.2 }} />
+                    <span className="text-[9px] text-[#7A6A63] tabular-nums">{d.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-4">
+              <h3 className="font-bold mb-2">Eng ko‘p sotilgan shablonlar</h3>
+              {stats.topTemplates.length === 0 ? (
+                <p className="text-sm text-[#7A6A63]">Hali sotuv yo‘q.</p>
+              ) : (
+                <ol className="space-y-1.5">
+                  {stats.topTemplates.map(([name, count], i) => (
+                    <li key={name} className="flex justify-between text-sm">
+                      <span>
+                        {i + 1}. {name}
+                      </span>
+                      <span className="font-bold tabular-nums">{count} ta</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* INVITATIONS */}
+        {loaded && tab === 'invitations' && (
+          <div className="space-y-2">
+            {invList
+              .filter((i) => match(i.hostNames, i.eventTitle, i.slug, i.venueName, i._key))
+              .map((i) => {
+                const id = i.id || i._key;
+                const active = i.status === 'paid' || i.status === 'published';
+                return (
+                  <div key={i._key} className="bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold">{i.hostNames || i.eventTitle || 'Nomsiz'}</span>
+                        <StatusBadge status={i.status} />
+                      </div>
+                      <div className="text-xs text-[#7A6A63] mt-0.5">
+                        /i/{i.slug || '—'} · {i.eventDate || '—'} · {i.templateSlug || '—'}
+                        {typeof i.viewsCount === 'number' ? ` · 👁 ${i.viewsCount}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {i.slug && (
+                        <a href={`/i/${i.slug}`} target="_blank" rel="noreferrer" className="min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold inline-flex items-center gap-1">
+                          <ExternalLink className="w-3.5 h-3.5" /> Ochish
+                        </a>
+                      )}
+                      {active ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            runAction({ type: 'invitation.setStatus', invitationId: id, status: 'pending_payment' }, 'O‘chirildi (nofaol)', 'Taklifnomani nofaol qilasizmi? Mehmonlar uni ocha olmaydi.')
+                          }
+                          className="min-h-[36px] px-3 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold"
+                        >
+                          Nofaol qilish
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            runAction({ type: 'invitation.setStatus', invitationId: id, status: 'paid' }, 'Faollashtirildi ✅', 'Taklifnomani to‘lovsiz faollashtirasizmi?')
+                          }
+                          className="min-h-[36px] px-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold"
+                        >
+                          Faollashtirish
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          runAction({ type: 'invitation.delete', invitationId: id }, 'O‘chirildi', `«${i.hostNames || id}» taklifnomasini butunlay o‘chirasizmi? Bu amalni qaytarib bo‘lmaydi.`)
+                        }
+                        className="min-h-[36px] px-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> O‘chirish
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            {invList.length === 0 && <p className="py-12 text-center text-sm text-[#7A6A63]">Taklifnomalar yo‘q.</p>}
+          </div>
+        )}
+
+        {/* USERS */}
+        {loaded && tab === 'users' && (
+          <div className="space-y-2">
+            {userList
+              .filter((u) => match(u.name, u.email, u.phone, u._key))
+              .map((u) => {
+                const uid = u.id || u._key;
+                const o = ordersByOwner.get(uid);
+                const phone = digits(u.phone);
+                return (
+                  <div key={u._key} className="bg-white rounded-2xl border border-black/5 p-3.5 flex flex-wrap items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#F5C9D8] to-[#B9DFFA] flex items-center justify-center font-bold">
+                      {(u.name || u.email || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <div className="font-bold">{u.name || '—'}</div>
+                      <div className="text-xs text-[#7A6A63] break-all">
+                        {u.email || '—'}
+                        {u.phone ? ` · ${u.phone}` : ''}
+                      </div>
+                      <div className="text-[11px] text-[#7A6A63]">
+                        Ro‘yxatdan: {fmtDate(u.createdAt)} · Oxirgi kirish: {ago(u.lastLoginAt) || '—'}
+                      </div>
+                    </div>
+                    <div className="text-xs text-right tabular-nums">
+                      <div>Taklifnomalar: <b>{invByOwner.get(uid) || 0}</b></div>
+                      <div>Buyurtmalar: <b>{o?.count || 0}</b></div>
+                      <div>To‘lagan: <b>{fmtMoney(o?.paid || 0)}</b></div>
+                    </div>
+                    {phone && (
+                      <a href={`tel:+${phone}`} className="min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold inline-flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5" /> Qo‘ng‘iroq
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            {userList.length === 0 && <p className="py-12 text-center text-sm text-[#7A6A63]">Foydalanuvchilar yo‘q.</p>}
+          </div>
+        )}
+
+        {/* MESSAGES */}
+        {loaded && tab === 'messages' && (
+          <div className="space-y-2">
+            {msgList
+              .filter((m) => match(m.name, m.contact, m.subject, m.message))
+              .map((m) => {
+                const id = m.id || m._key;
+                return (
+                  <div key={m._key} className={`bg-white rounded-2xl border p-4 space-y-2 ${m.status === 'new' ? 'border-[#D9658B]/40' : 'border-black/5'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-bold">
+                        {m.name || '—'} <span className="font-normal text-xs text-[#7A6A63]">· {m.contact}</span>
+                      </div>
+                      <span className="text-[11px] text-[#7A6A63]">{fmtDate(m.createdAt)}</span>
+                    </div>
+                    {m.subject && <div className="text-sm font-semibold">{m.subject}</div>}
+                    <p className="text-sm text-[#4A3E39] whitespace-pre-wrap">{m.message}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {m.status === 'new' ? (
+                        <button type="button" onClick={() => runAction({ type: 'message.setStatus', messageId: id, status: 'read' }, 'O‘qildi deb belgilandi')} className="min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold">
+                          O‘qildi
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => runAction({ type: 'message.setStatus', messageId: id, status: 'new' }, 'Yangi deb belgilandi')} className="min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold">
+                          Yangi deb belgilash
+                        </button>
+                      )}
+                      <button type="button" onClick={() => runAction({ type: 'message.delete', messageId: id }, 'O‘chirildi', 'Xabarni o‘chirasizmi?')} className="min-h-[36px] px-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold inline-flex items-center gap-1">
+                        <Trash2 className="w-3.5 h-3.5" /> O‘chirish
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            {msgList.length === 0 && <p className="py-12 text-center text-sm text-[#7A6A63]">Xabarlar yo‘q.</p>}
+          </div>
+        )}
+      </main>
+
+      {toast && (
+        <div
+          role="status"
+          className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white ${
+            toast.ok ? 'bg-[#1E1418]' : 'bg-rose-600'
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Hidden admin route (/admin). Not linked anywhere on the site and excluded from search engines. */
+export const AdminPage: React.FC = () => {
+  const [state, setState] = useState<'checking' | 'out' | 'in'>('checking');
+
+  useEffect(() => {
+    let meta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+    const created = !meta;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'robots';
+      document.head.appendChild(meta);
+    }
+    const prev = meta.content;
+    meta.content = 'noindex, nofollow';
+    document.title = 'Boshqaruv paneli';
+    const unsub = watchAdminSession((signedIn) => setState(signedIn ? 'in' : 'out'));
+    return () => {
+      unsub();
+      if (created) meta?.remove();
+      else if (meta) meta.content = prev;
+    };
+  }, []);
+
+  if (state === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-[#C64873]" />
+      </div>
+    );
+  }
+  return state === 'in' ? <AdminPanel /> : <AdminLogin onDone={() => setState('in')} />;
+};
+
+export default AdminPage;

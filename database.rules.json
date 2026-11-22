@@ -1,6 +1,6 @@
 {
   "rules": {
-    ".read": false,
+    ".read": "auth != null && auth.uid === 'tashrifim-admin' && auth.token.admin === true && auth.token.adminUntil > now",
     ".write": false,
 
     "users": {
