@@ -363,7 +363,13 @@ function canWrite(
 // ---------------------------------------------------------------------------
 test('RTDB Rules: database.rules.json is valid JSON and enforces strict defaults', () => {
   const rules = loadRules();
-  assert.equal(rules.rules['.read'], false);
+  // Root reads are denied to everyone except a live admin-panel session (custom token claims).
+  const rootRead = rules.rules['.read'];
+  assert.equal(typeof rootRead, 'string');
+  assert.equal(
+    rootRead,
+    "auth != null && auth.uid === 'tashrifim-admin' && auth.token.admin === true && auth.token.adminUntil > now"
+  );
   assert.equal(rules.rules['.write'], false);
   assert.equal(rules.rules.templates['.read'], true);
   assert.equal(rules.rules.templates['.write'], false);
