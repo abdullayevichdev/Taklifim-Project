@@ -6,6 +6,7 @@ import { mockTemplates } from '../data/mockTemplates';
 import { mockPlans } from '../data/mockPlans';
 import { InvitationData, ScheduleItem, DressCodeColor, Template, OrderStatus, OrderItem } from '../types';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
+import { useSiteSettings } from '../services/siteSettings';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { TemplateThemeDecoration } from '../components/TemplateThemeDecoration';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
@@ -152,6 +153,8 @@ function isDraftForeignToUser(
 }
 
 export const BuilderPage: React.FC = () => {
+  // Re-render when the admin changes card details
+  useSiteSettings();
   const { params, navigate } = useRouter();
   const { t, language } = useLanguage();
   const { showToast, isLoggedIn, authReady, hasFirebaseSession, user, updateUserProfile } = useAuth();
@@ -1616,7 +1619,9 @@ export const BuilderPage: React.FC = () => {
                   {t.builder.step1Desc}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto pr-1">
-                  {availableTemplates.map((tpl) => {
+                  {availableTemplates
+                    .filter((tpl) => !tpl.hidden || tpl.slug === invitationState.templateSlug)
+                    .map((tpl) => {
                     const isSelected =
                       invitationState.templateSlug === tpl.slug ||
                       invitationState.templateId === tpl.id;

@@ -55,6 +55,9 @@ const MyInvitationsPage = lazyWithRetry(() =>
 const OrderStatusPage = lazyWithRetry(() =>
   import('./pages/OrderStatusPage').then((m) => ({ default: m.OrderStatusPage }))
 );
+const AdminPage = lazyWithRetry(() =>
+  import('./pages/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
 const NotFoundPage = lazyWithRetry(() =>
   import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 );
@@ -107,9 +110,16 @@ const AppContent: React.FC = () => {
 
   // Determine if this is a dedicated guest-facing invitation page
   const isGuestInvitation = routePath.startsWith('/i/');
+  // Hidden admin panel: full-screen, without the public site header/footer.
+  const isAdminRoute = routePath === '/admin';
+  const hideSiteChrome = isGuestInvitation || isAdminRoute;
 
   // Route dispatcher
   const renderCurrentPage = () => {
+    if (isAdminRoute) {
+      return <AdminPage />;
+    }
+
     // Guest Invitation
     if (routePath.startsWith('/i/')) {
       return <InvitationGuestPage />;
@@ -183,11 +193,11 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      data-lg-backdrop={!isGuestInvitation && enableLgBackdrop ? '#taklifim-backdrop' : undefined}
+      data-lg-backdrop={!hideSiteChrome && enableLgBackdrop ? '#taklifim-backdrop' : undefined}
       className="min-h-screen flex flex-col justify-between selection:bg-[#F5C9D8] selection:text-[#231E1B] relative"
     >
-      {!isGuestInvitation && <GlassBackground />}
-      {!isGuestInvitation && <Header />}
+      {!hideSiteChrome && <GlassBackground />}
+      {!hideSiteChrome && <Header />}
 
       <main className="flex-1 relative z-10">
         <ErrorBoundary
@@ -202,8 +212,8 @@ const AppContent: React.FC = () => {
         </ErrorBoundary>
       </main>
 
-      {!isGuestInvitation && <Footer />}
-      {!isGuestInvitation && <GlassBottomNav />}
+      {!hideSiteChrome && <Footer />}
+      {!hideSiteChrome && <GlassBottomNav />}
 
       <ToastContainer />
     </div>

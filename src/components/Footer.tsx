@@ -1,5 +1,6 @@
 import React from 'react';
 import { TashrifimMark } from './TashrifimLogo';
+import { useSiteSettings, formatPhoneDisplay } from '../services/siteSettings';
 import { useRouter, Link } from '../context/RouterContext';
 import { useLanguage } from '../locales';
 import { Heart, Send, Instagram, Phone } from 'lucide-react';
@@ -7,6 +8,7 @@ import { FlagIcon } from './FlagIcon';
 import { shouldShowBottomNav } from './glass/GlassBottomNav';
 
 export const Footer: React.FC = () => {
+  const site = useSiteSettings();
   const { path } = useRouter();
   const { t, language, setLanguage } = useLanguage();
   const hasBottomNav = shouldShowBottomNav(path);
@@ -53,10 +55,10 @@ export const Footer: React.FC = () => {
                 <Instagram className="w-4 h-4" />
               </a>
               <a
-                href="tel:+998933223580"
+                href={`tel:+${site.phone}`}
                 className="w-11 h-11 rounded-2xl glass-surface hover:bg-white/95 hover:text-emerald-700 flex items-center justify-center transition-colors text-[#4A3E39]"
-                aria-label="Telefon: +998933223580"
-                title="+998933223580"
+                aria-label={`Telefon: ${formatPhoneDisplay(site.phone)}`}
+                title={formatPhoneDisplay(site.phone)}
               >
                 <Phone className="w-4 h-4" />
               </a>

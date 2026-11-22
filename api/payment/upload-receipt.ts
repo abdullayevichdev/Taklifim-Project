@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 import {
   getFirebaseAdminDiagnosticError,
+  getRtdb,
   getUserRecord,
   getVerifiedUserPhone,
   hasFirebaseAdmin,
@@ -9,6 +10,7 @@ import {
 import { cleanAndValidateUzPhone } from '../_lib/phone.js';
 import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 import { ensurePaymentBotWebhook } from '../_lib/telegram.js';
+import { getTemplatePriceOverride } from '../_lib/siteConfig.js';
 import { getPublicSiteUrl, getTelegramRuntimeEnv } from '../_lib/env.js';
 
 /** Public https base URL of this deployment (skips localhost and Vercel preview deployments). */
@@ -173,7 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       planName: planName ? String(planName) : undefined,
       weddingDate: weddingDate ? String(weddingDate) : '',
       venueName: venueName ? String(venueName) : '',
-      price: Number(price) || 0,
+      // An admin-set template price always wins over the price sent by the browser.
+      price: (await getTemplatePriceOverride(templateSlug ? String(templateSlug) : undefined)) ?? (Number(price) || 0),
       isPdf,
       fileName: fileName ? String(fileName) : undefined,
       fileType: fileType ? String(fileType) : undefined,
@@ -184,6 +187,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     await webhookCheck;
+
+    // Keep a copy of image receipts for the admin panel (PDFs already have a Storage URL).
+    if (result.statusCode === 200 && (result.body as any)?.success && fileBase64 && !isPdf) {
+      try {
+        const safeOrderId = String(orderId).replace(/[^A-Za-z0-9_-]/g, '');
+        const mime = typeof fileType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(fileType) ? fileType : 'image/jpeg';
+        const b64 = String(fileBase64).replace(/^data:[^;]+;base64,/, '');
+        if (safeOrderId && b64.length <= MAX_IMAGE_BASE64_CHARS) {
+          await getRtdb().ref(`receiptImages/${safeOrderId}`).set({
+            dataUrl: `data:${mime};base64,${b64}`,
+            savedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err: any) {
+        console.warn('Receipt image copy note:', err?.message || err);
+      }
+    }
+
     return res.status(result.statusCode).json(result.body);
   } catch (err: any) {
     console.error('Upload receipt handler error:', {

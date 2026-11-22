@@ -20,6 +20,8 @@ export interface Template {
   isFree?: boolean;
   isPopular?: boolean;
   isNew?: boolean;
+  /** Hidden from catalogs by the admin panel (existing invitations keep working). */
+  hidden?: boolean;
   previewImage: string;
   description: Record<Language, string>;
   features: Record<Language, string[]>;

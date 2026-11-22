@@ -21,6 +21,7 @@ import { mockTemplates } from '../data/mockTemplates';
 import { mockGuests } from '../data/mockGuests';
 import { mockOrders } from '../data/mockOrders';
 import { isFirebaseConfigured, db, rtdb, auth } from './firebase';
+import { applyTemplateOverrides, loadTemplateOverrides } from './siteSettings';
 import {
   collection,
   doc,
@@ -320,6 +321,11 @@ export const api = {
   // TEMPLATES
   // -------------------------------------------------------------
   async getTemplates(): Promise<Template[]> {
+    await loadTemplateOverrides();
+    return applyTemplateOverrides(await this.getTemplatesRaw());
+  },
+
+  async getTemplatesRaw(): Promise<Template[]> {
     // 1. Check Realtime Database
     if (isFirebaseConfigured() && rtdb) {
       try {

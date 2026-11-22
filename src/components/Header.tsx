@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { TashrifimMark } from './TashrifimLogo';
+import { useSiteSettings, formatPhoneDisplay } from '../services/siteSettings';
 import { useRouter, Link } from '../context/RouterContext';
 import { useLanguage } from '../locales';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,8 @@ import { CustomDropdown, GlassActionMenu, DropdownOption, GlassMenuItem } from '
 import { GlassNavbar, GlassNavbarItem, GlassButton } from './glass';
 
 export const Header: React.FC = () => {
+  const site = useSiteSettings();
+  const phoneDisplay = formatPhoneDisplay(site.phone);
   const { path, navigate } = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { isLoggedIn, user, logout } = useAuth();
@@ -359,9 +362,9 @@ export const Header: React.FC = () => {
             <div className="pointer-events-auto flex items-center gap-1.5 xl:gap-2 shrink-0">
               {/* Compact phone icon button on medium desktops (1240px–1419px) to prevent navbar crowding */}
               <a
-                href="tel:+998933223580"
-                aria-label="+998 933223580 — Avazxanov Abdulhay"
-                title="+998 933223580 — Avazxanov Abdulhay"
+                href={`tel:+${site.phone}`}
+                aria-label={`${phoneDisplay} — ${site.ownerName}`}
+                title={`${phoneDisplay} — ${site.ownerName}`}
                 className={`hidden min-[1240px]:inline-flex min-[1640px]:hidden items-center justify-center shrink-0 w-9 h-9 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
                   isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
                 }`}
@@ -371,8 +374,8 @@ export const Header: React.FC = () => {
 
               {/* Liquid Glass VIP Contact Pill (1420px+ where full header has generous horizontal room) */}
               <a
-                href="tel:+998933223580"
-                aria-label="+998 933223580 — Avazxanov Abdulhay"
+                href={`tel:+${site.phone}`}
+                aria-label={`${phoneDisplay} — ${site.ownerName}`}
                 className={`hidden min-[1640px]:inline-flex items-center gap-2 shrink-0 min-h-[38px] xl:min-h-[40px] px-2.5 xl:px-3 py-1 rounded-full lg-contact-pill group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389] ${
                   isScrolled ? 'shadow-[0_12px_30px_-8px_rgba(198,72,115,0.24)]' : ''
                 }`}
@@ -382,10 +385,10 @@ export const Header: React.FC = () => {
                 </span>
                 <span className="flex flex-col leading-none text-left pr-0.5">
                   <span className="text-[13px] xl:text-[13.5px] font-bold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
-                    +998 933223580
+                    {phoneDisplay}
                   </span>
                   <span className="text-[11px] xl:text-[11.5px] font-semibold tracking-[0.02em] text-[#8A3152] whitespace-nowrap mt-0.5">
-                    Avazxanov Abdulhay
+                    {site.ownerName}
                   </span>
                 </span>
               </a>
@@ -471,17 +474,17 @@ export const Header: React.FC = () => {
         <div className="pointer-events-auto flex items-center gap-1.5 lg:hidden shrink-0">
           {/* Phones: compact call button (the full number pill does not fit next to the logo) */}
           <a
-            href="tel:+998933223580"
-            aria-label="+998 933223580 — Avazxanov Abdulhay"
-            title="+998 933223580 — Avazxanov Abdulhay"
+            href={`tel:+${site.phone}`}
+            aria-label={`${phoneDisplay} — ${site.ownerName}`}
+            title={`${phoneDisplay} — ${site.ownerName}`}
             className="sm:hidden inline-flex items-center justify-center shrink-0 w-[42px] h-[42px] rounded-full lg-contact-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]"
           >
             <Phone className="w-4 h-4 text-[#B23864]" aria-hidden="true" />
           </a>
 
           <a
-            href="tel:+998933223580"
-            aria-label="+998 933223580 — Avazxanov Abdulhay"
+            href={`tel:+${site.phone}`}
+            aria-label={`${phoneDisplay} — ${site.ownerName}`}
             className="hidden sm:inline-flex items-center gap-2 shrink-0 min-h-[42px] px-3 py-1 rounded-full lg-contact-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D66389]"
           >
             <span className="w-6 h-6 rounded-full bg-gradient-to-br from-[#F5C9D8]/90 via-white to-[#B9DFFA]/85 flex items-center justify-center border border-white shrink-0 shadow-xs">
@@ -489,10 +492,10 @@ export const Header: React.FC = () => {
             </span>
             <span className="flex flex-col leading-none text-left pr-0.5">
               <span className="text-[13px] font-bold tracking-tight text-[#1E1418] tabular-nums whitespace-nowrap">
-                +998 933223580
+                {phoneDisplay}
               </span>
               <span className="text-[11px] font-semibold tracking-[0.02em] text-[#8A3152] whitespace-nowrap mt-0.5">
-                Avazxanov Abdulhay
+                {site.ownerName}
               </span>
             </span>
           </a>

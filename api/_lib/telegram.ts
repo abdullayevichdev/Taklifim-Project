@@ -1,6 +1,7 @@
 import { getPaymentTelegramConfig, getTelegramWebhookRegistrationSecret } from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
 import { decideOrderPayment } from './firebaseAdmin.js';
+import { getServerSiteSettings } from './siteConfig.js';
 
 function escapeTelegramHtml(value?: string | number | null): string {
   if (value === undefined || value === null) return '';
@@ -366,6 +367,7 @@ export async function sendReceiptToTelegram(params: {
     };
   }
 
+  const site = await getServerSiteSettings();
   const safePrice = Number.isFinite(Number(params.price)) ? Number(params.price) : 0;
   const formattedPrice = new Intl.NumberFormat('uz-UZ').format(safePrice);
   const formattedDate = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
@@ -385,7 +387,7 @@ export async function sendReceiptToTelegram(params: {
     `📅 <b>To'y sanasi:</b> ${safeWeddingDate}\n` +
     `📍 <b>To'yxona:</b> ${safeVenue}\n` +
     `💰 <b>To'lov summasi:</b> ${formattedPrice} so'm\n` +
-    `💳 <b>Karta:</b> 5614 6822 0920 2581 (ABDULLA DEDAXANOV)\n` +
+    `💳 <b>Karta:</b> ${escapeTelegramHtml(site.cardNumber.replace(/(\d{4})(?=\d)/g, '$1 '))} (${escapeTelegramHtml(site.cardHolder)})\n` +
     `⏱ <b>Yuklangan vaqt:</b> ${escapeTelegramHtml(formattedDate)}\n\n` +
     `👇 <i>Iltimos, to'lovni tasdiqlang yoki rad eting:</i>`;
 
@@ -512,5 +514,41 @@ export async function sendTemplateErrorAlertToTelegram(params: {
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: sanitizeTelegramErrorMessage(err) };
+  }
+}
+
+/**
+ * Called when a receipt is decided from the admin panel: removes the confirm/reject buttons
+ * from the original Telegram message and replies with the outcome, so the chat stays in sync.
+ */
+export async function markTelegramReceiptDecided(params: {
+  messageId?: number;
+  orderId: string;
+  decision: 'paid' | 'rejected';
+  reason?: string;
+}): Promise<void> {
+  const { adminChatId } = getPaymentTelegramConfig();
+  if (!adminChatId || adminChatId === 'MOCK_ADMIN_CHAT_ID') return;
+  try {
+    if (params.messageId) {
+      await tgPaymentApi('editMessageReplyMarkup', {
+        chat_id: adminChatId,
+        message_id: params.messageId,
+        reply_markup: { inline_keyboard: [] },
+      });
+    }
+    const text =
+      params.decision === 'paid'
+        ? `✅ <b>#${escapeTelegramHtml(params.orderId)}</b> — admin panel orqali TASDIQLANDI`
+        : `❌ <b>#${escapeTelegramHtml(params.orderId)}</b> — admin panel orqali RAD ETILDI` +
+          (params.reason ? `\nSabab: ${escapeTelegramHtml(params.reason.slice(0, 300))}` : '');
+    await tgPaymentApi('sendMessage', {
+      chat_id: adminChatId,
+      text,
+      parse_mode: 'HTML',
+      ...(params.messageId ? { reply_to_message_id: params.messageId, allow_sending_without_reply: true } : {}),
+    });
+  } catch {
+    /* non-fatal */
   }
 }

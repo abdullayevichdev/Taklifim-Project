@@ -1,6 +1,6 @@
 {
   "rules": {
-    ".read": false,
+    ".read": "auth != null && auth.uid === 'tashrifim-admin' && auth.token.admin === true && auth.token.adminUntil > now",
     ".write": false,
 
     "users": {
@@ -12,6 +12,26 @@
 
     "templates": {
       ".read": true,
+      ".write": false
+    },
+
+    "settings": {
+      "public": {
+        ".read": true
+      },
+      ".write": false
+    },
+
+    "templateOverrides": {
+      ".read": true,
+      ".write": false
+    },
+
+    "adminAudit": {
+      ".write": false
+    },
+
+    "receiptImages": {
       ".write": false
     },
 

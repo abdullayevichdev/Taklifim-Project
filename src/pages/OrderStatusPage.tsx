@@ -24,6 +24,7 @@ import {
 import { resolveLegacyOrderTemplate } from '../utils/templateResolver';
 import { cleanAndValidateUzPhone } from '../utils/phone.js';
 import { PAYMENT_CONFIG, getPaymentCopy } from '../config/payment';
+import { useSiteSettings } from '../services/siteSettings';
 import { isFirebaseConfigured, getStorageLazy } from '../services/firebase';
 import { ShareModal } from '../components/ShareModal';
 import { ReceiptAuthPrompt } from '../components/ReceiptAuthPrompt';
@@ -70,6 +71,8 @@ interface OrderViewState {
 const ADMIN_SUPPORT_TELEGRAM_URL = 'https://t.me/avazxanovvv_700';
 
 export const OrderStatusPage: React.FC = () => {
+  // Re-render when the admin changes card details
+  useSiteSettings();
   const { params, navigate } = useRouter();
   const { user, authReady, hasFirebaseSession, showToast } = useAuth();
   const { language, t } = useLanguage();

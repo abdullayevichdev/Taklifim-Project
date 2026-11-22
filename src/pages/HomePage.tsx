@@ -83,7 +83,7 @@ export const HomePage: React.FC = () => {
     };
   }, []);
 
-  const featuredTemplates = allTemplates.slice(0, 8);
+  const featuredTemplates = allTemplates.filter((tpl) => !tpl.hidden).slice(0, 8);
 
   const benefitIcons = [Smartphone, Share2, QrCode, Users, MapPin, Music];
   const benefitGradients = [

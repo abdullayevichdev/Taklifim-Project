@@ -38,6 +38,33 @@ async function startServer() {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+  app.post('/api/admin/login', async (req: Request, res: Response) => {
+    try {
+      const { default: h } = await import('./api/admin/login.js');
+      return await h(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });
+    }
+  });
+
+  app.post('/api/admin/action', async (req: Request, res: Response) => {
+    try {
+      const { default: h } = await import('./api/admin/action.js');
+      return await h(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });
+    }
+  });
+
+  app.get('/api/admin/data', async (req: Request, res: Response) => {
+    try {
+      const { default: h } = await import('./api/admin/data.js');
+      return await h(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });
+    }
+  });
+
   app.get('/api/maps/resolve', async (req: Request, res: Response) => {
     try {
       const { default: resolveHandler } = await import('./api/maps/resolve.js');
