@@ -59,7 +59,7 @@ export const TemplatesPage: React.FC = () => {
   );
 
   const filteredTemplates = useMemo(() => {
-    return filterTemplates(templates, {
+    return filterTemplates(templates.filter((tpl) => !tpl.hidden), {
       category,
       query: searchQuery,
       sortBy,

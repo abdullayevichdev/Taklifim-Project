@@ -9,7 +9,7 @@ import {
   Auth,
   User,
 } from 'firebase/auth';
-import { getDatabase, ref, onValue, get, Database } from 'firebase/database';
+import { getDatabase, ref, onValue, get, query, orderByKey, limitToLast, Database } from 'firebase/database';
 import { firebaseConfig } from './firebase';
 
 /**
@@ -126,7 +126,7 @@ async function fetchScope(scope: string, id?: string): Promise<any> {
  * rules do not allow it yet (rules not deployed), it falls back to polling the server every 5 s.
  */
 export function subscribeAdmin<T = any>(
-  path: 'orders' | 'invitations' | 'users' | 'messages',
+  path: 'orders' | 'invitations' | 'users' | 'messages' | 'adminAudit' | 'settings' | 'templateOverrides',
   onData: (value: Record<string, T>) => void,
   onModeChange?: (mode: 'realtime' | 'polling') => void
 ): () => void {
@@ -148,8 +148,10 @@ export function subscribeAdmin<T = any>(
     tick();
   };
 
+  const source =
+    path === 'adminAudit' ? query(ref(adminDb!, path), orderByKey(), limitToLast(300)) : ref(adminDb!, path);
   const unsub = onValue(
-    ref(adminDb!, path),
+    source,
     (snap) => {
       onModeChange?.('realtime');
       onData((snap.val() as Record<string, T>) || {});

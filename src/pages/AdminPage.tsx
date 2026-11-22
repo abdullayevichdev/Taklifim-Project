@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
+  History,
+  Settings as SettingsIcon,
   Check,
   Clock,
   ExternalLink,
@@ -19,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import { TashrifimMark } from '../components/TashrifimLogo';
+import { AdminSettings } from '../components/admin/AdminSettings';
+import { BRAND, ChartCard, ColumnChart, HBarList, LineChart, SERIES, SegmentBar } from '../components/admin/AdminCharts';
 import {
   adminAction,
   adminLogin,
@@ -88,7 +92,7 @@ interface AdminMessage {
   createdAt?: string;
 }
 
-type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages';
+type Tab = 'orders' | 'stats' | 'invitations' | 'users' | 'messages' | 'settings' | 'history';
 
 /* ---------------------------------------------------------------- helpers */
 const fmtMoney = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0))} so‘m`;
@@ -117,6 +121,18 @@ const toList = <T,>(rec: Record<string, T>): Array<T & { _key: string }> =>
     .filter(([, v]) => v && typeof v === 'object')
     .map(([k, v]) => ({ ...(v as any), _key: k }));
 const digits = (s?: string) => (s || '').replace(/\D/g, '');
+
+const AUDIT_LABEL: Record<string, string> = {
+  login: 'Panelga kirildi',
+  login_failed: 'Noto‘g‘ri kod',
+  'order.decide': 'Buyurtma qarori',
+  'invitation.setStatus': 'Taklifnoma holati',
+  'invitation.delete': 'Taklifnoma o‘chirildi',
+  'message.setStatus': 'Xabar holati',
+  'message.delete': 'Xabar o‘chirildi',
+  'settings.update': 'Sozlamalar o‘zgardi',
+  'template.update': 'Shablon o‘zgardi',
+};
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   pending_review: { text: 'Tekshiruvda', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
@@ -350,12 +366,16 @@ const AdminPanel: React.FC = () => {
   const [invitations, setInvitations] = useState<Record<string, AdminInvitation>>({});
   const [users, setUsers] = useState<Record<string, AdminUser>>({});
   const [messages, setMessages] = useState<Record<string, AdminMessage>>({});
+  const [siteSettings, setSiteSettings] = useState<Record<string, any>>({});
+  const [templateOverrides, setTemplateOverrides] = useState<Record<string, any>>({});
+  const [audit, setAudit] = useState<Record<string, { type?: string; target?: string; detail?: string; ip?: string; at?: string }>>({});
   const [mode, setMode] = useState<'realtime' | 'polling' | 'connecting'>('connecting');
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [orderFilter, setOrderFilter] = useState<'pending' | 'all' | 'paid' | 'rejected'>('pending');
   const [query, setQuery] = useState('');
   const knownPending = useRef<Set<string> | null>(null);
+  const [range, setRange] = useState<7 | 30 | 90>(30);
 
   const showToast = (text: string, ok = true) => {
     setToast({ text, ok });
@@ -371,6 +391,9 @@ const AdminPanel: React.FC = () => {
       subscribeAdmin<AdminInvitation>('invitations', setInvitations),
       subscribeAdmin<AdminUser>('users', setUsers),
       subscribeAdmin<AdminMessage>('messages', setMessages),
+      subscribeAdmin<any>('settings', setSiteSettings),
+      subscribeAdmin<any>('templateOverrides', setTemplateOverrides),
+      subscribeAdmin<any>('adminAudit', setAudit),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
@@ -410,50 +433,68 @@ const AdminPanel: React.FC = () => {
   const msgList = toList(messages).sort((a, b) => ts(b.createdAt) - ts(a.createdAt));
   const newMessages = msgList.filter((m) => m.status === 'new').length;
 
-  /* stats */
+  /* stats (recomputed live whenever orders / users / invitations change) */
   const stats = useMemo(() => {
-    const now = Date.now();
     const day = 86400000;
     const startToday = new Date();
     startToday.setHours(0, 0, 0, 0);
+    const todayMs = startToday.getTime();
+    const fromMs = todayMs - (range - 1) * day;
     const paid = orderList.filter((o) => o.status === 'paid');
-    const revenue = (from: number) =>
-      paid.filter((o) => ts(o.decidedAt || o.updatedAt) >= from).reduce((s, o) => s + (Number(o.price) || 0), 0);
-    const byTemplate = new Map<string, number>();
-    paid.forEach((o) => {
-      const k = o.templateName || o.invitationSlug || '—';
-      byTemplate.set(k, (byTemplate.get(k) || 0) + 1);
+    const paidAt = (o: AdminOrder) => ts(o.decidedAt || o.updatedAt);
+    const orderAt = (o: AdminOrder) => ts(o.receiptSentAt || o.submittedAt || o.createdAt);
+    const sumPaid = (from: number, to = Infinity) =>
+      paid.filter((o) => paidAt(o) >= from && paidAt(o) < to).reduce((s2, o) => s2 + (Number(o.price) || 0), 0);
+
+    const days = Array.from({ length: range }, (_, i) => {
+      const from = fromMs + i * day;
+      const d = new Date(from);
+      return { from, to: from + day, label: `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}` };
     });
-    const last14 = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(startToday.getTime() - (13 - i) * day);
-      const from = d.getTime();
-      const to = from + day;
-      const sum = paid
-        .filter((o) => {
-          const t = ts(o.decidedAt || o.updatedAt);
-          return t >= from && t < to;
-        })
-        .reduce((s, o) => s + (Number(o.price) || 0), 0);
-      return { label: `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}`, sum };
-    });
-    const submitted = orderList.filter((o) => o.status !== 'pending_payment' && o.status !== 'draft').length;
+    const revenueDaily = days.map((d) => ({ label: d.label, value: sumPaid(d.from, d.to) }));
+    const ordersDaily = days.map(
+      (d) => orderList.filter((o) => o.status !== 'pending_payment' && o.status !== 'draft' && orderAt(o) >= d.from && orderAt(o) < d.to).length
+    );
+    const usersDaily = days.map((d) => userList.filter((u) => ts(u.createdAt) >= d.from && ts(u.createdAt) < d.to).length);
+
+    const inRange = orderList.filter((o) => orderAt(o) >= fromMs);
+    const byTemplate = new Map<string, { count: number; sum: number }>();
+    paid
+      .filter((o) => paidAt(o) >= fromMs)
+      .forEach((o) => {
+        const k = o.templateName || o.invitationSlug || '—';
+        const e = byTemplate.get(k) || { count: 0, sum: 0 };
+        e.count += 1;
+        e.sum += Number(o.price) || 0;
+        byTemplate.set(k, e);
+      });
+    const top = [...byTemplate.entries()].sort((x, y) => y[1].count - x[1].count).slice(0, 6);
+    const submitted = inRange.filter((o) => o.status !== 'pending_payment' && o.status !== 'draft').length;
+    const paidInRange = inRange.filter((o) => o.status === 'paid').length;
+
     return {
-      today: revenue(startToday.getTime()),
-      week: revenue(now - 7 * day),
-      month: revenue(now - 30 * day),
-      total: revenue(0),
-      paidCount: paid.length,
+      today: sumPaid(todayMs),
+      rangeRevenue: sumPaid(fromMs),
+      total: sumPaid(0),
       pendingCount: pending.length,
-      rejectedCount: orderList.filter((o) => o.status === 'rejected').length,
-      conversion: submitted ? Math.round((paid.length / submitted) * 100) : 0,
-      topTemplates: [...byTemplate.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+      statusSegments: [
+        { label: 'Tasdiqlangan', value: inRange.filter((o) => o.status === 'paid').length, color: SERIES[0] },
+        { label: 'Tekshiruvda', value: inRange.filter((o) => o.status === 'pending_review').length, color: SERIES[1] },
+        { label: 'Rad etilgan', value: inRange.filter((o) => o.status === 'rejected').length, color: SERIES[2] },
+      ],
+      conversion: submitted ? Math.round((paidInRange / submitted) * 100) : 0,
+      topCount: top.map(([label, v]) => ({ label, value: v.count })),
+      topSum: top.map(([label, v]) => ({ label, value: v.sum })),
       users: userList.length,
-      newUsers7: userList.filter((u) => ts(u.createdAt) >= now - 7 * day).length,
+      newUsers: userList.filter((u) => ts(u.createdAt) >= fromMs).length,
       invitations: invList.length,
       activeInvitations: invList.filter((i) => i.status === 'paid' || i.status === 'published').length,
-      last14,
+      revenueDaily,
+      ordersDaily,
+      usersDaily,
+      dayLabels: days.map((d) => d.label),
     };
-  }, [orderList, pending.length, userList, invList]);
+  }, [orderList, pending.length, userList, invList, range]);
 
   const ordersByOwner = useMemo(() => {
     const m = new Map<string, { count: number; paid: number }>();
@@ -487,9 +528,10 @@ const AdminPanel: React.FC = () => {
     { id: 'invitations', label: 'Taklifnomalar', icon: <Mail className="w-4 h-4" /> },
     { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
     { id: 'messages', label: 'Xabarlar', icon: <Inbox className="w-4 h-4" />, badge: newMessages },
+    { id: 'settings', label: 'Sozlamalar', icon: <SettingsIcon className="w-4 h-4" /> },
+    { id: 'history', label: 'Tarix', icon: <History className="w-4 h-4" /> },
   ];
 
-  const maxDay = Math.max(1, ...stats.last14.map((d) => d.sum));
 
   return (
     <div className="min-h-screen bg-[#F7F3F1] text-[#1E1418]">
@@ -548,7 +590,7 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {loaded && tab !== 'stats' && (
+        {loaded && tab !== 'stats' && tab !== 'settings' && (
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6A63]" />
             <input
@@ -602,18 +644,31 @@ const AdminPanel: React.FC = () => {
         {/* STATS */}
         {loaded && tab === 'stats' && (
           <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {([7, 30, 90] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRange(r)}
+                  aria-pressed={range === r}
+                  className={`min-h-[38px] px-3.5 rounded-full text-sm font-semibold border ${
+                    range === r ? 'bg-[#1E1418] text-white border-[#1E1418]' : 'bg-white border-black/10'
+                  }`}
+                >
+                  {r} kun
+                </button>
+              ))}
+              <span className="text-xs text-[#7A6A63] ml-1">Barcha raqamlar jonli yangilanadi</span>
+            </div>
+
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                ['Bugun', fmtMoney(stats.today)],
-                ['7 kun', fmtMoney(stats.week)],
-                ['30 kun', fmtMoney(stats.month)],
+                ['Bugungi tushum', fmtMoney(stats.today)],
+                [`${range} kunlik tushum`, fmtMoney(stats.rangeRevenue)],
                 ['Jami tushum', fmtMoney(stats.total)],
                 ['Tekshiruvda', String(stats.pendingCount)],
-                ['Tasdiqlangan', String(stats.paidCount)],
-                ['Rad etilgan', String(stats.rejectedCount)],
                 ['Konversiya', `${stats.conversion}%`],
-                ['Foydalanuvchilar', String(stats.users)],
-                ['Yangi (7 kun)', String(stats.newUsers7)],
+                ['Foydalanuvchilar', `${stats.users} (+${stats.newUsers})`],
                 ['Taklifnomalar', String(stats.invitations)],
                 ['Faol taklifnomalar', String(stats.activeInvitations)],
               ].map(([label, value]) => (
@@ -624,34 +679,59 @@ const AdminPanel: React.FC = () => {
               ))}
             </div>
 
-            <div className="bg-white rounded-2xl border border-black/5 p-4">
-              <h3 className="font-bold mb-3">Oxirgi 14 kunlik tushum</h3>
-              <div className="flex items-end gap-1.5 h-40">
-                {stats.last14.map((d) => (
-                  <div key={d.label} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.label}: ${fmtMoney(d.sum)}`}>
-                    <div className="w-full rounded-t-md bg-[#D6517F]" style={{ height: `${Math.max(2, (d.sum / maxDay) * 100)}%`, opacity: d.sum ? 1 : 0.2 }} />
-                    <span className="text-[9px] text-[#7A6A63] tabular-nums">{d.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ChartCard
+              title="Kunlik tushum"
+              subtitle={`Oxirgi ${range} kun · tasdiqlangan to‘lovlar, so‘m`}
+              table={{ head: ['Kun', 'Tushum'], rows: stats.revenueDaily.map((d) => [d.label, fmtMoney(d.value)]) }}
+            >
+              <ColumnChart data={stats.revenueDaily} valueLabel="Tushum" format={fmtMoney} />
+            </ChartCard>
 
-            <div className="bg-white rounded-2xl border border-black/5 p-4">
-              <h3 className="font-bold mb-2">Eng ko‘p sotilgan shablonlar</h3>
-              {stats.topTemplates.length === 0 ? (
-                <p className="text-sm text-[#7A6A63]">Hali sotuv yo‘q.</p>
-              ) : (
-                <ol className="space-y-1.5">
-                  {stats.topTemplates.map(([name, count], i) => (
-                    <li key={name} className="flex justify-between text-sm">
-                      <span>
-                        {i + 1}. {name}
-                      </span>
-                      <span className="font-bold tabular-nums">{count} ta</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ChartCard
+                title="Buyurtmalar va yangi foydalanuvchilar"
+                subtitle={`Oxirgi ${range} kun · kunlik soni`}
+                legend={[
+                  { label: 'Yuborilgan cheklar', color: SERIES[0], shape: 'line' },
+                  { label: 'Yangi foydalanuvchilar', color: SERIES[1], shape: 'line' },
+                ]}
+                table={{
+                  head: ['Kun', 'Cheklar', 'Yangi foydalanuvchilar'],
+                  rows: stats.dayLabels.map((l, i) => [l, stats.ordersDaily[i], stats.usersDaily[i]]),
+                }}
+              >
+                <LineChart
+                  labels={stats.dayLabels}
+                  series={[
+                    { name: 'Yuborilgan cheklar', color: SERIES[0], values: stats.ordersDaily },
+                    { name: 'Yangi foydalanuvchilar', color: SERIES[1], values: stats.usersDaily },
+                  ]}
+                />
+              </ChartCard>
+
+              <ChartCard
+                title="Buyurtmalar holati"
+                subtitle={`Oxirgi ${range} kun`}
+                table={{ head: ['Holat', 'Soni'], rows: stats.statusSegments.map((s) => [s.label, s.value]) }}
+              >
+                <SegmentBar segments={stats.statusSegments} />
+              </ChartCard>
+
+              <ChartCard
+                title="Eng ko‘p sotilgan shablonlar"
+                subtitle={`Oxirgi ${range} kun · sotuvlar soni`}
+                table={{ head: ['Shablon', 'Soni'], rows: stats.topCount.map((d) => [d.label, d.value]) }}
+              >
+                <HBarList items={stats.topCount} format={(n) => `${n} ta`} />
+              </ChartCard>
+
+              <ChartCard
+                title="Shablonlar bo‘yicha tushum"
+                subtitle={`Oxirgi ${range} kun · so‘m`}
+                table={{ head: ['Shablon', 'Tushum'], rows: stats.topSum.map((d) => [d.label, fmtMoney(d.value)]) }}
+              >
+                <HBarList items={stats.topSum} color={BRAND} format={fmtMoney} />
+              </ChartCard>
             </div>
           </div>
         )}
@@ -796,6 +876,29 @@ const AdminPanel: React.FC = () => {
                 );
               })}
             {msgList.length === 0 && <p className="py-12 text-center text-sm text-[#7A6A63]">Xabarlar yo‘q.</p>}
+          </div>
+        )}
+        {/* SETTINGS */}
+        {loaded && tab === 'settings' && (
+          <AdminSettings settings={siteSettings} overrides={templateOverrides} onToast={showToast} />
+        )}
+
+        {/* HISTORY (audit log) */}
+        {loaded && tab === 'history' && (
+          <div className="bg-white rounded-2xl border border-black/5 divide-y divide-black/5">
+            {toList(audit)
+              .sort((a, b) => ts(b.at) - ts(a.at))
+              .filter((e) => match(e.type, e.target, e.detail, e.ip))
+              .map((e) => (
+                <div key={e._key} className="px-4 py-2.5 text-sm flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span className="text-[11px] text-[#7A6A63] tabular-nums w-[120px] shrink-0">{fmtDate(e.at)}</span>
+                  <span className={`font-semibold ${e.type === 'login_failed' ? 'text-rose-700' : ''}`}>{AUDIT_LABEL[e.type || ''] || e.type}</span>
+                  {e.target && <span className="font-mono text-xs text-[#9E3E60]">{e.target}</span>}
+                  {e.detail && <span className="text-[#4A3E39]">{e.detail}</span>}
+                  {e.ip && <span className="text-[11px] text-[#7A6A63] ml-auto">IP {e.ip}</span>}
+                </div>
+              ))}
+            {Object.keys(audit).length === 0 && <p className="py-12 text-center text-sm text-[#7A6A63]">Hali amallar yo‘q.</p>}
           </div>
         )}
       </main>

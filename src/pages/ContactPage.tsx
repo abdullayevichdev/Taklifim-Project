@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSiteSettings, formatPhoneDisplay } from '../services/siteSettings';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
 import { api } from '../services/api';
@@ -25,6 +26,7 @@ interface FieldErrors {
 }
 
 export const ContactPage: React.FC = () => {
+  const site = useSiteSettings();
   const { showToast } = useAuth();
   const { t } = useLanguage();
   const [name, setName] = useState('');
@@ -107,10 +109,10 @@ export const ContactPage: React.FC = () => {
                       {t.contact.phoneLabel}
                     </span>
                     <a
-                      href="tel:+998933223580"
+                      href={`tel:+${site.phone}`}
                       className="font-bold text-[#1E1418] hover:text-[#C94F79] transition-colors mt-0.5 block"
                     >
-                      +998 93 322 35 80
+                      {formatPhoneDisplay(site.phone)}
                     </a>
                     <p className="text-[#5C4F48]">{t.contact.hoursValue}</p>
                   </div>

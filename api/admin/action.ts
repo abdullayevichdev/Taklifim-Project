@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 import { verifyAdminRequest } from '../_lib/adminAuth.js';
 import { decideOrderPayment, getOrder, getRtdb, hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
 import { markTelegramReceiptDecided } from '../_lib/telegram.js';
+import { getClientIp } from '../_lib/adminAuth.js';
+import { invalidateServerSiteSettings, writeAdminAudit } from '../_lib/siteConfig.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -10,7 +12,19 @@ type ActionBody =
   | { type: 'invitation.setStatus'; invitationId: string; status: 'paid' | 'pending_payment' }
   | { type: 'invitation.delete'; invitationId: string }
   | { type: 'message.setStatus'; messageId: string; status: 'new' | 'read' | 'replied' }
-  | { type: 'message.delete'; messageId: string };
+  | { type: 'message.delete'; messageId: string }
+  | {
+      type: 'settings.update';
+      settings: { phone?: string; ownerName?: string; cardNumber?: string; cardHolder?: string; cardBank?: string };
+    }
+  | {
+      type: 'template.update';
+      slug: string;
+      price?: number | null;
+      hidden?: boolean;
+      isPopular?: boolean;
+      isNew?: boolean;
+    };
 
 /** POST admin actions. Every request must carry a live admin-session ID token. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -33,6 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getRtdb();
   const nowIso = new Date().toISOString();
+  const ip = getClientIp(req.headers as any, req.socket?.remoteAddress || '');
+  const audit = (target: string, detail?: string) =>
+    writeAdminAudit({ type: String((body as any)?.type || 'unknown'), target, detail, ip });
 
   try {
     switch (body?.type) {
@@ -58,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           decision: body.decision,
           reason,
         });
+        await audit(body.orderId, body.decision === 'paid' ? 'Tasdiqlandi' : `Rad etildi${reason ? `: ${reason}` : ''}`);
         return res.json({ ok: true });
       }
 
@@ -82,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (owner && SAFE_ID.test(String(owner))) updates[`userOrders/${owner}/${inv.orderId}`] = body.status;
         }
         await db.ref().update(updates);
+        await audit(body.invitationId, body.status === 'paid' ? 'Faollashtirildi' : 'Nofaol qilindi');
         return res.json({ ok: true });
       }
 
@@ -95,18 +114,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (slugSnap.val() === body.invitationId) updates[`slugs/${String(inv.slug).toLowerCase()}`] = null;
         }
         await db.ref().update(updates);
+        await audit(body.invitationId, `O‘chirildi${inv.hostNames ? `: ${inv.hostNames}` : ''}`);
         return res.json({ ok: true });
       }
 
       case 'message.setStatus': {
         if (!SAFE_ID.test(body.messageId) || !['new', 'read', 'replied'].includes(body.status)) break;
         await db.ref(`messages/${body.messageId}/status`).set(body.status);
+        await audit(body.messageId, body.status);
         return res.json({ ok: true });
       }
 
       case 'message.delete': {
         if (!SAFE_ID.test(body.messageId)) break;
         await db.ref(`messages/${body.messageId}`).remove();
+        await audit(body.messageId, 'Xabar o‘chirildi');
+        return res.json({ ok: true });
+      }
+
+      case 'settings.update': {
+        const input = body.settings || {};
+        const patch: Record<string, string> = {};
+        if (typeof input.phone === 'string') {
+          const d = input.phone.replace(/\D/g, '');
+          if (!/^998\d{9}$/.test(d)) return res.status(400).json({ ok: false, error: 'Telefon +998 XX XXX XX XX ko‘rinishida bo‘lsin.' });
+          patch.phone = d;
+        }
+        if (typeof input.cardNumber === 'string') {
+          const d = input.cardNumber.replace(/\D/g, '');
+          if (!/^\d{16}$/.test(d)) return res.status(400).json({ ok: false, error: 'Karta raqami 16 ta raqamdan iborat bo‘lsin.' });
+          patch.cardNumber = d;
+        }
+        for (const key of ['ownerName', 'cardHolder', 'cardBank'] as const) {
+          if (typeof input[key] === 'string') {
+            const v = input[key]!.trim().slice(0, 80);
+            if (!v) return res.status(400).json({ ok: false, error: 'Bo‘sh maydon qoldirmang.' });
+            patch[key] = v;
+          }
+        }
+        if (Object.keys(patch).length === 0) break;
+        await db.ref('settings/public').update({ ...patch, updatedAt: nowIso });
+        invalidateServerSiteSettings();
+        await audit('settings', Object.entries(patch).map(([k, v]) => `${k}=${k === 'cardNumber' ? `****${v.slice(-4)}` : v}`).join(', '));
+        return res.json({ ok: true });
+      }
+
+      case 'template.update': {
+        const slug = String(body.slug || '');
+        if (!/^[a-z0-9_-]{1,64}$/i.test(slug)) break;
+        const patch: Record<string, unknown> = { updatedAt: nowIso };
+        if (body.price === null) patch.price = null;
+        else if (body.price !== undefined) {
+          const p = Math.round(Number(body.price));
+          if (!Number.isFinite(p) || p < 1000 || p > 100_000_000) {
+            return res.status(400).json({ ok: false, error: 'Narx 1 000 so‘mdan katta bo‘lsin.' });
+          }
+          patch.price = p;
+        }
+        for (const key of ['hidden', 'isPopular', 'isNew'] as const) {
+          if (typeof body[key] === 'boolean') patch[key] = body[key];
+        }
+        await db.ref(`templateOverrides/${slug}`).update(patch);
+        const { updatedAt: _u, ...shown } = patch;
+        await audit(slug, Object.entries(shown).map(([k, v]) => `${k}=${v}`).join(', '));
         return res.json({ ok: true });
       }
     }

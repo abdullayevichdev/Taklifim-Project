@@ -28,3 +28,18 @@ test('admin API requests without a valid admin ID token are rejected', async () 
   assert.equal(await verifyAdminRequest('Bearer not-a-token'), false);
   assert.equal(await verifyAdminRequest('Basic abc'), false);
 });
+
+test('RTDB rules: public settings / template overrides readable by all, writable by no client; admin data private', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const rules = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'database.rules.json'), 'utf8')).rules;
+  assert.equal(rules.settings.public['.read'], true);
+  assert.equal(rules.settings['.write'], false);
+  assert.equal(rules.settings['.read'], undefined);
+  assert.equal(rules.templateOverrides['.read'], true);
+  assert.equal(rules.templateOverrides['.write'], false);
+  assert.equal(rules.adminAudit['.read'], undefined);
+  assert.equal(rules.adminAudit['.write'], false);
+  assert.equal(rules.receiptImages['.read'], undefined);
+  assert.equal(rules.receiptImages['.write'], false);
+});

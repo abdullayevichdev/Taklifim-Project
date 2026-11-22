@@ -15,6 +15,26 @@
       ".write": false
     },
 
+    "settings": {
+      "public": {
+        ".read": true
+      },
+      ".write": false
+    },
+
+    "templateOverrides": {
+      ".read": true,
+      ".write": false
+    },
+
+    "adminAudit": {
+      ".write": false
+    },
+
+    "receiptImages": {
+      ".write": false
+    },
+
     "slugs": {
       ".read": true,
       "$slug": {

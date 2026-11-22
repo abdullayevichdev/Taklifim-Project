@@ -9,6 +9,7 @@ import { checkExternalRateLimit } from '../_lib/rateLimit.js';
 import { hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
 import { getPaymentTelegramConfig } from '../_lib/env.js';
 import { sendTelegramBotMessage } from '../_lib/telegram.js';
+import { writeAdminAudit } from '../_lib/siteConfig.js';
 
 const PER_IP = { limit: 5, windowMs: 15 * 60 * 1000 };
 const GLOBAL = { limit: 30, windowMs: 24 * 60 * 60 * 1000 };
@@ -57,11 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (perIp.remaining <= 1) {
       await notifyAdminChat(`⚠️ <b>Admin panel</b>: noto‘g‘ri kod bilan bir necha marta kirishga urinildi.\nIP: <code>${ip}</code>`);
     }
+    await writeAdminAudit({ type: 'login_failed', ip });
     return res.status(401).json({ ok: false, error: 'Kod noto‘g‘ri.' });
   }
 
   try {
     const { token, expiresAt } = await createAdminSessionToken();
+    await writeAdminAudit({ type: 'login', ip });
     await notifyAdminChat(
       `🔐 <b>Admin panelga kirildi</b>\nIP: <code>${ip}</code>\nVaqt: ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`
     );

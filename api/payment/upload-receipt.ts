@@ -10,6 +10,7 @@ import {
 import { cleanAndValidateUzPhone } from '../_lib/phone.js';
 import { processUploadReceipt } from '../_lib/uploadReceiptService.js';
 import { ensurePaymentBotWebhook } from '../_lib/telegram.js';
+import { getTemplatePriceOverride } from '../_lib/siteConfig.js';
 import { getPublicSiteUrl, getTelegramRuntimeEnv } from '../_lib/env.js';
 
 /** Public https base URL of this deployment (skips localhost and Vercel preview deployments). */
@@ -174,7 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       planName: planName ? String(planName) : undefined,
       weddingDate: weddingDate ? String(weddingDate) : '',
       venueName: venueName ? String(venueName) : '',
-      price: Number(price) || 0,
+      // An admin-set template price always wins over the price sent by the browser.
+      price: (await getTemplatePriceOverride(templateSlug ? String(templateSlug) : undefined)) ?? (Number(price) || 0),
       isPdf,
       fileName: fileName ? String(fileName) : undefined,
       fileType: fileType ? String(fileType) : undefined,

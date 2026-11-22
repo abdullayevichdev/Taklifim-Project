@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '../_lib/http.js';
 import { verifyAdminRequest } from '../_lib/adminAuth.js';
 import { getRtdb, hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
 
-const SCOPES = new Set(['orders', 'invitations', 'users', 'messages', 'receiptImages']);
+const SCOPES = new Set(['orders', 'invitations', 'users', 'messages', 'receiptImages', 'adminAudit', 'settings', 'templateOverrides']);
 
 /**
  * GET ?scope=orders|invitations|users|messages (or receiptImages&id=ORD-1).
@@ -26,6 +26,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (scope === 'receiptImages' && !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
     return res.status(400).json({ ok: false, error: 'id kerak.' });
   }
-  const snap = await getRtdb().ref(scope === 'receiptImages' ? `receiptImages/${id}` : scope).get();
+  const db = getRtdb();
+  const snap =
+    scope === 'receiptImages'
+      ? await db.ref(`receiptImages/${id}`).get()
+      : scope === 'adminAudit'
+      ? await db.ref('adminAudit').orderByKey().limitToLast(300).get()
+      : await db.ref(scope).get();
   return res.json({ ok: true, data: snap.exists() ? snap.val() : null });
 }

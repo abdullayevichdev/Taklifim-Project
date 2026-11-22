@@ -1,6 +1,7 @@
 import { getPaymentTelegramConfig, getTelegramWebhookRegistrationSecret } from './env.js';
 import { formatUzPhoneForDisplay } from './phone.js';
 import { decideOrderPayment } from './firebaseAdmin.js';
+import { getServerSiteSettings } from './siteConfig.js';
 
 function escapeTelegramHtml(value?: string | number | null): string {
   if (value === undefined || value === null) return '';
@@ -366,6 +367,7 @@ export async function sendReceiptToTelegram(params: {
     };
   }
 
+  const site = await getServerSiteSettings();
   const safePrice = Number.isFinite(Number(params.price)) ? Number(params.price) : 0;
   const formattedPrice = new Intl.NumberFormat('uz-UZ').format(safePrice);
   const formattedDate = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
@@ -385,7 +387,7 @@ export async function sendReceiptToTelegram(params: {
     `📅 <b>To'y sanasi:</b> ${safeWeddingDate}\n` +
     `📍 <b>To'yxona:</b> ${safeVenue}\n` +
     `💰 <b>To'lov summasi:</b> ${formattedPrice} so'm\n` +
-    `💳 <b>Karta:</b> 5614 6822 0920 2581 (ABDULLA DEDAXANOV)\n` +
+    `💳 <b>Karta:</b> ${escapeTelegramHtml(site.cardNumber.replace(/(\d{4})(?=\d)/g, '$1 '))} (${escapeTelegramHtml(site.cardHolder)})\n` +
     `⏱ <b>Yuklangan vaqt:</b> ${escapeTelegramHtml(formattedDate)}\n\n` +
     `👇 <i>Iltimos, to'lovni tasdiqlang yoki rad eting:</i>`;
 
