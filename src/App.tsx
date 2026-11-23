@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ToastContainer } from './components/ToastContainer';
+import { AuthWelcomeOverlay } from './components/AuthWelcomeOverlay';
 import { GlassBackground } from './components/glass/GlassBackground';
 import { GlassBottomNav } from './components/glass/GlassBottomNav';
 import { useCanUseLiquidGlass } from './components/glass/loader';
@@ -216,6 +217,7 @@ const AppContent: React.FC = () => {
       {!hideSiteChrome && <GlassBottomNav />}
 
       <ToastContainer />
+      <AuthWelcomeOverlay />
     </div>
   );
 };

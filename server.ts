@@ -65,6 +65,15 @@ async function startServer() {
     }
   });
 
+  app.post('/api/auth/phone', async (req: Request, res: Response) => {
+    try {
+      const { default: h } = await import('./api/auth/phone.js');
+      return await h(req as any, res as any);
+    } catch {
+      return res.status(500).json({ ok: false, error: 'PHONE_AUTH_FAILED' });
+    }
+  });
+
   app.get('/api/maps/resolve', async (req: Request, res: Response) => {
     try {
       const { default: resolveHandler } = await import('./api/maps/resolve.js');

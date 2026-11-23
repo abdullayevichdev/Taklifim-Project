@@ -3,6 +3,7 @@ import { verifyAdminRequest } from '../_lib/adminAuth.js';
 import { decideOrderPayment, getOrder, getRtdb, hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
 import { markTelegramReceiptDecided } from '../_lib/telegram.js';
 import { getClientIp } from '../_lib/adminAuth.js';
+import { generatePin, hashPin, phoneFromUid } from '../_lib/phoneAuth.js';
 import { invalidateServerSiteSettings, writeAdminAudit } from '../_lib/siteConfig.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -24,7 +25,8 @@ type ActionBody =
       hidden?: boolean;
       isPopular?: boolean;
       isNew?: boolean;
-    };
+    }
+  | { type: 'user.resetPin'; uid: string };
 
 /** POST admin actions. Every request must carry a live admin-session ID token. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -157,6 +159,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         invalidateServerSiteSettings();
         await audit('settings', Object.entries(patch).map(([k, v]) => `${k}=${k === 'cardNumber' ? `****${v.slice(-4)}` : v}`).join(', '));
         return res.json({ ok: true });
+      }
+
+      case 'user.resetPin': {
+        const phone = phoneFromUid(String(body.uid || ''));
+        if (!phone) break;
+        const ref = db.ref(`phoneAccounts/${phone}`);
+        if (!(await ref.get()).exists()) return res.status(404).json({ ok: false, error: 'Bu foydalanuvchining PIN akkaunti topilmadi.' });
+        const pin = generatePin();
+        await ref.update({ pinHash: hashPin(pin), failedAttempts: 0, lockedUntil: null, pinResetAt: nowIso });
+        await audit(`+${phone}`, 'PIN yangilandi');
+        return res.json({ ok: true, pin });
       }
 
       case 'template.update': {

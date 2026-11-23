@@ -9,6 +9,7 @@ import {
   AuthProvider as FirebaseAuthProvider,
   signInWithPopup,
   signInWithRedirect,
+  signInWithCustomToken,
   getRedirectResult,
   setPersistence,
   browserLocalPersistence,
@@ -72,7 +73,7 @@ function scopeLocalCachesToUser(nextUid: string | null): void {
   } catch {}
 }
 
-export type AuthProviderId = 'google' | 'apple';
+export type AuthProviderId = 'google' | 'apple' | 'phone';
 
 export interface ToastMessage {
   id: string;
@@ -104,6 +105,8 @@ interface AuthContextType {
   user: UserProfile | null;
   loginWithGoogle: () => Promise<AuthActionResult>;
   loginWithApple: () => Promise<AuthActionResult>;
+  /** Signs in with a server-issued custom token (Apple users: phone + PIN). */
+  loginWithPhoneToken: (token: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: { name?: string; phone?: string; lang?: Language }) => Promise<void>;
   canUseFreePlan: () => boolean;
@@ -174,7 +177,7 @@ function readStoredUser(): UserProfile | null {
       lang: parsed.lang,
       photoURL: parsed.photoURL,
       authProvider:
-        parsed.authProvider === 'google' || parsed.authProvider === 'apple'
+        parsed.authProvider === 'google' || parsed.authProvider === 'apple' || parsed.authProvider === 'phone'
           ? parsed.authProvider
           : undefined,
       createdAt: typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString(),
@@ -209,6 +212,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loginWithGoogle: async () => ({ success: false }),
   loginWithApple: async () => ({ success: false }),
+  loginWithPhoneToken: async () => ({ success: false }),
   logout: async () => {},
   updateUserProfile: async () => {},
   canUseFreePlan: () => false,
@@ -426,6 +430,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signInWithProvider(provider, 'apple');
   }, [signInWithProvider]);
 
+  const loginWithPhoneToken = useCallback(
+    async (token: string): Promise<AuthActionResult> => {
+      if (!isFirebaseConfigured() || !auth) {
+        return { success: false, message: getAuthT().errors.providerNotEnabled };
+      }
+      try {
+        await setPersistence(auth, browserLocalPersistence).catch(() => {});
+        const res = await signInWithCustomToken(auth, token);
+        scopeLocalCachesToUser(res.user.uid);
+        setHasFirebaseSession(true);
+        await syncFirebaseUserProfile(res.user);
+        return { success: true };
+      } catch (err: any) {
+        const msg = translateAuthError(err?.code || '');
+        return { success: false, message: msg };
+      }
+    },
+    [syncFirebaseUserProfile]
+  );
+
   const logout = useCallback(async () => {
     if (isFirebaseConfigured() && auth) {
       try {
@@ -483,6 +507,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loginWithGoogle,
         loginWithApple,
+        loginWithPhoneToken,
         logout,
         updateUserProfile,
         canUseFreePlan,

@@ -99,7 +99,9 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function adminAction(body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+export async function adminAction(
+  body: Record<string, unknown>
+): Promise<{ ok: boolean; error?: string; pin?: string }> {
   try {
     const res = await fetch('/api/admin/action', {
       method: 'POST',
@@ -107,7 +109,9 @@ export async function adminAction(body: Record<string, unknown>): Promise<{ ok: 
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => null);
-    return res.ok && data?.ok ? { ok: true } : { ok: false, error: data?.error || 'Xatolik yuz berdi.' };
+    return res.ok && data?.ok
+      ? { ok: true, ...(typeof data.pin === 'string' ? { pin: data.pin } : {}) }
+      : { ok: false, error: data?.error || 'Xatolik yuz berdi.' };
   } catch {
     return { ok: false, error: 'Server bilan bog‘lanib bo‘lmadi.' };
   }
