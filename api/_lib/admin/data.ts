@@ -1,6 +1,6 @@
-import type { VercelRequest, VercelResponse } from '../_lib/http.js';
-import { verifyAdminRequest } from '../_lib/adminAuth.js';
-import { getRtdb, hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
+import type { VercelRequest, VercelResponse } from '../http.js';
+import { verifyAdminRequest } from '../adminAuth.js';
+import { getRtdb, hasFirebaseAdmin } from '../firebaseAdmin.js';
 
 const SCOPES = new Set(['orders', 'invitations', 'users', 'messages', 'receiptImages', 'adminAudit', 'settings', 'templateOverrides']);
 

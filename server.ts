@@ -40,7 +40,7 @@ async function startServer() {
 
   app.post('/api/admin/login', async (req: Request, res: Response) => {
     try {
-      const { default: h } = await import('./api/admin/login.js');
+      const { default: h } = await import('./api/_lib/admin/login.js');
       return await h(req as any, res as any);
     } catch {
       return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });
@@ -49,7 +49,7 @@ async function startServer() {
 
   app.post('/api/admin/action', async (req: Request, res: Response) => {
     try {
-      const { default: h } = await import('./api/admin/action.js');
+      const { default: h } = await import('./api/_lib/admin/action.js');
       return await h(req as any, res as any);
     } catch {
       return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });
@@ -58,7 +58,7 @@ async function startServer() {
 
   app.get('/api/admin/data', async (req: Request, res: Response) => {
     try {
-      const { default: h } = await import('./api/admin/data.js');
+      const { default: h } = await import('./api/_lib/admin/data.js');
       return await h(req as any, res as any);
     } catch {
       return res.status(500).json({ ok: false, error: 'ADMIN_ROUTE_FAILED' });

@@ -4,19 +4,19 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/telegram/login-webhook",
+      "destination": "/api/telegram/webhook"
+    },
+    {
       "source": "/((?!api/|assets/|images/|video/|.*\\.(?:js|mjs|css|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|mp3|ogg|wav|mp4|webm)$).*)",
       "destination": "/index.html"
     }
   ],
   "functions": {
     "api/payment/upload-receipt.ts": {
-      "maxDuration": 30,
-      "memory": 1024
+      "maxDuration": 30
     },
     "api/telegram/webhook.ts": {
-      "maxDuration": 20
-    },
-    "api/telegram/login-webhook.ts": {
       "maxDuration": 20
     },
     "api/telegram/setup-webhook.ts": {
@@ -34,14 +34,8 @@
     "api/auth/phone.ts": {
       "maxDuration": 15
     },
-    "api/admin/login.ts": {
-      "maxDuration": 10
-    },
-    "api/admin/action.ts": {
+    "api/admin/[op].ts": {
       "maxDuration": 20
-    },
-    "api/admin/data.ts": {
-      "maxDuration": 15
     }
   },
   "headers": [

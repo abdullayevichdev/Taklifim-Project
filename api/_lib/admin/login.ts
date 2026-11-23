@@ -1,15 +1,15 @@
-import type { VercelRequest, VercelResponse } from '../_lib/http.js';
+import type { VercelRequest, VercelResponse } from '../http.js';
 import {
   createAdminSessionToken,
   getClientIp,
   isAdminCodeConfigured,
   verifyAdminCode,
-} from '../_lib/adminAuth.js';
-import { checkExternalRateLimit } from '../_lib/rateLimit.js';
-import { hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
-import { getPaymentTelegramConfig } from '../_lib/env.js';
-import { sendTelegramBotMessage } from '../_lib/telegram.js';
-import { writeAdminAudit } from '../_lib/siteConfig.js';
+} from '../adminAuth.js';
+import { checkExternalRateLimit } from '../rateLimit.js';
+import { hasFirebaseAdmin } from '../firebaseAdmin.js';
+import { getPaymentTelegramConfig } from '../env.js';
+import { sendTelegramBotMessage } from '../telegram.js';
+import { writeAdminAudit } from '../siteConfig.js';
 
 const PER_IP = { limit: 5, windowMs: 15 * 60 * 1000 };
 const GLOBAL = { limit: 30, windowMs: 24 * 60 * 60 * 1000 };
