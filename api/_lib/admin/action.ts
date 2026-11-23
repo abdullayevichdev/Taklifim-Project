@@ -1,10 +1,10 @@
-import type { VercelRequest, VercelResponse } from '../_lib/http.js';
-import { verifyAdminRequest } from '../_lib/adminAuth.js';
-import { decideOrderPayment, getOrder, getRtdb, hasFirebaseAdmin } from '../_lib/firebaseAdmin.js';
-import { markTelegramReceiptDecided } from '../_lib/telegram.js';
-import { getClientIp } from '../_lib/adminAuth.js';
-import { generatePin, hashPin, phoneFromUid } from '../_lib/phoneAuth.js';
-import { invalidateServerSiteSettings, writeAdminAudit } from '../_lib/siteConfig.js';
+import type { VercelRequest, VercelResponse } from '../http.js';
+import { verifyAdminRequest } from '../adminAuth.js';
+import { decideOrderPayment, getOrder, getRtdb, hasFirebaseAdmin } from '../firebaseAdmin.js';
+import { markTelegramReceiptDecided } from '../telegram.js';
+import { getClientIp } from '../adminAuth.js';
+import { generatePin, hashPin, phoneFromUid } from '../phoneAuth.js';
+import { invalidateServerSiteSettings, writeAdminAudit } from '../siteConfig.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
