@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
 import { GlassButton } from './glass';
+import { AppleAccessModal } from './AppleAccessModal';
 
 // Official Google 4-color SVG
 export const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5 shrink-0' }) => (
@@ -49,18 +50,19 @@ export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
   onBeforeSignIn,
   compact = false,
 }) => {
-  const { loginWithGoogle, loginWithApple } = useAuth();
+  const { loginWithGoogle } = useAuth();
+  const [appleOpen, setAppleOpen] = useState(false);
   const { t } = useLanguage();
-  const [submitting, setSubmitting] = useState<'google' | 'apple' | null>(null);
+  const [submitting, setSubmitting] = useState<'google' | null>(null);
   const [error, setError] = useState<string>('');
 
-  const run = async (provider: 'google' | 'apple') => {
+  const run = async () => {
     if (submitting) return;
     setError('');
-    setSubmitting(provider);
+    setSubmitting('google');
     onBeforeSignIn?.();
     try {
-      const res = provider === 'google' ? await loginWithGoogle() : await loginWithApple();
+      const res = await loginWithGoogle();
       if (res.success) {
         onSuccess?.();
       } else if (res.message) {
@@ -83,14 +85,14 @@ export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
         </div>
       )}
 
-      <div className={compact ? 'grid grid-cols-1 sm:grid-cols-2 gap-2' : 'space-y-3'}>
+      <div className={compact ? 'grid grid-cols-1 gap-2' : 'space-y-3'}>
         <GlassButton
           type="button"
           tone="light"
           size={compact ? 'sm' : 'lg'}
           disabled={Boolean(submitting)}
           loading={submitting === 'google'}
-          onClick={() => run('google')}
+          onClick={() => run()}
           leftIcon={submitting === 'google' ? undefined : <GoogleIcon className={compact ? 'w-4 h-4 shrink-0' : 'w-5 h-5 shrink-0'} />}
           className="w-full justify-center"
         >
@@ -100,19 +102,20 @@ export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
         <button
           type="button"
           disabled={Boolean(submitting)}
-          onClick={() => run('apple')}
+          onClick={() => {
+            setError('');
+            onBeforeSignIn?.();
+            setAppleOpen(true);
+          }}
           className={`w-full ${
             compact ? 'min-h-[40px] py-2 px-3.5 text-xs font-bold' : 'min-h-[48px] py-3 px-4 text-sm font-semibold'
           } rounded-full bg-[#1E1418] hover:bg-black text-white shadow-md hover:shadow-lg transition-colors flex items-center justify-center gap-2.5 disabled:opacity-60 border border-white/15 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E1418]`}
         >
-          {submitting === 'apple' ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <AppleIcon className="w-4 h-4 fill-white shrink-0" />
-          )}
-          <span>{submitting === 'apple' ? t.auth.connecting : t.auth.appleLoginBtn}</span>
+          <AppleIcon className="w-4 h-4 fill-white shrink-0" />
+          <span>{t.auth.appleLoginBtn}</span>
         </button>
       </div>
+      <AppleAccessModal open={appleOpen} onClose={() => setAppleOpen(false)} onSuccess={onSuccess} />
     </div>
   );
 };

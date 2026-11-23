@@ -1734,3 +1734,18 @@ html.taklifim-modal-open .taklifim-bottom-nav {
 @keyframes adminDraw {
   to { stroke-dashoffset: 0; }
 }
+
+/* "Apple orqali kirish" sheet — transform/opacity only */
+@media (prefers-reduced-motion: no-preference) {
+  .apple-backdrop-in { animation: appleFade 0.25s ease both; }
+  .apple-sheet-in { animation: appleSheetIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .apple-shake { animation: adminShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+  .apple-fade { animation: appleFadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .apple-rise { animation: appleFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+  .apple-check-pop { animation: appleCheckPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .apple-dot-pop { animation: appleCheckPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+}
+@keyframes appleFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes appleFadeUp { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes appleSheetIn { from { opacity: 0; transform: translate3d(0, 40px, 0) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes appleCheckPop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }

@@ -134,6 +134,8 @@ const AUDIT_LABEL: Record<string, string> = {
   'message.delete': 'Xabar o‘chirildi',
   'settings.update': 'Sozlamalar o‘zgardi',
   'template.update': 'Shablon o‘zgardi',
+  'phone.register': 'Yangi foydalanuvchi (Apple / telefon)',
+  'user.resetPin': 'PIN tiklandi',
 };
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
@@ -896,7 +898,18 @@ export const AdminPanel: React.FC = () => {
                       {(u.name || u.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <div className="font-bold">{u.name || '—'}</div>
+                      <div className="font-bold flex flex-wrap items-center gap-1.5">
+                        {u.name || '—'}
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            u.authProvider === 'phone'
+                              ? 'bg-[#1E1418] text-white border-[#1E1418]'
+                              : 'bg-[#E8F3FA] text-[#1E3A5F] border-[#B9DFFA]'
+                          }`}
+                        >
+                          {u.authProvider === 'phone' ? 'Apple · telefon + PIN' : u.authProvider === 'apple' ? 'Apple ID' : 'Google'}
+                        </span>
+                      </div>
                       <div className="text-xs text-[#7A6A63] break-all">
                         {u.email || '—'}
                         {u.phone ? ` · ${u.phone}` : ''}
@@ -911,9 +924,25 @@ export const AdminPanel: React.FC = () => {
                       <div>To‘lagan: <b>{fmtMoney(o?.paid || 0)}</b></div>
                     </div>
                     {phone && (
-                      <a href={`tel:+${phone}`} className="min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold inline-flex items-center gap-1">
+                      <a href={`tel:+${phone}`} className="admin-press min-h-[36px] px-3 rounded-xl bg-[#F3EEEA] text-xs font-semibold inline-flex items-center gap-1">
                         <Phone className="w-3.5 h-3.5" /> Qo‘ng‘iroq
                       </a>
+                    )}
+                    {u.authProvider === 'phone' && /^ph_998\d{9}$/.test(uid) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm(`${u.name || uid} uchun yangi PIN yaratilsinmi? Eski PIN ishlamay qoladi.`)) return;
+                          const r = await adminAction({ type: 'user.resetPin', uid });
+                          if (r.ok && r.pin) {
+                            window.alert(`Yangi PIN: ${r.pin}\n\nUni foydalanuvchiga ayting (telefon yoki Telegram orqali). Bu oyna yopilgach PIN boshqa ko‘rsatilmaydi.`);
+                            showToast('Yangi PIN yaratildi');
+                          } else showToast(r.error || 'Xatolik', false);
+                        }}
+                        className="admin-press min-h-[36px] px-3 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold"
+                      >
+                        PIN tiklash
+                      </button>
                     )}
                   </div>
                 );

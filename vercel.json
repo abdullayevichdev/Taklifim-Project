@@ -31,6 +31,9 @@
     "api/maps/resolve.ts": {
       "maxDuration": 10
     },
+    "api/auth/phone.ts": {
+      "maxDuration": 15
+    },
     "api/admin/login.ts": {
       "maxDuration": 10
     },
