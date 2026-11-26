@@ -4,13 +4,7 @@ import {
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
-  GoogleAuthProvider,
-  OAuthProvider,
-  AuthProvider as FirebaseAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
   signInWithCustomToken,
-  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
 } from 'firebase/auth';
@@ -103,9 +97,7 @@ interface AuthContextType {
   authReady: boolean;
   hasFirebaseSession: boolean;
   user: UserProfile | null;
-  loginWithGoogle: () => Promise<AuthActionResult>;
-  loginWithApple: () => Promise<AuthActionResult>;
-  /** Signs in with a server-issued custom token (Apple users: phone + PIN). */
+  /** Signs in with a server-issued custom token (phone + PIN). */
   loginWithPhoneToken: (token: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: { name?: string; phone?: string; lang?: Language }) => Promise<void>;
@@ -162,42 +154,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
       }
     );
   });
-}
-
-/**
- * True when this network cannot reach Firebase (DNS/ISP/antivirus filtering of *.firebaseio.com or
- * the auth endpoints). Used to show a clear message instead of a spinner that never ends.
- */
-async function isFirebaseNetworkBlocked(): Promise<boolean> {
-  const probe = (url: string) =>
-    withTimeout(
-      fetch(url, { mode: 'no-cors', cache: 'no-store' }).then(() => true),
-      6000,
-      false
-    );
-  const [rtdbOk, authOk] = await Promise.all([
-    probe('https://teklifim-9dae7-default-rtdb.firebaseio.com/.json?shallow=true'),
-    probe('https://identitytoolkit.googleapis.com/v1/projects'),
-  ]);
-  return !rtdbOk || !authOk;
-}
-
-/** Errors where a full-page redirect sign-in usually still works. */
-function shouldFallbackToRedirect(code: string): boolean {
-  return (
-    code === 'auth/popup-blocked' ||
-    code === 'auth/operation-not-supported-in-this-environment' ||
-    code === 'auth/web-storage-unsupported' ||
-    code === 'auth/internal-error'
-  );
-}
-
-function isSilentAuthError(errCode: string): boolean {
-  return (
-    errCode === 'auth/popup-closed-by-user' ||
-    errCode === 'auth/cancelled-popup-request' ||
-    errCode === 'auth/user-cancelled'
-  );
 }
 
 function inferProvider(fbUser: FirebaseUser): AuthProviderId | undefined {
@@ -257,8 +213,6 @@ const AuthContext = createContext<AuthContextType>({
   authReady: false,
   hasFirebaseSession: false,
   user: null,
-  loginWithGoogle: async () => ({ success: false }),
-  loginWithApple: async () => ({ success: false }),
   loginWithPhoneToken: async () => ({ success: false }),
   logout: async () => {},
   updateUserProfile: async () => {},
@@ -378,14 +332,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setPersistence(authInstance, browserLocalPersistence).catch(() => {});
 
-    // Completes a redirect-based sign-in (used when the browser blocks popups).
-    getRedirectResult(authInstance).catch((err: any) => {
-      const code = err?.code || '';
-      if (code && !isSilentAuthError(code)) {
-        showToast(translateAuthError(code), 'error');
-      }
-    });
-
     const unsub = onAuthStateChanged(authInstance, async (fbUser) => {
       if (!isMounted) return;
       if (fbUser) {
@@ -410,91 +356,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsub();
     };
   }, [syncFirebaseUserProfile, showToast]);
-
-  const signInWithProvider = useCallback(
-    async (provider: FirebaseAuthProvider, providerId: AuthProviderId): Promise<AuthActionResult> => {
-      if (!isFirebaseConfigured() || !auth) {
-        const msg = getAuthT().errors.providerNotEnabled;
-        showToast(msg, 'error');
-        return { success: false, message: msg };
-      }
-
-      try {
-        await setPersistence(auth, browserLocalPersistence).catch(() => {});
-        const res = await signInWithPopup(auth, provider);
-        if (!res.user?.uid) {
-          const msg = getAuthT().errors.generic;
-          showToast(msg, 'error');
-          return { success: false, message: msg };
-        }
-
-        scopeLocalCachesToUser(res.user.uid);
-        setHasFirebaseSession(true);
-        const resolvedUser = await syncFirebaseUserProfile(res.user);
-        showToast(
-          providerId === 'google'
-            ? `${getAuthT().toastGoogleWelcomePrefix} ${resolvedUser.name}!`
-            : getAuthT().toastAppleSuccess,
-          'success'
-        );
-        return { success: true };
-      } catch (err: any) {
-        const code = err?.code || '';
-        console.warn(`Firebase ${providerId} auth error:`, code || err?.message);
-
-        // Popup blocked (e.g. in-app browsers) → fall back to full-page redirect sign-in.
-        if (shouldFallbackToRedirect(code)) {
-          // A redirect to an unreachable Google/Firebase page would strand the user on a browser
-          // error page — check the network first.
-          if (await isFirebaseNetworkBlocked()) {
-            return { success: false, message: getAuthT().errors.firebaseBlocked };
-          }
-          try {
-            showToast(getAuthT().errors.redirecting, 'info');
-            await signInWithRedirect(auth, provider);
-            return { success: false };
-          } catch (redirectErr: any) {
-            const msg = translateAuthError(redirectErr?.code || code);
-            showToast(msg, 'error');
-            return { success: false, message: msg };
-          }
-        }
-
-        // Network problems: tell the user whether their network blocks Google/Firebase.
-        if (code === 'auth/network-request-failed' || code === 'auth/timeout') {
-          const blocked = await isFirebaseNetworkBlocked();
-          return { success: false, message: blocked ? getAuthT().errors.firebaseBlocked : translateAuthError(code) };
-        }
-
-        // The user closed the popup — often because the Google window showed an error.
-        if (code === 'auth/popup-closed-by-user') {
-          const blocked = await isFirebaseNetworkBlocked();
-          if (!blocked) showToast(getAuthT().errors.popupClosedHint, 'info');
-          return { success: false, message: blocked ? getAuthT().errors.firebaseBlocked : undefined };
-        }
-
-        const msg = translateAuthError(code);
-        if (!isSilentAuthError(code)) {
-          showToast(msg, 'error');
-        }
-        return { success: false, message: msg };
-      }
-    },
-    [showToast, syncFirebaseUserProfile]
-  );
-
-  const loginWithGoogle = useCallback(() => {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    return signInWithProvider(provider, 'google');
-  }, [signInWithProvider]);
-
-  const loginWithApple = useCallback(() => {
-    const provider = new OAuthProvider('apple.com');
-    provider.addScope('email');
-    provider.addScope('name');
-    return signInWithProvider(provider, 'apple');
-  }, [signInWithProvider]);
 
   const loginWithPhoneToken = useCallback(
     async (token: string): Promise<AuthActionResult> => {
@@ -571,8 +432,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authReady,
         hasFirebaseSession,
         user,
-        loginWithGoogle,
-        loginWithApple,
         loginWithPhoneToken,
         logout,
         updateUserProfile,

@@ -14,8 +14,6 @@ const L = {
   uz: {
     gTitle: 'Google orqali kirish',
     gSubtitle: 'Telefon raqam va 4 xonali PIN bilan oson va xavfsiz kirish',
-    legacyQ: 'Oldin Google hisobingiz bilan kirganmisiz?',
-    legacyBtn: 'Eski usulda kirish',
     title: 'Apple orqali kirish',
     subtitle: 'iPhone foydalanuvchilari uchun telefon raqam va PIN bilan oson kirish',
     tabRegister: 'Yangi akkaunt',
@@ -43,8 +41,6 @@ const L = {
   ru: {
     gTitle: 'Вход через Google',
     gSubtitle: 'Простой и безопасный вход по номеру телефона и 4-значному PIN',
-    legacyQ: 'Раньше входили через аккаунт Google?',
-    legacyBtn: 'Войти по-старому',
     title: 'Вход через Apple',
     subtitle: 'Простой вход для пользователей iPhone по номеру телефона и PIN',
     tabRegister: 'Новый аккаунт',
@@ -72,8 +68,6 @@ const L = {
   en: {
     gTitle: 'Continue with Google',
     gSubtitle: 'Easy, secure sign-in with your phone number and a 4-digit PIN',
-    legacyQ: 'Signed in with your Google account before?',
-    legacyBtn: 'Use the old way',
     title: 'Continue with Apple',
     subtitle: 'Easy sign-in for iPhone users with phone number and PIN',
     tabRegister: 'New account',
@@ -176,9 +170,8 @@ interface AppleAccessModalProps {
 export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClose, onSuccess, brand = 'apple' }) => {
   const { language } = useLanguage();
   const l = L[language as keyof typeof L] || L.uz;
-  const { loginWithPhoneToken, loginWithGoogle } = useAuth();
+  const { loginWithPhoneToken } = useAuth();
   const isGoogle = brand === 'google';
-  const [legacyBusy, setLegacyBusy] = useState(false);
   const site = useSiteSettings();
 
   const [mode, setMode] = useState<Mode>('register');
@@ -440,32 +433,6 @@ export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClos
               )}
               {mode === 'register' ? l.register : l.login}
             </button>
-
-            {isGoogle && (
-              <div className="pt-1 text-center text-xs text-[#7A6A63]">
-                {l.legacyQ}{' '}
-                <button
-                  type="button"
-                  disabled={busy || legacyBusy}
-                  onClick={async () => {
-                    setError('');
-                    setLegacyBusy(true);
-                    const res = await loginWithGoogle();
-                    setLegacyBusy(false);
-                    if (res.success) {
-                      onSuccess?.();
-                      onClose();
-                    } else if (res.message) {
-                      fail(res.message);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 font-semibold text-[#1E1418] underline underline-offset-2 disabled:opacity-50"
-                >
-                  {legacyBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {l.legacyBtn}
-                </button>
-              </div>
-            )}
         </form>
       </div>
     </div>,
