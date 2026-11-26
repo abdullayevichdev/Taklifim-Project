@@ -822,6 +822,10 @@ export const en: typeof uz = {
     toastAppleSuccess: 'You signed in with Apple!',
     toastLoggedOut: 'Signed out successfully',
     errors: {
+      storageBlocked: 'Your browser blocks the cookies/storage needed to sign in (incognito or strict protection). Open a normal window or use “Continue with Apple”.',
+      firebaseBlocked: 'Your network (provider, Wi‑Fi filter, VPN or antivirus) is blocking Google/Firebase servers. Try mobile data or another Wi‑Fi network.',
+      popupClosedHint: 'The sign-in window was closed. If it showed an error, refresh the page and try again, or use “Continue with Apple”.',
+      redirecting: 'Redirecting to Google…',
       userDisabled: 'This account has been disabled.',
       tooManyRequests: 'Too many attempts. Please try again later.',
       invalidPhone: 'Invalid phone number format. (Enter like +998 90 123 45 67)',

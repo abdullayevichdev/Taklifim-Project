@@ -140,9 +140,56 @@ function translateAuthError(errCode: string): string {
       return errT.unauthorizedDomain;
     case 'auth/account-exists-with-different-credential':
       return errT.accountExistsDifferentCredential;
+    case 'auth/web-storage-unsupported':
+      return errT.storageBlocked;
     default:
       return errT.generic;
   }
+}
+
+/** Resolves with `fallback` if the promise does not settle in time (RTDB waits forever when unreachable). */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
+/**
+ * True when this network cannot reach Firebase (DNS/ISP/antivirus filtering of *.firebaseio.com or
+ * the auth endpoints). Used to show a clear message instead of a spinner that never ends.
+ */
+async function isFirebaseNetworkBlocked(): Promise<boolean> {
+  const probe = (url: string) =>
+    withTimeout(
+      fetch(url, { mode: 'no-cors', cache: 'no-store' }).then(() => true),
+      6000,
+      false
+    );
+  const [rtdbOk, authOk] = await Promise.all([
+    probe('https://teklifim-9dae7-default-rtdb.firebaseio.com/.json?shallow=true'),
+    probe('https://identitytoolkit.googleapis.com/v1/projects'),
+  ]);
+  return !rtdbOk || !authOk;
+}
+
+/** Errors where a full-page redirect sign-in usually still works. */
+function shouldFallbackToRedirect(code: string): boolean {
+  return (
+    code === 'auth/popup-blocked' ||
+    code === 'auth/operation-not-supported-in-this-environment' ||
+    code === 'auth/web-storage-unsupported' ||
+    code === 'auth/internal-error'
+  );
 }
 
 function isSilentAuthError(errCode: string): boolean {
@@ -251,8 +298,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (rtdb) {
       try {
-        const snap = await rtdbGet(rtdbRef(rtdb, `users/${fbUser.uid}`));
-        if (snap.exists()) {
+        // Never block sign-in on the database: if it is slow or unreachable, continue with the
+        // Firebase Auth profile and sync later.
+        const snap = await withTimeout(rtdbGet(rtdbRef(rtdb, `users/${fbUser.uid}`)), 4000, null);
+        if (snap && snap.exists()) {
           profileData = snap.val() as Partial<UserProfile>;
         }
       } catch (err) {
@@ -294,7 +343,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (rtdb && auth?.currentUser?.uid === fbUser.uid) {
       try {
-        await rtdbUpdate(
+        // Fire-and-forget (bounded): the profile write must not delay the UI.
+        void withTimeout(rtdbUpdate(
           rtdbRef(rtdb, `users/${fbUser.uid}`),
           stripUndefined({
             id: resolvedUser.id,
@@ -306,7 +356,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             createdAt: resolvedUser.createdAt,
             lastLoginAt: resolvedUser.lastLoginAt,
           })
-        );
+        ), 8000, undefined);
       } catch (err) {
         console.warn('RTDB user profile write note:', err);
       }
@@ -393,11 +443,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn(`Firebase ${providerId} auth error:`, code || err?.message);
 
         // Popup blocked (e.g. in-app browsers) → fall back to full-page redirect sign-in.
-        if (
-          code === 'auth/popup-blocked' ||
-          code === 'auth/operation-not-supported-in-this-environment'
-        ) {
+        if (shouldFallbackToRedirect(code)) {
+          // A redirect to an unreachable Google/Firebase page would strand the user on a browser
+          // error page — check the network first.
+          if (await isFirebaseNetworkBlocked()) {
+            return { success: false, message: getAuthT().errors.firebaseBlocked };
+          }
           try {
+            showToast(getAuthT().errors.redirecting, 'info');
             await signInWithRedirect(auth, provider);
             return { success: false };
           } catch (redirectErr: any) {
@@ -405,6 +458,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             showToast(msg, 'error');
             return { success: false, message: msg };
           }
+        }
+
+        // Network problems: tell the user whether their network blocks Google/Firebase.
+        if (code === 'auth/network-request-failed' || code === 'auth/timeout') {
+          const blocked = await isFirebaseNetworkBlocked();
+          return { success: false, message: blocked ? getAuthT().errors.firebaseBlocked : translateAuthError(code) };
+        }
+
+        // The user closed the popup — often because the Google window showed an error.
+        if (code === 'auth/popup-closed-by-user') {
+          const blocked = await isFirebaseNetworkBlocked();
+          if (!blocked) showToast(getAuthT().errors.popupClosedHint, 'info');
+          return { success: false, message: blocked ? getAuthT().errors.firebaseBlocked : undefined };
         }
 
         const msg = translateAuthError(code);

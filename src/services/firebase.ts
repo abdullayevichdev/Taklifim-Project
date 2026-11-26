@@ -8,9 +8,22 @@ import type { FirebaseStorage } from 'firebase/storage';
  * -------------------------------------------------------
  * Realtime Database va Firestore to'liq sozlangan
  */
+function resolveAuthDomain(): string {
+  const fallback = 'teklifim-9dae7.firebaseapp.com';
+  const configured = String((import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || '').trim();
+  if (!configured || typeof window === 'undefined') return fallback;
+  // Only use the custom domain when the visitor is actually on that site (apex or www).
+  const host = window.location.hostname;
+  return host === configured || host.endsWith(`.${configured}`) ? configured : fallback;
+}
+
 export const firebaseConfig = {
   apiKey: "AIzaSyAwLudjK-S9jcApB-GXfOdHEj_EuRhaEK8",
-  authDomain: "teklifim-9dae7.firebaseapp.com",
+  // Google sign-in opens its window on authDomain. Serving it from the site's own domain
+  // (Vercel proxies /__/auth/* to firebaseapp.com) avoids browsers that block third-party
+  // storage ("The requested action is invalid"). Set VITE_FIREBASE_AUTH_DOMAIN=tashrifim.uz on
+  // Vercel once https://tashrifim.uz/__/auth/handler is an authorized redirect URI in Google Cloud.
+  authDomain: resolveAuthDomain(),
   databaseURL: "https://teklifim-9dae7-default-rtdb.firebaseio.com",
   projectId: "teklifim-9dae7",
   storageBucket: "teklifim-9dae7.firebasestorage.app",
