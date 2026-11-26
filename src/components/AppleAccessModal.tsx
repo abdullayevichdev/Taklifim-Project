@@ -5,13 +5,17 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
 import { getPortalRoot } from '../utils/portalRoot';
 import { useSiteSettings, formatPhoneDisplay } from '../services/siteSettings';
-import { AppleIcon } from './SocialLoginButtons';
+import { AppleIcon, GoogleIcon } from './SocialLoginButtons';
 import { showAuthWelcome } from './AuthWelcomeOverlay';
 
 type Mode = 'register' | 'login';
 
 const L = {
   uz: {
+    gTitle: 'Google orqali kirish',
+    gSubtitle: 'Telefon raqam va 4 xonali PIN bilan oson va xavfsiz kirish',
+    legacyQ: 'Oldin Google hisobingiz bilan kirganmisiz?',
+    legacyBtn: 'Eski usulda kirish',
     title: 'Apple orqali kirish',
     subtitle: 'iPhone foydalanuvchilari uchun telefon raqam va PIN bilan oson kirish',
     tabRegister: 'Yangi akkaunt',
@@ -37,6 +41,10 @@ const L = {
     hide: 'Yashirish',
   },
   ru: {
+    gTitle: 'Вход через Google',
+    gSubtitle: 'Простой и безопасный вход по номеру телефона и 4-значному PIN',
+    legacyQ: 'Раньше входили через аккаунт Google?',
+    legacyBtn: 'Войти по-старому',
     title: 'Вход через Apple',
     subtitle: 'Простой вход для пользователей iPhone по номеру телефона и PIN',
     tabRegister: 'Новый аккаунт',
@@ -62,6 +70,10 @@ const L = {
     hide: 'Скрыть',
   },
   en: {
+    gTitle: 'Continue with Google',
+    gSubtitle: 'Easy, secure sign-in with your phone number and a 4-digit PIN',
+    legacyQ: 'Signed in with your Google account before?',
+    legacyBtn: 'Use the old way',
     title: 'Continue with Apple',
     subtitle: 'Easy sign-in for iPhone users with phone number and PIN',
     tabRegister: 'New account',
@@ -153,16 +165,20 @@ interface AppleAccessModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Which button opened the sheet — both use the same phone + PIN accounts. */
+  brand?: 'apple' | 'google';
 }
 
 /**
  * "Apple orqali kirish": Apple users sign up with first/last name, phone, optional email and a
  * 4-digit PIN; later they sign in with phone + PIN (the phone number is the account key).
  */
-export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClose, onSuccess }) => {
+export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClose, onSuccess, brand = 'apple' }) => {
   const { language } = useLanguage();
   const l = L[language as keyof typeof L] || L.uz;
-  const { loginWithPhoneToken } = useAuth();
+  const { loginWithPhoneToken, loginWithGoogle } = useAuth();
+  const isGoogle = brand === 'google';
+  const [legacyBusy, setLegacyBusy] = useState(false);
   const site = useSiteSettings();
 
   const [mode, setMode] = useState<Mode>('register');
@@ -222,7 +238,7 @@ export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClos
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           mode === 'register'
-            ? { mode, firstName, lastName, phone: `998${phone}`, email, pin }
+            ? { mode, firstName, lastName, phone: `998${phone}`, email, pin, via: brand }
             : { mode, phone: `998${phone}`, pin }
         ),
       });
@@ -269,12 +285,16 @@ export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClos
         <form onSubmit={submit} className="px-5 sm:px-6 pt-5 pb-6 space-y-4" noValidate>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="w-11 h-11 rounded-2xl bg-[#1E1418] flex items-center justify-center shadow-md">
-                  <AppleIcon className="w-5 h-5 fill-white shrink-0" />
+                <span
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-md ${
+                    isGoogle ? 'bg-white border border-black/10' : 'bg-[#1E1418]'
+                  }`}
+                >
+                  {isGoogle ? <GoogleIcon className="w-5 h-5 shrink-0" /> : <AppleIcon className="w-5 h-5 fill-white shrink-0" />}
                 </span>
                 <div>
-                  <h2 className="font-bold text-lg text-[#1E1418] leading-tight">{l.title}</h2>
-                  <p className="text-xs text-[#7A6A63] leading-snug">{l.subtitle}</p>
+                  <h2 className="font-bold text-lg text-[#1E1418] leading-tight">{isGoogle ? l.gTitle : l.title}</h2>
+                  <p className="text-xs text-[#7A6A63] leading-snug">{isGoogle ? l.gSubtitle : l.subtitle}</p>
                 </div>
               </div>
               <button
@@ -409,9 +429,43 @@ export const AppleAccessModal: React.FC<AppleAccessModalProps> = ({ open, onClos
               disabled={busy}
               className="w-full min-h-[52px] rounded-2xl bg-[#1E1418] hover:bg-black text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition-transform"
             >
-              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <AppleIcon className="w-4 h-4 fill-white shrink-0" />}
+              {busy ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isGoogle ? (
+                <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                  <GoogleIcon className="w-4 h-4 shrink-0" />
+                </span>
+              ) : (
+                <AppleIcon className="w-4 h-4 fill-white shrink-0" />
+              )}
               {mode === 'register' ? l.register : l.login}
             </button>
+
+            {isGoogle && (
+              <div className="pt-1 text-center text-xs text-[#7A6A63]">
+                {l.legacyQ}{' '}
+                <button
+                  type="button"
+                  disabled={busy || legacyBusy}
+                  onClick={async () => {
+                    setError('');
+                    setLegacyBusy(true);
+                    const res = await loginWithGoogle();
+                    setLegacyBusy(false);
+                    if (res.success) {
+                      onSuccess?.();
+                      onClose();
+                    } else if (res.message) {
+                      fail(res.message);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 font-semibold text-[#1E1418] underline underline-offset-2 disabled:opacity-50"
+                >
+                  {legacyBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {l.legacyBtn}
+                </button>
+              </div>
+            )}
         </form>
       </div>
     </div>,

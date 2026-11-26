@@ -134,7 +134,7 @@ const AUDIT_LABEL: Record<string, string> = {
   'message.delete': 'Xabar o‘chirildi',
   'settings.update': 'Sozlamalar o‘zgardi',
   'template.update': 'Shablon o‘zgardi',
-  'phone.register': 'Yangi foydalanuvchi (Apple / telefon)',
+  'phone.register': 'Yangi foydalanuvchi (telefon + PIN)',
   'user.resetPin': 'PIN tiklandi',
 };
 
@@ -907,7 +907,7 @@ export const AdminPanel: React.FC = () => {
                               : 'bg-[#E8F3FA] text-[#1E3A5F] border-[#B9DFFA]'
                           }`}
                         >
-                          {u.authProvider === 'phone' ? 'Apple · telefon + PIN' : u.authProvider === 'apple' ? 'Apple ID' : 'Google'}
+                          {u.authProvider === 'phone' ? `${(u as any).signupVia === 'google' ? 'Google' : 'Apple'} · telefon + PIN` : u.authProvider === 'apple' ? 'Apple ID' : 'Google hisobi'}
                         </span>
                       </div>
                       <div className="text-xs text-[#7A6A63] break-all">
