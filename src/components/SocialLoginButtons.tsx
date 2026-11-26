@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../locales';
 import { GlassButton } from './glass';
 import { AppleAccessModal } from './AppleAccessModal';
@@ -50,72 +48,46 @@ export const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
   onBeforeSignIn,
   compact = false,
 }) => {
-  const { loginWithGoogle } = useAuth();
-  const [appleOpen, setAppleOpen] = useState(false);
   const { t } = useLanguage();
-  const [submitting, setSubmitting] = useState<'google' | null>(null);
-  const [error, setError] = useState<string>('');
+  // Both buttons open the same phone + 4-digit PIN sign-in (styled for the chosen brand).
+  const [sheet, setSheet] = useState<'google' | 'apple' | null>(null);
 
-  const run = async () => {
-    if (submitting) return;
-    setError('');
-    setSubmitting('google');
+  const open = (brand: 'google' | 'apple') => {
     onBeforeSignIn?.();
-    try {
-      const res = await loginWithGoogle();
-      if (res.success) {
-        onSuccess?.();
-      } else if (res.message) {
-        setError(res.message);
-      }
-    } finally {
-      setSubmitting(null);
-    }
+    setSheet(brand);
   };
 
   return (
     <div className="space-y-3 min-w-0">
-      {error && (
-        <div
-          role="alert"
-          className="text-xs text-rose-800 font-semibold flex items-start gap-2 bg-rose-50/95 p-3 rounded-xl border border-rose-200"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
-
       <div className={compact ? 'grid grid-cols-1 gap-2' : 'space-y-3'}>
         <GlassButton
           type="button"
           tone="light"
           size={compact ? 'sm' : 'lg'}
-          disabled={Boolean(submitting)}
-          loading={submitting === 'google'}
-          onClick={() => run()}
-          leftIcon={submitting === 'google' ? undefined : <GoogleIcon className={compact ? 'w-4 h-4 shrink-0' : 'w-5 h-5 shrink-0'} />}
+          onClick={() => open('google')}
+          leftIcon={<GoogleIcon className={compact ? 'w-4 h-4 shrink-0' : 'w-5 h-5 shrink-0'} />}
           className="w-full justify-center"
         >
-          {submitting === 'google' ? t.auth.connecting : t.auth.googleLoginBtn}
+          {t.auth.googleLoginBtn}
         </GlassButton>
 
         <button
           type="button"
-          disabled={Boolean(submitting)}
-          onClick={() => {
-            setError('');
-            onBeforeSignIn?.();
-            setAppleOpen(true);
-          }}
+          onClick={() => open('apple')}
           className={`w-full ${
             compact ? 'min-h-[40px] py-2 px-3.5 text-xs font-bold' : 'min-h-[48px] py-3 px-4 text-sm font-semibold'
-          } rounded-full bg-[#1E1418] hover:bg-black text-white shadow-md hover:shadow-lg transition-colors flex items-center justify-center gap-2.5 disabled:opacity-60 border border-white/15 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E1418]`}
+          } rounded-full bg-[#1E1418] hover:bg-black text-white shadow-md hover:shadow-lg transition-colors flex items-center justify-center gap-2.5 border border-white/15 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E1418]`}
         >
           <AppleIcon className="w-4 h-4 fill-white shrink-0" />
           <span>{t.auth.appleLoginBtn}</span>
         </button>
       </div>
-      <AppleAccessModal open={appleOpen} onClose={() => setAppleOpen(false)} onSuccess={onSuccess} />
+      <AppleAccessModal
+        open={sheet !== null}
+        brand={sheet || 'apple'}
+        onClose={() => setSheet(null)}
+        onSuccess={onSuccess}
+      />
     </div>
   );
 };

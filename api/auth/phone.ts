@@ -88,6 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const uid = phoneUid(phone);
     const name = `${firstName} ${lastName}`;
+    const via: 'google' | 'apple' = body.via === 'google' ? 'google' : 'apple';
     const record = {
       uid,
       firstName,
@@ -98,6 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       createdAt: nowIso,
       lastLoginAt: nowIso,
       createdIp: ip,
+      via,
     };
 
     // Atomic: only one registration per phone number.
@@ -119,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       phoneVerified: false,
       ...(email ? { email } : {}),
       authProvider: 'phone',
+      signupVia: via,
       createdAt: nowIso,
       lastLoginAt: nowIso,
     });
@@ -134,13 +137,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await Promise.all([
       notifyAdmin(
-        `🍏 <b>Yangi foydalanuvchi</b> (Apple orqali)\n` +
+        `${via === 'google' ? '🟢' : '🍏'} <b>Yangi foydalanuvchi</b> (${via === 'google' ? 'Google' : 'Apple'} orqali)\n` +
           `👤 ${esc(name)}\n` +
           `📞 ${formatUzPhone(phone)}\n` +
           (email ? `✉️ ${esc(email)}\n` : '') +
           `🕒 ${new Date(now).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`
       ),
-      writeAdminAudit({ type: 'phone.register', target: `+${phone}`, detail: name, ip }),
+      writeAdminAudit({ type: 'phone.register', target: `+${phone}`, detail: `${name} · ${via === 'google' ? 'Google' : 'Apple'}`, ip }),
     ]);
     return res.json({ ok: true, token, name, isNew: true });
   }
