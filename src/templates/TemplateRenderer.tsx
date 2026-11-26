@@ -1,6 +1,7 @@
 import React from 'react';
 import { InvitationData, Language, GuestRSVP } from '../types';
 import { mockTemplates } from '../data/mockTemplates';
+import { Template3DScene } from './three-d/Template3D';
 import { TemplateRenderProps } from './types';
 import { resolveTemplate } from '../utils/templateResolver';
 import { reportTemplateResolutionError } from '../utils/templateAlert';
@@ -131,6 +132,14 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
 
   return (
     <div className="taklifim-template-root" style={{ fontStyle: undefined }}>
+      <Template3DScene
+        templateSlug={templateDef.slug}
+        hostNames={localizedInvitation.hostNames}
+        eventDate={localizedInvitation.eventDate}
+        headingFont={headingFont}
+        background={bgColor}
+        isPreview={isPreview}
+      >
       <Component
         invitation={localizedInvitation}
         template={templateDef}
@@ -149,6 +158,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({
         interactiveMap={interactiveMap}
         musicPlayer={musicPlayer}
       />
+      </Template3DScene>
       {preferItalicHeading && (
         <style>{`.taklifim-tpl-fit-title { font-style: italic; }`}</style>
       )}
