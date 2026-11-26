@@ -838,6 +838,10 @@ export const uz = {
     toastAppleSuccess: 'Apple orqali muvaffaqiyatli kirdingiz!',
     toastLoggedOut: 'Tizimdan muvaffaqiyatli chiqildi',
     errors: {
+      storageBlocked: 'Brauzeringiz kirish uchun kerakli cookie/ma’lumotlarni bloklayapti (inkognito rejim yoki qat’iy himoya). Oddiy oynada oching yoki «Apple orqali kirish»dan foydalaning.',
+      firebaseBlocked: 'Internet tarmog‘ingiz (provayder, Wi‑Fi filtri, VPN yoki antivirus) Google/Firebase serverlarini bloklayapti. Mobil internet yoki boshqa Wi‑Fi orqali qayta urinib ko‘ring.',
+      popupClosedHint: 'Kirish oynasi yopildi. Agar oynada xatolik ko‘rgan bo‘lsangiz, sahifani yangilab qayta urinib ko‘ring yoki «Apple orqali kirish»dan foydalaning.',
+      redirecting: 'Google sahifasiga yo‘naltirilmoqda…',
       userDisabled: 'Ushbu hisob bloklangan.',
       tooManyRequests: 'Juda ko‘p urinishlar. Birozdan so‘ng qayta urinib ko‘ring.',
       invalidPhone: 'Telefon raqami formati noto‘g‘ri. (+998 90 123 45 67 kabi kiriting)',
